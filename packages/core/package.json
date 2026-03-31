@@ -17,6 +17,9 @@
     "dist"
   ],
   "type": "module",
+  "imports": {
+    "#litmus/*": "./src/*"
+  },
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
@@ -33,6 +36,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "@typescript/native-preview": "7.0.0-dev.20260328.1",
     "vite-plus": "catalog:"
   }
 }
