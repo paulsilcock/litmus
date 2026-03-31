@@ -59,14 +59,6 @@ Vite+ automatically detects and wraps the underlying package manager such as pnp
 
 These commands map to their corresponding tools. For example, `vp dev --port 3000` runs Vite's dev server and works the same as Vite. `vp test` runs JavaScript tests through the bundled Vitest. The version of all tools can be checked using `vp --version`. This is useful when researching documentation, features, and bugs.
 
-## Installing the `vp` CLI (alpha)
-
-To install a specific alpha version of the `vp` CLI globally, use `VITE_PLUS_VERSION` (not `VP_VERSION` as incorrectly documented in Vite+ GitHub releases):
-
-```bash
-curl -fsSL https://vite.plus | VITE_PLUS_VERSION=0.1.15-alpha.7 bash
-```
-
 ## Common Pitfalls
 
 - **Using the package manager directly:** Do not use pnpm, npm, or Yarn directly. Vite+ can handle all package manager operations.

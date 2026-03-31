@@ -17,6 +17,9 @@
     "dist"
   ],
   "type": "module",
+  "imports": {
+    "#litmus/*": "./src/*"
+  },
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
