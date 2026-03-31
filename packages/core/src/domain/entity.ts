@@ -1,5 +1,11 @@
+import { ulid } from "ulidx";
+
 export abstract class Entity {
-  constructor(public readonly id: string) {}
+  public readonly id: string;
+
+  constructor(id?: string) {
+    this.id = id ?? ulid();
+  }
 
   equals(other: Entity): boolean {
     return this.id === other.id;
