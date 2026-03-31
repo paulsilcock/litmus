@@ -1,10 +1,38 @@
 {
   "name": "@litmus/core",
-  "version": "0.0.1",
+  "version": "0.0.0",
+  "description": "Domain primitives and base classes for the Litmus framework.",
+  "homepage": "https://github.com/paulsilcock/litmus#readme",
+  "bugs": {
+    "url": "https://github.com/paulsilcock/litmus/issues"
+  },
+  "license": "MIT",
+  "author": "Paul Silcock",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulsilcock/litmus.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
-  "dependencies": {
-    "ulidx": "^2.4.1"
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "vite-plus": "catalog:"
   }
 }

@@ -1,1 +1,3 @@
-export * from "./domain/index.js";
+export function fn() {
+  return "Hello, tsdown!";
+}
