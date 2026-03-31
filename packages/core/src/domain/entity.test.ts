@@ -13,4 +13,11 @@ describe("Entity", () => {
 
     expect(entity1.equals(entity2)).toBe(true);
   });
+
+  it("two entities with different IDs are not equal", () => {
+    const entity1 = new TestEntity("abc", "Alice");
+    const entity2 = new TestEntity("def", "Alice");
+
+    expect(entity1.equals(entity2)).toBe(false);
+  });
 });
