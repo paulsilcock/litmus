@@ -1,0 +1,9 @@
+{
+  "name": "litmus",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vite-plus": "^0.1.14"
+  }
+}
