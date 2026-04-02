@@ -4,7 +4,10 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
+  fmt: {
+    printWidth: 80,
+    sortImports: true,
+  },
   lint: {
     options: {
       typeAware: true,

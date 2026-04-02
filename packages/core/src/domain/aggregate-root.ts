@@ -30,10 +30,6 @@ export abstract class AggregateRoot<
     return this.#data;
   }
 
-  protected updateData(updater: (current: TData) => TData): void {
-    this.#data = updater(this.#data);
-  }
-
   /** @internal Called by repository after successful save. */
   _incrementVersion(): void {
     this.#data = { ...this.#data, version: this.#data.version! + 1 };

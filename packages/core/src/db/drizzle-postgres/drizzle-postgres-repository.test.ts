@@ -1,10 +1,21 @@
-import { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/drizzle-postgres-repository.ts";
-import { type AggregateData, AggregateRoot } from "#litmus/domain/aggregate-root.ts";
 import { PGlite } from "@electric-sql/pglite";
+import { pushSchema } from "drizzle-kit/api";
 import { eq } from "drizzle-orm";
-import { integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import {
+  integer,
+  jsonb,
+  pgTable,
+  timestamp,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { type PgliteDatabase, drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
+
+import { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/drizzle-postgres-repository.ts";
+import {
+  type AggregateData,
+  AggregateRoot,
+} from "#litmus/domain/aggregate-root.ts";
 
 // --- Test schema ---
 
@@ -12,8 +23,12 @@ const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
   data: jsonb("data").notNull().$type<{ status: string }>(),
   version: integer("version").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 const schema = { orders };
@@ -31,29 +46,45 @@ class Order extends AggregateRoot<OrderData> {
   }
 
   ship() {
-    this.updateData((d) => ({ ...d, status: "shipped" }));
+    this.data.status = "shipped";
   }
 
   cancel() {
-    this.updateData((d) => ({ ...d, status: "cancelled" }));
+    this.data.status = "cancelled";
   }
 }
 
 // --- Test repository ---
 
-class OrderRepository extends DrizzlePostgresRepository<Order, typeof schema, typeof orders> {
+class OrderRepository extends DrizzlePostgresRepository<
+  Order,
+  typeof schema,
+  typeof orders
+> {
   constructor(db: Db) {
     super(db, orders);
   }
 
   protected toPersistence(order: Order) {
-    return { data: { status: order.status } };
+    return {
+      data: {
+        status: order.status,
+      },
+    };
   }
 
   async findById(id: string): Promise<Order | null> {
-    const rows = await this.db.select().from(orders).where(eq(orders.id, id)).limit(1);
+    const rows = await this.db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, id))
+      .limit(1);
     if (!rows[0]) return null;
-    return new Order({ id: rows[0].id, status: rows[0].data.status, version: rows[0].version });
+    return new Order({
+      id: rows[0].id,
+      status: rows[0].data.status,
+      version: rows[0].version,
+    });
   }
 }
 
@@ -67,7 +98,7 @@ describe("DrizzlePostgresRepository", () => {
     const client = new PGlite();
 
     const rawDb = drizzle(client);
-    const { apply } = await (await import("drizzle-kit/api")).pushSchema(schema, rawDb);
+    const { apply } = await pushSchema(schema, rawDb);
     await apply();
 
     db = drizzle(client, { schema });
@@ -97,6 +128,8 @@ describe("DrizzlePostgresRepository", () => {
 
     const rows = await db.select().from(orders).where(eq(orders.id, "order-1"));
     expect(rows[0]!.data.status).toBe("shipped");
+    expect(rows[0]!.version).toBe(1);
+    expect(found!.version).toBe(1);
   });
 
   it("rejects stale updates", async () => {
