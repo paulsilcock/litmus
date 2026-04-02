@@ -2,10 +2,9 @@ export class ConcurrencyError extends Error {
   constructor(
     readonly aggregateId: string,
     readonly expectedVersion: number,
-    readonly actualVersion: number,
   ) {
     super(
-      `ConcurrencyError: aggregate ${aggregateId} expected version ${expectedVersion} but found ${actualVersion}`,
+      `ConcurrencyError: aggregate ${aggregateId} has been modified since version ${expectedVersion}`,
     );
     this.name = "ConcurrencyError";
   }

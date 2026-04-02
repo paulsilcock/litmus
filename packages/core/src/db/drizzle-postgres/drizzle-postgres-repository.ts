@@ -1,14 +1,9 @@
 import { ConcurrencyError } from "#litmus/db/concurrency-error.ts";
 import type { Repository } from "#litmus/db/repository.ts";
 import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
-import { and, eq } from "drizzle-orm";
 import type { ColumnBaseConfig } from "drizzle-orm";
-import {
-  type PgColumn,
-  PgDatabase,
-  type PgQueryResultHKT,
-  type PgTable,
-} from "drizzle-orm/pg-core";
+import { and, eq } from "drizzle-orm";
+import type { PgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 
 type HasAggregateColumns = PgTable & {
   id: PgColumn<any>;
@@ -18,12 +13,13 @@ type HasAggregateColumns = PgTable & {
 };
 
 export abstract class DrizzlePostgresRepository<
-  TAggregate extends AggregateRoot,
+  TAggregate extends AggregateRoot<any>,
+  TSchema extends Record<string, unknown> = Record<string, unknown>,
   TTable extends HasAggregateColumns = HasAggregateColumns,
 > implements Repository<TAggregate> {
   constructor(
-    protected readonly db: PgDatabase<PgQueryResultHKT, any>,
-    protected readonly table: TTable,
+    protected readonly db: PgDatabase<PgQueryResultHKT, TSchema>,
+    private readonly table: TTable,
   ) {}
 
   protected abstract toPersistence(
@@ -31,36 +27,30 @@ export abstract class DrizzlePostgresRepository<
   ): Omit<TTable["$inferInsert"], "id" | "version" | "createdAt" | "updatedAt">;
 
   async add(aggregate: TAggregate): Promise<void> {
-    const data = this.toPersistence(aggregate);
-    await (this.db as any).insert(this.table).values({
-      ...data,
+    const data: TTable["$inferInsert"] = {
+      ...this.toPersistence(aggregate),
       id: aggregate.id,
       version: 0,
-    });
+    };
+
+    await this.db.insert(this.table).values(data);
   }
 
   async update(aggregate: TAggregate): Promise<void> {
-    const data = this.toPersistence(aggregate);
-    const updated = await (this.db as any)
+    const data: TTable["$inferInsert"] = {
+      ...this.toPersistence(aggregate),
+      version: aggregate.version + 1,
+      updatedAt: new Date(),
+    };
+
+    const updated = await this.db
       .update(this.table)
-      .set({
-        ...data,
-        version: aggregate.version + 1,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(eq(this.table.id, aggregate.id as string), eq(this.table.version, aggregate.version)),
-      )
+      .set(data)
+      .where(and(eq(this.table.id, aggregate.id), eq(this.table.version, aggregate.version)))
       .returning({ id: this.table.id });
 
     if (updated.length === 0) {
-      const rows = await (this.db as any)
-        .select({ version: this.table.version })
-        .from(this.table)
-        .where(eq(this.table.id, aggregate.id as string))
-        .limit(1);
-
-      throw new ConcurrencyError(aggregate.id as string, aggregate.version, rows[0]?.version ?? -1);
+      throw new ConcurrencyError(aggregate.id, aggregate.version);
     }
 
     aggregate._incrementVersion();

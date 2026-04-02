@@ -1,9 +1,8 @@
 import { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/drizzle-postgres-repository.ts";
-import { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
+import { type AggregateData, AggregateRoot } from "#litmus/domain/aggregate-root.ts";
 import { PGlite } from "@electric-sql/pglite";
-import { pushSchema } from "drizzle-kit/api";
 import { eq } from "drizzle-orm";
-import { PgDatabase, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { type PgliteDatabase, drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
@@ -22,18 +21,27 @@ type Db = PgliteDatabase<typeof schema>;
 
 // --- Test aggregate ---
 
-class Order extends AggregateRoot {
-  constructor(
-    id: string,
-    public status: string,
-  ) {
-    super(id);
+interface OrderData extends AggregateData {
+  status: string;
+}
+
+class Order extends AggregateRoot<OrderData> {
+  get status() {
+    return this.data.status;
+  }
+
+  ship() {
+    this.updateData((d) => ({ ...d, status: "shipped" }));
+  }
+
+  cancel() {
+    this.updateData((d) => ({ ...d, status: "cancelled" }));
   }
 }
 
 // --- Test repository ---
 
-class OrderRepository extends DrizzlePostgresRepository<Order> {
+class OrderRepository extends DrizzlePostgresRepository<Order, typeof schema, typeof orders> {
   constructor(db: Db) {
     super(db, orders);
   }
@@ -45,9 +53,7 @@ class OrderRepository extends DrizzlePostgresRepository<Order> {
   async findById(id: string): Promise<Order | null> {
     const rows = await this.db.select().from(orders).where(eq(orders.id, id)).limit(1);
     if (!rows[0]) return null;
-    const order = new Order(rows[0].id, rows[0].data.status);
-    order._setVersion(rows[0].version);
-    return order;
+    return new Order({ id: rows[0].id, status: rows[0].data.status, version: rows[0].version });
   }
 }
 
@@ -60,15 +66,16 @@ describe("DrizzlePostgresRepository", () => {
   beforeEach(async () => {
     const client = new PGlite();
 
-    db = drizzle(client, { schema });
-    const { apply } = await pushSchema(schema, db as PgDatabase<any, any>);
+    const rawDb = drizzle(client);
+    const { apply } = await (await import("drizzle-kit/api")).pushSchema(schema, rawDb);
     await apply();
 
+    db = drizzle(client, { schema });
     repo = new OrderRepository(db);
   });
 
   it("can persist new aggregates", async () => {
-    const order = new Order("order-1", "placed");
+    const order = new Order({ id: "order-1", status: "placed" });
 
     await repo.add(order);
 
@@ -81,11 +88,11 @@ describe("DrizzlePostgresRepository", () => {
   });
 
   it("can update existing aggregates", async () => {
-    const order = new Order("order-1", "placed");
+    const order = new Order({ id: "order-1", status: "placed" });
     await repo.add(order);
 
     const found = await repo.findById("order-1");
-    found!.status = "shipped";
+    found!.ship();
     await repo.update(found!);
 
     const rows = await db.select().from(orders).where(eq(orders.id, "order-1"));
@@ -93,19 +100,16 @@ describe("DrizzlePostgresRepository", () => {
   });
 
   it("rejects stale updates", async () => {
-    const order = new Order("order-1", "placed");
+    const order = new Order({ id: "order-1", status: "placed" });
     await repo.add(order);
 
-    // Simulate two concurrent reads
     const reader1 = await repo.findById("order-1");
     const reader2 = await repo.findById("order-1");
 
-    // First update succeeds
-    reader1!.status = "shipped";
+    reader1!.ship();
     await repo.update(reader1!);
 
-    // Second update should fail — it has a stale version
-    reader2!.status = "cancelled";
+    reader2!.cancel();
     await expect(repo.update(reader2!)).rejects.toThrow("ConcurrencyError");
   });
 });

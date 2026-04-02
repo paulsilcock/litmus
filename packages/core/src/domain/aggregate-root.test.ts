@@ -1,10 +1,18 @@
-import { describe, expect, it } from "vite-plus/test";
-import { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
+import { type AggregateData, AggregateRoot } from "#litmus/domain/aggregate-root.ts";
 import { DomainEvent } from "#litmus/domain/domain-event.ts";
+import { describe, expect, it } from "vite-plus/test";
 
 class OrderPlaced extends DomainEvent {}
 
-class Order extends AggregateRoot {
+interface OrderData extends AggregateData {
+  status: string;
+}
+
+class Order extends AggregateRoot<OrderData> {
+  get status() {
+    return this.data.status;
+  }
+
   place() {
     this.addDomainEvent(new OrderPlaced());
   }
@@ -12,7 +20,7 @@ class Order extends AggregateRoot {
 
 describe("AggregateRoot", () => {
   it("records domain events", () => {
-    const order = new Order("order-1");
+    const order = new Order({ id: "order-1", status: "draft" });
     order.place();
 
     expect(order.domainEvents).toHaveLength(1);
@@ -20,7 +28,7 @@ describe("AggregateRoot", () => {
   });
 
   it("clearing returns and removes recorded events", () => {
-    const order = new Order("order-1");
+    const order = new Order({ id: "order-1", status: "draft" });
     order.place();
     order.place();
 

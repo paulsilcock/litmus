@@ -1,35 +1,51 @@
 import type { DomainEvent } from "#litmus/domain/domain-event.ts";
 import { Entity } from "#litmus/domain/entity.ts";
 
-export abstract class AggregateRoot<TId = string> extends Entity<TId> {
-  private _domainEvents: DomainEvent[] = [];
-  private _version: number = 0;
+export type AggregateData<TId = string> = {
+  id: TId;
+  version?: number;
+};
 
-  get domainEvents(): readonly DomainEvent[] {
-    return this._domainEvents;
+export abstract class AggregateRoot<
+  TData extends AggregateData<TId>,
+  TId = string,
+> extends Entity<TId> {
+  #data: TData;
+  #domainEvents: DomainEvent[] = [];
+
+  constructor(data: TData) {
+    super(data.id);
+    this.#data = { ...data, version: data.version ?? 0 };
   }
 
   get version(): number {
-    return this._version;
+    return this.#data.version!;
   }
 
-  /** @internal Called by repository after loading from persistence. */
-  _setVersion(version: number): void {
-    this._version = version;
+  get domainEvents(): readonly DomainEvent[] {
+    return this.#domainEvents;
+  }
+
+  protected get data(): TData {
+    return this.#data;
+  }
+
+  protected updateData(updater: (current: TData) => TData): void {
+    this.#data = updater(this.#data);
   }
 
   /** @internal Called by repository after successful save. */
   _incrementVersion(): void {
-    this._version++;
+    this.#data = { ...this.#data, version: this.#data.version! + 1 };
   }
 
   protected addDomainEvent(event: DomainEvent): void {
-    this._domainEvents.push(event);
+    this.#domainEvents.push(event);
   }
 
   clearDomainEvents(): DomainEvent[] {
-    const events = [...this._domainEvents];
-    this._domainEvents = [];
+    const events = [...this.#domainEvents];
+    this.#domainEvents = [];
     return events;
   }
 }
