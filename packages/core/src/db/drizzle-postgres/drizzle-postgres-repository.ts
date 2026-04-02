@@ -1,9 +1,15 @@
+import type { ColumnBaseConfig } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type {
+  PgColumn,
+  PgDatabase,
+  PgQueryResultHKT,
+  PgTable,
+} from "drizzle-orm/pg-core";
+
 import { ConcurrencyError } from "#litmus/db/concurrency-error.ts";
 import type { Repository } from "#litmus/db/repository.ts";
 import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
-import type { ColumnBaseConfig } from "drizzle-orm";
-import { and, eq } from "drizzle-orm";
-import type { PgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 
 type HasAggregateColumns = PgTable & {
   id: PgColumn<any>;
@@ -46,7 +52,12 @@ export abstract class DrizzlePostgresRepository<
     const updated = await this.db
       .update(this.table)
       .set(data)
-      .where(and(eq(this.table.id, aggregate.id), eq(this.table.version, aggregate.version)))
+      .where(
+        and(
+          eq(this.table.id, aggregate.id),
+          eq(this.table.version, aggregate.version),
+        ),
+      )
       .returning({ id: this.table.id });
 
     if (updated.length === 0) {

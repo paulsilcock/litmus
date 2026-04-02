@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+
 import { ValueObject } from "#litmus/domain/value-object.ts";
 
 class Money extends ValueObject {

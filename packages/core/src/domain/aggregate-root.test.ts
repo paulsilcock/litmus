@@ -1,6 +1,10 @@
-import { type AggregateData, AggregateRoot } from "#litmus/domain/aggregate-root.ts";
-import { DomainEvent } from "#litmus/domain/domain-event.ts";
 import { describe, expect, it } from "vite-plus/test";
+
+import {
+  type AggregateData,
+  AggregateRoot,
+} from "#litmus/domain/aggregate-root.ts";
+import { DomainEvent } from "#litmus/domain/domain-event.ts";
 
 class OrderPlaced extends DomainEvent {}
 
