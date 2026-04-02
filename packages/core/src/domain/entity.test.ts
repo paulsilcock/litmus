@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+
 import { Entity } from "#litmus/domain/entity.ts";
 
 class Order extends Entity {
