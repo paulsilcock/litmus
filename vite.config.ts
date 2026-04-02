@@ -10,6 +10,9 @@ export default defineConfig({
       typeAware: true,
       typeCheck: true,
     },
+    rules: {
+      "no-unsafe-type-assertion": "error",
+    },
   },
   run: {
     cache: true,
