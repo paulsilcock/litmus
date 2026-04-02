@@ -10,15 +10,13 @@ Monorepo powered by [Vite+](https://viteplus.dev) (`vp`) as the unified toolchai
 - [Bun](https://bun.sh/) >= 1.3.11
 - [Vite+](https://viteplus.dev/guide/) (`vp`) CLI installed globally
 
-### Installing Vite+ (alpha)
+### Installing Vite+
 
 ```bash
-curl -fsSL https://vite.plus | VITE_PLUS_VERSION=0.1.15-alpha.7 bash
+curl -fsSL https://vite.plus | bash
 ```
 
-> **Note:** The Vite+ GitHub releases page incorrectly documents the env var as `VP_VERSION`. The install script actually reads `VITE_PLUS_VERSION`. Without the correct env var, the script silently installs the latest stable release instead.
-
-Verify the correct version is installed:
+Verify the installation:
 
 ```bash
 vp -V
