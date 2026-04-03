@@ -8,6 +8,7 @@ import type {
 } from "drizzle-orm/pg-core";
 
 import { ConcurrencyError } from "#litmus/db/concurrency-error.ts";
+import { DrizzleTransaction } from "#litmus/db/drizzle-postgres/transaction.ts";
 import type { Repository } from "#litmus/db/repository.ts";
 import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
 
@@ -28,6 +29,10 @@ export abstract class DrizzlePostgresRepository<
     private readonly table: TTable,
   ) {}
 
+  private get connection() {
+    return DrizzleTransaction.active() ?? this.db;
+  }
+
   protected abstract toPersistence(
     aggregate: TAggregate,
   ): Omit<TTable["$inferInsert"], "id" | "version" | "createdAt" | "updatedAt">;
@@ -39,7 +44,7 @@ export abstract class DrizzlePostgresRepository<
       version: 0,
     };
 
-    await this.db.insert(this.table).values(data);
+    await this.connection.insert(this.table).values(data);
   }
 
   async update(aggregate: TAggregate): Promise<void> {
@@ -49,7 +54,7 @@ export abstract class DrizzlePostgresRepository<
       updatedAt: new Date(),
     };
 
-    const updated = await this.db
+    const updated = await this.connection
       .update(this.table)
       .set(data)
       .where(
