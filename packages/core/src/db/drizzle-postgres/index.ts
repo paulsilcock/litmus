@@ -1,1 +1,1 @@
-export { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/drizzle-postgres-repository.ts";
+export { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/repository.ts";
