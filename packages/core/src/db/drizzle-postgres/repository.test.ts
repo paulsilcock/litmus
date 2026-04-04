@@ -8,11 +8,11 @@ import {
   timestamp,
   varchar,
 } from "drizzle-orm/pg-core";
-import { type PgliteDatabase, drizzle } from "drizzle-orm/pglite";
+import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
+import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
 import { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/repository.ts";
-import { DrizzleTransaction } from "#litmus/db/drizzle-postgres/transaction.ts";
 import {
   type AggregateData,
   AggregateRoot,
@@ -45,9 +45,8 @@ const customers = pgTable("customers", {
 });
 
 const schema = { orders, customers };
-type Db = PgliteDatabase<typeof schema>;
 
-// --- Test aggregate ---
+// --- Test aggregates ---
 
 interface OrderData extends AggregateData {
   status: string;
@@ -81,11 +80,10 @@ class Customer extends AggregateRoot<CustomerData> {
 
 class CustomerRepository extends DrizzlePostgresRepository<
   Customer,
-  typeof schema,
   typeof customers
 > {
-  constructor(db: Db) {
-    super(db, customers);
+  constructor(ctx: DrizzleDbContext) {
+    super(ctx, customers);
   }
 
   protected toPersistence(customer: Customer) {
@@ -95,20 +93,14 @@ class CustomerRepository extends DrizzlePostgresRepository<
   }
 }
 
-class OrderRepository extends DrizzlePostgresRepository<
-  Order,
-  typeof schema,
-  typeof orders
-> {
-  constructor(db: Db) {
-    super(db, orders);
+class OrderRepository extends DrizzlePostgresRepository<Order, typeof orders> {
+  constructor(ctx: DrizzleDbContext) {
+    super(ctx, orders);
   }
 
   protected toPersistence(order: Order) {
     return {
-      data: {
-        status: order.status,
-      },
+      data: { status: order.status },
     };
   }
 
@@ -130,10 +122,9 @@ class OrderRepository extends DrizzlePostgresRepository<
 // --- Tests ---
 
 describe("DrizzlePostgresRepository", () => {
-  let db: Db;
-  let orederRepo: OrderRepository;
+  let ctx: DrizzleDbContext;
+  let orderRepo: OrderRepository;
   let customerRepo: CustomerRepository;
-  let tx: DrizzleTransaction;
 
   beforeEach(async () => {
     const client = new PGlite();
@@ -142,18 +133,21 @@ describe("DrizzlePostgresRepository", () => {
     const { apply } = await pushSchema(schema, rawDb);
     await apply();
 
-    db = drizzle(client, { schema });
-    orederRepo = new OrderRepository(db);
-    customerRepo = new CustomerRepository(db);
-    tx = new DrizzleTransaction(db);
+    const db = drizzle(client, { schema });
+    ctx = new DrizzleDbContext(db);
+    orderRepo = new OrderRepository(ctx);
+    customerRepo = new CustomerRepository(ctx);
   });
 
   it("can persist new aggregates", async () => {
     const order = new Order({ id: "order-1", status: "placed" });
 
-    await orederRepo.add(order);
+    await orderRepo.add(order);
 
-    const rows = await db.select().from(orders).where(eq(orders.id, "order-1"));
+    const rows = await ctx.db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, "order-1"));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.data.status).toBe("placed");
     expect(rows[0]!.version).toBe(0);
@@ -163,13 +157,16 @@ describe("DrizzlePostgresRepository", () => {
 
   it("can update existing aggregates", async () => {
     const order = new Order({ id: "order-1", status: "placed" });
-    await orederRepo.add(order);
+    await orderRepo.add(order);
 
-    const found = await orederRepo.findById("order-1");
+    const found = await orderRepo.findById("order-1");
     found!.ship();
-    await orederRepo.update(found!);
+    await orderRepo.update(found!);
 
-    const rows = await db.select().from(orders).where(eq(orders.id, "order-1"));
+    const rows = await ctx.db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, "order-1"));
     expect(rows[0]!.data.status).toBe("shipped");
     expect(rows[0]!.version).toBe(1);
     expect(found!.version).toBe(1);
@@ -177,18 +174,21 @@ describe("DrizzlePostgresRepository", () => {
 
   it("all modifications within a transaction are persisted", async () => {
     const order = new Order({ id: "order-1", status: "placed" });
-    const customer = new Customer({ id: "customer-1", name: "Alice" });
+    const customer = new Customer({
+      id: "customer-1",
+      name: "Alice",
+    });
 
-    await tx.execute(async () => {
-      await orederRepo.add(order);
+    await ctx.transaction(async () => {
+      await orderRepo.add(order);
       await customerRepo.add(customer);
     });
 
-    const orderRows = await db
+    const orderRows = await ctx.db
       .select()
       .from(orders)
       .where(eq(orders.id, "order-1"));
-    const customerRows = await db
+    const customerRows = await ctx.db
       .select()
       .from(customers)
       .where(eq(customers.id, "customer-1"));
@@ -201,28 +201,31 @@ describe("DrizzlePostgresRepository", () => {
     const order = new Order({ id: "order-1", status: "placed" });
 
     await expect(
-      tx.execute(async () => {
-        await orederRepo.add(order);
+      ctx.transaction(async () => {
+        await orderRepo.add(order);
         throw new Error("something went wrong");
       }),
     ).rejects.toThrow("something went wrong");
 
-    const rows = await db.select().from(orders).where(eq(orders.id, "order-1"));
+    const rows = await ctx.db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, "order-1"));
     expect(rows).toHaveLength(0);
   });
 
   it("rejects stale updates", async () => {
     const order = new Order({ id: "order-1", status: "placed" });
-    await orederRepo.add(order);
+    await orderRepo.add(order);
 
-    const reader1 = await orederRepo.findById("order-1");
-    const reader2 = await orederRepo.findById("order-1");
+    const reader1 = await orderRepo.findById("order-1");
+    const reader2 = await orderRepo.findById("order-1");
 
     reader1!.ship();
-    await orederRepo.update(reader1!);
+    await orderRepo.update(reader1!);
 
     reader2!.cancel();
-    await expect(orederRepo.update(reader2!)).rejects.toThrow(
+    await expect(orderRepo.update(reader2!)).rejects.toThrow(
       "ConcurrencyError",
     );
   });

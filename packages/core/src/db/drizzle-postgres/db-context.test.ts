@@ -4,7 +4,7 @@ import { integer, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { DrizzleTransaction } from "#litmus/db/drizzle-postgres/transaction.ts";
+import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
 
 const items = pgTable("items", {
   id: varchar("id").primaryKey(),
@@ -19,9 +19,8 @@ const items = pgTable("items", {
 
 const schema = { items };
 
-describe("DrizzleTransaction", () => {
-  let db: ReturnType<typeof drizzle>;
-  let tx: DrizzleTransaction;
+describe("DrizzleDbContext", () => {
+  let ctx: DrizzleDbContext;
 
   beforeEach(async () => {
     const client = new PGlite();
@@ -30,15 +29,15 @@ describe("DrizzleTransaction", () => {
     const { apply } = await pushSchema(schema, rawDb);
     await apply();
 
-    db = drizzle(client, { schema });
-    tx = new DrizzleTransaction(db);
+    const db = drizzle(client, { schema });
+    ctx = new DrizzleDbContext(db);
   });
 
-  it("nested execute reuses the existing transaction", async () => {
-    const transactionSpy = vi.spyOn(db, "transaction");
+  it("nested transaction reuses the existing transaction", async () => {
+    const transactionSpy = vi.spyOn(ctx.db, "transaction");
 
-    await tx.execute(async () => {
-      await tx.execute(async () => {
+    await ctx.transaction(async () => {
+      await ctx.transaction(async () => {
         // inner work
       });
     });
