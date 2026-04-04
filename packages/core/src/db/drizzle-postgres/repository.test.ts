@@ -1,125 +1,19 @@
 import { PGlite } from "@electric-sql/pglite";
 import { pushSchema } from "drizzle-kit/api";
 import { eq } from "drizzle-orm";
-import {
-  integer,
-  jsonb,
-  pgTable,
-  timestamp,
-  varchar,
-} from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
-import { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/repository.ts";
 import {
-  type AggregateData,
-  AggregateRoot,
-} from "#litmus/domain/aggregate-root.ts";
-
-// --- Test schema ---
-
-const orders = pgTable("orders", {
-  id: varchar("id").primaryKey(),
-  data: jsonb("data").notNull().$type<{ status: string }>(),
-  version: integer("version").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
-const customers = pgTable("customers", {
-  id: varchar("id").primaryKey(),
-  data: jsonb("data").notNull().$type<{ name: string }>(),
-  version: integer("version").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
-const schema = { orders, customers };
-
-// --- Test aggregates ---
-
-interface OrderData extends AggregateData {
-  status: string;
-}
-
-class Order extends AggregateRoot<OrderData> {
-  get status() {
-    return this.data.status;
-  }
-
-  ship() {
-    this.data.status = "shipped";
-  }
-
-  cancel() {
-    this.data.status = "cancelled";
-  }
-}
-
-interface CustomerData extends AggregateData {
-  name: string;
-}
-
-class Customer extends AggregateRoot<CustomerData> {
-  get name() {
-    return this.data.name;
-  }
-}
-
-// --- Test repositories ---
-
-class CustomerRepository extends DrizzlePostgresRepository<
   Customer,
-  typeof customers
-> {
-  constructor(ctx: DrizzleDbContext) {
-    super(ctx, customers);
-  }
-
-  protected toPersistence(customer: Customer) {
-    return {
-      data: { name: customer.name },
-    };
-  }
-}
-
-class OrderRepository extends DrizzlePostgresRepository<Order, typeof orders> {
-  constructor(ctx: DrizzleDbContext) {
-    super(ctx, orders);
-  }
-
-  protected toPersistence(order: Order) {
-    return {
-      data: { status: order.status },
-    };
-  }
-
-  async findById(id: string): Promise<Order | null> {
-    const rows = await this.db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, id))
-      .limit(1);
-    if (!rows[0]) return null;
-    return new Order({
-      id: rows[0].id,
-      status: rows[0].data.status,
-      version: rows[0].version,
-    });
-  }
-}
-
-// --- Tests ---
+  CustomerRepository,
+  Order,
+  OrderRepository,
+  customers,
+  orders,
+  schema,
+} from "#litmus/test-support/fixtures.ts";
 
 describe("DrizzlePostgresRepository", () => {
   let ctx: DrizzleDbContext;
@@ -212,6 +106,29 @@ describe("DrizzlePostgresRepository", () => {
       .from(orders)
       .where(eq(orders.id, "order-1"));
     expect(rows).toHaveLength(0);
+  });
+
+  it("drains domain events from aggregate after add", async () => {
+    const order = new Order({ id: "order-1", status: "draft" });
+    order.place();
+    expect(order.domainEvents).toHaveLength(1);
+
+    await orderRepo.add(order);
+
+    expect(order.domainEvents).toHaveLength(0);
+  });
+
+  it("drains domain events from aggregate after update", async () => {
+    const order = new Order({ id: "order-1", status: "placed" });
+    await orderRepo.add(order);
+
+    const found = await orderRepo.findById("order-1");
+    found!.ship();
+    expect(found!.domainEvents).toHaveLength(1);
+
+    await orderRepo.update(found!);
+
+    expect(found!.domainEvents).toHaveLength(0);
   });
 
   it("rejects stale updates", async () => {

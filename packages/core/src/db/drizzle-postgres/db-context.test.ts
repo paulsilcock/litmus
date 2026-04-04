@@ -5,6 +5,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
+import { DomainEventDispatcher } from "#litmus/domain/domain-event-dispatcher.ts";
+import { DomainEvent } from "#litmus/domain/domain-event.ts";
 
 const items = pgTable("items", {
   id: varchar("id").primaryKey(),
@@ -43,5 +45,22 @@ describe("DrizzleDbContext", () => {
     });
 
     expect(transactionSpy).toHaveBeenCalledOnce();
+  });
+
+  it("buffers events during a transaction and dispatches after commit", async () => {
+    class TestEvent extends DomainEvent {}
+
+    const dispatcher = new DomainEventDispatcher();
+    const handler = vi.fn();
+    dispatcher.on(TestEvent, handler);
+
+    const ctxWithDispatcher = new DrizzleDbContext(ctx.db, dispatcher);
+
+    await ctxWithDispatcher.transaction(async () => {
+      ctxWithDispatcher.publishEvents([new TestEvent()]);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    expect(handler).toHaveBeenCalledOnce();
   });
 });

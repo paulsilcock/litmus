@@ -39,6 +39,7 @@ export abstract class DrizzlePostgresRepository<
     };
 
     await this.db.insert(this.table).values(data);
+    this.ctx.publishEvents(aggregate.clearDomainEvents());
   }
 
   async update(aggregate: TAggregate): Promise<void> {
@@ -64,5 +65,6 @@ export abstract class DrizzlePostgresRepository<
     }
 
     aggregate._incrementVersion();
+    this.ctx.publishEvents(aggregate.clearDomainEvents());
   }
 }
