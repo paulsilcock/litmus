@@ -14,7 +14,6 @@
  * class PlaceOrder extends CommandHandler<PlaceOrderCommand, OrderDto> {
  *   constructor(
  *     private readonly orderRepo: OrderRepository,
- *     private readonly ctx: DrizzleDbContext,
  *   ) { super(); }
  *
  *   async handle(cmd: PlaceOrderCommand): Promise<OrderDto> {
