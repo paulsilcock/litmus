@@ -6,10 +6,12 @@ import {
 } from "#litmus/domain/aggregate-root.ts";
 import { DomainEvent } from "#litmus/domain/domain-event.ts";
 
-class OrderPlaced extends DomainEvent {}
-
 interface OrderData extends AggregateData {
   status: string;
+}
+
+interface UserData extends AggregateData {
+  name: string;
 }
 
 class Order extends AggregateRoot<OrderData> {
@@ -22,7 +24,19 @@ class Order extends AggregateRoot<OrderData> {
   }
 }
 
+class OrderPlaced extends DomainEvent<OrderData> {}
+class UserRegistered extends DomainEvent<UserData> {}
+
 describe("AggregateRoot", () => {
+  // Type-level regression: aggregates cannot raise events belonging to other aggregates.
+  // If the constraint is removed, @ts-expect-error will fail the type check.
+  void class extends AggregateRoot<OrderData> {
+    doSomethingWrong() {
+      // @ts-expect-error — Order cannot raise User events
+      this.addDomainEvent(new UserRegistered());
+    }
+  };
+
   it("records domain events", () => {
     const order = new Order({ id: "order-1", status: "draft" });
     order.place();
