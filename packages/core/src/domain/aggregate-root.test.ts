@@ -27,16 +27,16 @@ class Order extends AggregateRoot<OrderData> {
 class OrderPlaced extends DomainEvent<OrderData> {}
 class UserRegistered extends DomainEvent<UserData> {}
 
-// Aggregates cannot raise events belonging to other aggregates.
-// If the constraint is removed, @ts-expect-error will fail the type check.
-void class extends AggregateRoot<OrderData> {
-  doSomethingWrong() {
-    // @ts-expect-error — Order cannot raise User events
-    this.addDomainEvent(new UserRegistered());
-  }
-};
-
 describe("AggregateRoot", () => {
+  // Type-level regression: aggregates cannot raise events belonging to other aggregates.
+  // If the constraint is removed, @ts-expect-error will fail the type check.
+  void class extends AggregateRoot<OrderData> {
+    doSomethingWrong() {
+      // @ts-expect-error — Order cannot raise User events
+      this.addDomainEvent(new UserRegistered());
+    }
+  };
+
   it("records domain events", () => {
     const order = new Order({ id: "order-1", status: "draft" });
     order.place();
