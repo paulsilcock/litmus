@@ -45,9 +45,9 @@ export const schema = { orders, customers };
 
 // --- Domain Events ---
 
-export class OrderPlaced extends DomainEvent {}
-export class OrderShipped extends DomainEvent {}
-export class CustomerCreated extends DomainEvent {}
+export class OrderPlaced extends DomainEvent<OrderData> {}
+export class OrderShipped extends DomainEvent<OrderData> {}
+export class CustomerCreated extends DomainEvent<CustomerData> {}
 
 // --- Aggregates ---
 

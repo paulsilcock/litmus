@@ -11,7 +11,7 @@ export abstract class AggregateRoot<
   TId = string,
 > extends Entity<TId> {
   #data: TData;
-  #domainEvents: DomainEvent[] = [];
+  #domainEvents: DomainEvent<any>[] = [];
 
   constructor(data: TData) {
     super(data.id);
@@ -22,7 +22,7 @@ export abstract class AggregateRoot<
     return this.#data.version!;
   }
 
-  get domainEvents(): readonly DomainEvent[] {
+  get domainEvents(): readonly DomainEvent<any>[] {
     return this.#domainEvents;
   }
 
@@ -35,7 +35,7 @@ export abstract class AggregateRoot<
     this.#data = { ...this.#data, version: this.#data.version! + 1 };
   }
 
-  protected addDomainEvent(event: DomainEvent): void {
+  protected addDomainEvent(event: DomainEvent<TData>): void {
     this.#domainEvents.push(event);
   }
 
