@@ -8,13 +8,13 @@ import {
 } from "drizzle-orm/pg-core";
 
 import type { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
-import { DrizzlePostgresRepository } from "#litmus/db/drizzle-postgres/repository.ts";
 import {
   type AggregateData,
   AggregateRoot,
 } from "#litmus/domain/aggregate-root.ts";
 import { DomainEvent } from "#litmus/domain/domain-event.ts";
 import { prefixedUlid } from "#litmus/id.ts";
+import { DrizzlePostgresRepository } from "#litmus/repo/drizzle-postgres/repository.ts";
 
 // --- Schema ---
 
