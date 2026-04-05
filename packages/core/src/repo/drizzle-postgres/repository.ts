@@ -2,10 +2,10 @@ import type { ColumnBaseConfig } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 
-import { ConcurrencyError } from "#litmus/db/concurrency-error.ts";
 import type { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
-import type { Repository } from "#litmus/db/repository.ts";
 import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
+import type { Repository } from "#litmus/domain/repository.ts";
+import { ConcurrencyError } from "#litmus/repo/concurrency-error.ts";
 
 type HasAggregateColumns = PgTable & {
   id: PgColumn<any>;

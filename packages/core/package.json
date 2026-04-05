@@ -22,6 +22,10 @@
   },
   "exports": {
     ".": "./dist/index.mjs",
+    "./db/drizzle-postgres": "./dist/db/drizzle-postgres/index.mjs",
+    "./repo/drizzle-postgres": "./dist/repo/drizzle-postgres/index.mjs",
+    "./id": "./dist/id.mjs",
+    "./events": "./dist/domain/domain-event-dispatcher.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
