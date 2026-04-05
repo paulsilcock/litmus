@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
+import { DomainEventDispatcher } from "#litmus/domain/domain-event-dispatcher.ts";
 import {
   Customer,
   CustomerRepository,
@@ -28,7 +29,7 @@ describe("DrizzlePostgresRepository", () => {
     await apply();
 
     const db = drizzle(client, { schema });
-    ctx = new DrizzleDbContext(db);
+    ctx = new DrizzleDbContext(db, new DomainEventDispatcher());
     orderRepo = new OrderRepository(ctx);
     customerRepo = new CustomerRepository(ctx);
   });

@@ -14,7 +14,7 @@ export class DrizzleDbContext implements DbContext<PgDb> {
 
   constructor(
     readonly db: PgDb,
-    private readonly dispatcher?: DomainEventDispatcher,
+    private readonly dispatcher: DomainEventDispatcher,
   ) {}
 
   async transaction(fn: () => Promise<void>): Promise<void> {
@@ -49,7 +49,6 @@ export class DrizzleDbContext implements DbContext<PgDb> {
   }
 
   private dispatchEvents(events: DomainEvent[]): void {
-    if (!this.dispatcher) return;
     for (const event of events) {
       this.dispatcher.publish(event);
     }

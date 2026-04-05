@@ -32,7 +32,7 @@ describe("DrizzleDbContext", () => {
     await apply();
 
     const db = drizzle(client, { schema });
-    ctx = new DrizzleDbContext(db);
+    ctx = new DrizzleDbContext(db, new DomainEventDispatcher());
   });
 
   it("nested transaction reuses the existing transaction", async () => {
