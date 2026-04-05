@@ -15,6 +15,7 @@ export default defineConfig({
     },
     rules: {
       "no-unsafe-type-assertion": "error",
+      "no-relative-parent-imports": "error",
     },
   },
   run: {

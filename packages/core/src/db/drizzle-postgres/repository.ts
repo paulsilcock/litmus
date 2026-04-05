@@ -1,14 +1,9 @@
 import type { ColumnBaseConfig } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
-import type {
-  PgColumn,
-  PgDatabase,
-  PgQueryResultHKT,
-  PgTable,
-} from "drizzle-orm/pg-core";
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 
 import { ConcurrencyError } from "#litmus/db/concurrency-error.ts";
-import { DrizzleTransaction } from "#litmus/db/drizzle-postgres/transaction.ts";
+import type { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
 import type { Repository } from "#litmus/db/repository.ts";
 import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
 
@@ -21,16 +16,15 @@ type HasAggregateColumns = PgTable & {
 
 export abstract class DrizzlePostgresRepository<
   TAggregate extends AggregateRoot<any>,
-  TSchema extends Record<string, unknown> = Record<string, unknown>,
   TTable extends HasAggregateColumns = HasAggregateColumns,
 > implements Repository<TAggregate> {
   constructor(
-    protected readonly db: PgDatabase<PgQueryResultHKT, TSchema>,
+    protected readonly ctx: DrizzleDbContext,
     private readonly table: TTable,
   ) {}
 
-  private get connection() {
-    return DrizzleTransaction.active() ?? this.db;
+  protected get db() {
+    return this.ctx.connection;
   }
 
   protected abstract toPersistence(
@@ -44,7 +38,8 @@ export abstract class DrizzlePostgresRepository<
       version: 0,
     };
 
-    await this.connection.insert(this.table).values(data);
+    await this.db.insert(this.table).values(data);
+    this.ctx.publishEvents(aggregate.clearDomainEvents());
   }
 
   async update(aggregate: TAggregate): Promise<void> {
@@ -54,7 +49,7 @@ export abstract class DrizzlePostgresRepository<
       updatedAt: new Date(),
     };
 
-    const updated = await this.connection
+    const updated = await this.db
       .update(this.table)
       .set(data)
       .where(
@@ -70,5 +65,6 @@ export abstract class DrizzlePostgresRepository<
     }
 
     aggregate._incrementVersion();
+    this.ctx.publishEvents(aggregate.clearDomainEvents());
   }
 }
