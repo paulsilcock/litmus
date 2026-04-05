@@ -27,6 +27,8 @@ export abstract class DrizzlePostgresRepository<
     return this.ctx.connection;
   }
 
+  abstract nextId(): TAggregate["id"];
+
   protected abstract toPersistence(
     aggregate: TAggregate,
   ): Omit<TTable["$inferInsert"], "id" | "version" | "createdAt" | "updatedAt">;
