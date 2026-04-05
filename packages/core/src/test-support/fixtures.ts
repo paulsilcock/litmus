@@ -14,6 +14,7 @@ import {
   AggregateRoot,
 } from "#litmus/domain/aggregate-root.ts";
 import { DomainEvent } from "#litmus/domain/domain-event.ts";
+import { prefixedUlid } from "#litmus/id.ts";
 
 // --- Schema ---
 
@@ -99,6 +100,10 @@ export class OrderRepository extends DrizzlePostgresRepository<
     super(ctx, orders);
   }
 
+  nextId() {
+    return prefixedUlid("order");
+  }
+
   protected toPersistence(order: Order) {
     return { data: { status: order.status } };
   }
@@ -124,6 +129,10 @@ export class CustomerRepository extends DrizzlePostgresRepository<
 > {
   constructor(ctx: DrizzleDbContext) {
     super(ctx, customers);
+  }
+
+  nextId() {
+    return prefixedUlid("customer");
   }
 
   protected toPersistence(customer: Customer) {

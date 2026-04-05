@@ -39,7 +39,8 @@ describe("saving aggregates with domain events", () => {
     const handler = vi.fn();
     dispatcher.on(OrderPlaced, handler);
 
-    const order = new Order({ id: "order-1", status: "draft" });
+    const id = orderRepo.nextId();
+    const order = new Order({ id, status: "draft" });
     order.place();
     await orderRepo.add(order);
 
@@ -54,12 +55,15 @@ describe("saving aggregates with domain events", () => {
     dispatcher.on(CustomerCreated, customerHandler);
 
     await ctx.transaction(async () => {
-      const order = new Order({ id: "order-1", status: "draft" });
+      const order = new Order({
+        id: orderRepo.nextId(),
+        status: "draft",
+      });
       order.place();
       await orderRepo.add(order);
 
       const customer = new Customer({
-        id: "customer-1",
+        id: customerRepo.nextId(),
         name: "Alice",
       });
       customer.register();
