@@ -1,7 +1,7 @@
 {
-  "name": "@litmus/core",
+  "name": "@litmus/http",
   "version": "0.0.0",
-  "description": "Domain primitives and base classes for the Litmus framework.",
+  "description": "HTTP entrypoint adapter for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
     "url": "https://github.com/paulsilcock/litmus/issues"
@@ -11,21 +11,17 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/paulsilcock/litmus.git",
-    "directory": "packages/core"
+    "directory": "packages/http"
   },
   "files": [
     "dist"
   ],
   "type": "module",
   "imports": {
-    "#litmus/*": "./src/*"
+    "#litmus-http/*": "./src/*"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./db/drizzle-postgres": "./src/db/drizzle-postgres/index.ts",
-    "./repo/drizzle-postgres": "./src/repo/drizzle-postgres/index.ts",
-    "./id": "./src/id.ts",
-    "./events": "./src/domain/domain-event-dispatcher.ts",
+    ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -39,14 +35,16 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
-    "ulidx": "^2.4.1"
+    "@litmus/core": "workspace:*"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.4.2",
     "@types/node": "^25.5.0",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
-    "drizzle-kit": "^0.31.10",
-    "vite-plus": "catalog:"
+    "hono": "^4.0.0",
+    "vite-plus": "catalog:",
+    "zod": "^3.24.0"
+  },
+  "peerDependencies": {
+    "hono": "^4.0.0"
   }
 }
