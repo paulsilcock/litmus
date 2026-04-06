@@ -2,7 +2,7 @@ import { CommandHandler } from "@litmus/core";
 import { describe, expect, test } from "vite-plus/test";
 import { z } from "zod";
 
-import { HttpServer } from "#litmus-http/server.ts";
+import { httpServer } from "#litmus-http/server.ts";
 
 const PlaceOrderSchema = z.object({
   customerId: z.string(),
@@ -20,13 +20,9 @@ class PlaceOrder extends CommandHandler<
   }
 }
 
-describe("HttpServer", () => {
+describe("httpServer", () => {
   test("valid input is validated and passed to the handler", async () => {
-    const server = new HttpServer().post(
-      "/orders",
-      PlaceOrder,
-      PlaceOrderSchema,
-    );
+    const server = httpServer().post("/orders", PlaceOrder, PlaceOrderSchema);
 
     const res = await server.request("/orders", {
       method: "POST",
@@ -40,5 +36,24 @@ describe("HttpServer", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ orderId: "order_cust_1" });
+  });
+
+  test("invalid input returns 422 with validation errors", async () => {
+    const server = httpServer().post("/orders", PlaceOrder, PlaceOrderSchema);
+
+    const res = await server.request("/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customerId: 123 }),
+    });
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body).toEqual({
+      errors: [
+        { field: "customerId", message: "Expected string, received number" },
+        { field: "items", message: "Required" },
+      ],
+    });
   });
 });
