@@ -1,10 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
+import type { DomainEvent } from "@litmus/core";
+import type { DbContext } from "@litmus/core/db";
+import type { DomainEventDispatcher } from "@litmus/core/events";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-
-import type { DbContext } from "#litmus/db/db-context.ts";
-import type { DomainEventDispatcher } from "#litmus/domain/domain-event-dispatcher.ts";
-import type { DomainEvent } from "#litmus/domain/domain-event.ts";
 
 type PgDb = PgDatabase<PgQueryResultHKT, Record<string, unknown>>;
 

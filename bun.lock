@@ -12,16 +12,37 @@
       "name": "@litmus/core",
       "version": "0.0.0",
       "dependencies": {
-        "drizzle-orm": "^0.45.2",
         "ulidx": "^2.4.1",
       },
       "devDependencies": {
         "@electric-sql/pglite": "^0.4.2",
+        "@litmus/db": "workspace:*",
         "@types/node": "^25.5.0",
         "@typescript/native-preview": "7.0.0-dev.20260328.1",
         "drizzle-kit": "^0.31.10",
+        "drizzle-orm": "^0.45.2",
         "vite-plus": "catalog:",
       },
+    },
+    "packages/db": {
+      "name": "@litmus/db",
+      "version": "0.0.0",
+      "dependencies": {
+        "@litmus/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@electric-sql/pglite": "^0.4.2",
+        "@types/node": "^25.5.0",
+        "drizzle-kit": "^0.31.10",
+        "drizzle-orm": "^0.45.2",
+        "vite-plus": "catalog:",
+      },
+      "peerDependencies": {
+        "drizzle-orm": "^0.45.2",
+      },
+      "optionalPeers": [
+        "drizzle-orm",
+      ],
     },
   },
   "overrides": {
@@ -95,6 +116,8 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
     "@litmus/core": ["@litmus/core@workspace:packages/core"],
+
+    "@litmus/db": ["@litmus/db@workspace:packages/db"],
 
     "@oxc-project/runtime": ["@oxc-project/runtime@0.122.0", "", {}, "sha512-vevyz3bNjevQFCV2Yg5o6Sp9BSoiYiJVymMrzA3S1ZGj4J8ak4YiywhFyQMueQ3UNlJU6HZOZYDy70TUc99aHw=="],
 

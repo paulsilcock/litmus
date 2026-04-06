@@ -1,9 +1,9 @@
 import { PGlite } from "@electric-sql/pglite";
+import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
 import { pushSchema } from "drizzle-kit/api";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
 import { DomainEventDispatcher } from "#litmus/domain/domain-event-dispatcher.ts";
 
 import {
