@@ -1,4 +1,9 @@
-import { CommandHandler, DomainError, QueryHandler } from "@litmus/core";
+import {
+  CommandHandler,
+  DomainError,
+  isAsyncIterable,
+  QueryHandler,
+} from "@litmus/core";
 import { Hono } from "hono";
 import { hc } from "hono/client";
 import { describe, expect, it } from "vite-plus/test";
@@ -270,6 +275,79 @@ describe("routeHandler", () => {
     });
 
     expect(res.status).toBe(500);
+  });
+
+  it("streams AsyncIterable results as SSE", async () => {
+    const StreamSchema = z.object({ count: z.number() });
+    type StreamInput = z.infer<typeof StreamSchema>;
+
+    class StreamTokens extends CommandHandler<StreamInput, { token: string }> {
+      async *handle(input: StreamInput): AsyncIterable<{ token: string }> {
+        for (let i = 0; i < input.count; i++) {
+          yield { token: `tok_${i}` };
+        }
+      }
+    }
+
+    const app = new Hono().post(
+      "/stream",
+      ...routeHandler(StreamTokens, StreamSchema),
+    );
+
+    const res = await app.request("/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: 3 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/event-stream");
+
+    const body = await res.text();
+    expect(body).toContain('data: {"token":"tok_0"}');
+    expect(body).toContain('data: {"token":"tok_1"}');
+    expect(body).toContain('data: {"token":"tok_2"}');
+  });
+
+  it("respond callback overrides default response handling", async () => {
+    const StreamSchema = z.object({ count: z.number() });
+    type StreamInput = z.infer<typeof StreamSchema>;
+
+    class StreamTokens extends CommandHandler<StreamInput, { token: string }> {
+      async *handle(input: StreamInput): AsyncIterable<{ token: string }> {
+        for (let i = 0; i < input.count; i++) {
+          yield { token: `tok_${i}` };
+        }
+      }
+    }
+
+    const app = new Hono().post(
+      "/stream",
+      ...routeHandler(StreamTokens, StreamSchema, {
+        respond: async (result, c) => {
+          const chunks: string[] = [];
+          if (isAsyncIterable<{ token: string }>(result)) {
+            for await (const chunk of result) {
+              chunks.push(JSON.stringify(chunk));
+            }
+          }
+          return c.body(chunks.join("\n"), 200, {
+            "Content-Type": "application/x-ndjson",
+          });
+        },
+      }),
+    );
+
+    const res = await app.request("/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: 2 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("application/x-ndjson");
+    const body = await res.text();
+    expect(body).toBe('{"token":"tok_0"}\n{"token":"tok_1"}');
   });
 
   it("explicit status option overrides the default", async () => {

@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
-import { DomainError } from "@litmus/core";
+import { DomainError, isAsyncIterable } from "@litmus/core";
 import type { Context, Env } from "hono";
+import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodSchema } from "zod";
 
@@ -22,9 +23,13 @@ type HandlerClass<TInput, TResult> = new () => {
 
 type ValidationTarget = "json" | "param" | "query";
 
-interface RouteHandlerOptions {
+interface RouteHandlerOptions<TResult = unknown> {
   target?: ValidationTarget;
   status?: ContentfulStatusCode;
+  respond?: (
+    result: TResult | AsyncIterable<TResult>,
+    c: Context,
+  ) => Response | Promise<Response>;
 }
 
 function validationHook(
@@ -50,7 +55,7 @@ function validationHook(
 export function routeHandler<TInput extends Record<string, unknown>, TResult>(
   Handler: HandlerClass<TInput, TResult>,
   schema: ZodSchema<TInput>,
-  options: RouteHandlerOptions = {},
+  options: RouteHandlerOptions<TResult> = {},
 ) {
   const target = options.target ?? "json";
   const validator = zValidator(target, schema, validationHook);
@@ -60,8 +65,18 @@ export function routeHandler<TInput extends Record<string, unknown>, TResult>(
     const input = c.req.valid(target);
     const h = new Handler();
     const result = await h.handle(input);
+    if (options.respond) {
+      return options.respond(result, c);
+    }
     if (result === undefined) {
       return c.body(null, 204);
+    }
+    if (isAsyncIterable<TResult>(result)) {
+      return streamSSE(c, async (stream) => {
+        for await (const chunk of result) {
+          await stream.writeSSE({ data: JSON.stringify(chunk) });
+        }
+      });
     }
     const status = options.status ?? (c.req.method === "POST" ? 201 : 200);
     return c.json(result, status);
