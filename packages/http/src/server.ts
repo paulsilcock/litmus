@@ -1,7 +1,20 @@
 import { zValidator } from "@hono/zod-validator";
+import { DomainError } from "@litmus/core";
 import type { Context, Env } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodSchema } from "zod";
+
+type DomainErrorMap = Record<string, ContentfulStatusCode>;
+
+export function domainErrorHandler(map: DomainErrorMap) {
+  return (err: Error, c: Context) => {
+    if (err instanceof DomainError) {
+      const status = map[err.constructor.name] ?? 400;
+      return c.json({ code: err.code, message: err.message }, status);
+    }
+    return c.body(null, 500);
+  };
+}
 
 type HandlerClass<TInput, TResult> = new () => {
   handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;

@@ -1,10 +1,10 @@
-import { CommandHandler, QueryHandler } from "@litmus/core";
+import { CommandHandler, DomainError, QueryHandler } from "@litmus/core";
 import { Hono } from "hono";
 import { hc } from "hono/client";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { useCase } from "#litmus-http/server.ts";
+import { domainErrorHandler, useCase } from "#litmus-http/server.ts";
 
 const PlaceOrderSchema = z.object({
   customerId: z.string(),
@@ -55,7 +55,7 @@ class GetOrder extends QueryHandler<
 }
 
 describe("useCase", () => {
-  test("valid input is validated and passed to the handler", async () => {
+  it("valid input is validated and passed to the handler", async () => {
     const app = new Hono().post(
       "/orders",
       ...useCase(PlaceOrder, PlaceOrderSchema),
@@ -75,7 +75,7 @@ describe("useCase", () => {
     expect(body).toEqual({ orderId: "order_cust_1" });
   });
 
-  test("invalid input returns 422 with validation errors", async () => {
+  it("invalid input returns 422 with validation errors", async () => {
     const app = new Hono().post(
       "/orders",
       ...useCase(PlaceOrder, PlaceOrderSchema),
@@ -97,7 +97,7 @@ describe("useCase", () => {
     });
   });
 
-  test("handler returning void yields 204 with no body", async () => {
+  it("handler returning void yields 204 with no body", async () => {
     const ShipOrderSchema = z.object({ id: z.string() });
     type ShipOrderCommand = z.infer<typeof ShipOrderSchema>;
 
@@ -133,7 +133,7 @@ describe("useCase", () => {
       }
     }
 
-    test("POST defaults to 201", async () => {
+    it("POST defaults to 201", async () => {
       const app = new Hono().post("/x", ...useCase(Noop, NoopSchema));
       const res = await app.request("/x", {
         method: "POST",
@@ -143,7 +143,7 @@ describe("useCase", () => {
       expect(res.status).toBe(201);
     });
 
-    test("GET defaults to 200", async () => {
+    it("GET defaults to 200", async () => {
       const app = new Hono().get(
         "/x",
         ...useCase(Noop, NoopSchema, { target: "query" }),
@@ -152,7 +152,7 @@ describe("useCase", () => {
       expect(res.status).toBe(200);
     });
 
-    test("PUT defaults to 200", async () => {
+    it("PUT defaults to 200", async () => {
       const app = new Hono().put("/x", ...useCase(Noop, NoopSchema));
       const res = await app.request("/x", {
         method: "PUT",
@@ -162,7 +162,7 @@ describe("useCase", () => {
       expect(res.status).toBe(200);
     });
 
-    test("PATCH defaults to 200", async () => {
+    it("PATCH defaults to 200", async () => {
       const app = new Hono().patch("/x", ...useCase(Noop, NoopSchema));
       const res = await app.request("/x", {
         method: "PATCH",
@@ -172,7 +172,7 @@ describe("useCase", () => {
       expect(res.status).toBe(200);
     });
 
-    test("DELETE defaults to 200 when handler returns a body", async () => {
+    it("DELETE defaults to 200 when handler returns a body", async () => {
       const app = new Hono().delete(
         "/x",
         ...useCase(Noop, NoopSchema, { target: "query" }),
@@ -182,7 +182,97 @@ describe("useCase", () => {
     });
   });
 
-  test("explicit status option overrides the default", async () => {
+  it("can specify response codes for domain errors", async () => {
+    class OrderNotFound extends DomainError {
+      constructor(id: string) {
+        super("ORDER_NOT_FOUND", `Order ${id} not found`);
+      }
+    }
+
+    const FindOrderSchema = z.object({ id: z.string() });
+    type FindOrderQuery = z.infer<typeof FindOrderSchema>;
+
+    class FindOrder extends QueryHandler<FindOrderQuery, { id: string }> {
+      async handle(query: FindOrderQuery): Promise<{ id: string }> {
+        throw new OrderNotFound(query.id);
+      }
+    }
+
+    const app = new Hono()
+      .onError(domainErrorHandler({ OrderNotFound: 404 }))
+      .get(
+        "/orders/:id",
+        ...useCase(FindOrder, FindOrderSchema, { target: "param" }),
+      );
+
+    const res = await app.request("/orders/order_missing");
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toEqual({
+      code: "ORDER_NOT_FOUND",
+      message: "Order order_missing not found",
+    });
+  });
+
+  it("unmapped DomainError defaults to 400", async () => {
+    class SomethingWentWrong extends DomainError {
+      constructor() {
+        super("SOMETHING_WENT_WRONG", "Generic failure");
+      }
+    }
+
+    const NoopSchema = z.object({});
+    type NoopInput = z.infer<typeof NoopSchema>;
+
+    class FailingHandler extends CommandHandler<NoopInput, void> {
+      async handle(_input: NoopInput): Promise<void> {
+        throw new SomethingWentWrong();
+      }
+    }
+
+    const app = new Hono()
+      .onError(domainErrorHandler({}))
+      .post("/x", ...useCase(FailingHandler, NoopSchema));
+
+    const res = await app.request("/x", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({
+      code: "SOMETHING_WENT_WRONG",
+      message: "Generic failure",
+    });
+  });
+
+  it("non-DomainError yields 500 with no body", async () => {
+    const NoopSchema = z.object({});
+    type NoopInput = z.infer<typeof NoopSchema>;
+
+    class CrashingHandler extends CommandHandler<NoopInput, void> {
+      async handle(_input: NoopInput): Promise<void> {
+        throw new Error("kaboom");
+      }
+    }
+
+    const app = new Hono()
+      .onError(domainErrorHandler({}))
+      .post("/x", ...useCase(CrashingHandler, NoopSchema));
+
+    const res = await app.request("/x", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+
+    expect(res.status).toBe(500);
+  });
+
+  it("explicit status option overrides the default", async () => {
     const app = new Hono().post(
       "/orders",
       ...useCase(PlaceOrder, PlaceOrderSchema, { status: 202 }),
@@ -200,7 +290,7 @@ describe("useCase", () => {
     expect(res.status).toBe(202);
   });
 
-  test("invalid path params return 422 with validation errors", async () => {
+  it("invalid path params return 422 with validation errors", async () => {
     const app = new Hono().get(
       "/orders/:id",
       ...useCase(GetOrder, GetOrderSchema, { target: "param" }),
