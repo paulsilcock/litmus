@@ -1,14 +1,15 @@
 import type { DomainEvent } from "#litmus/domain/domain-event.ts";
 
-type DomainEventClass = new (...args: any[]) => DomainEvent;
-type Handler = (event: DomainEvent) => void;
+type DomainEventClass = new (...args: any[]) => DomainEvent<any>;
+type Handler = (event: DomainEvent<any>) => void;
 
 /**
  * In-process pub/sub for domain events.
  *
- * Handlers are registered by event class. When an event is published,
- * any handler registered for the event's type — or for a class it
- * extends — is invoked. Handlers run synchronously and serially within
+ * Handlers are registered against an event class. When an event is
+ * published, every handler whose registered class the event is an instance
+ * of will fire — so a handler registered for a base class also receives
+ * events of any subclass. Handlers run synchronously and serially within
  * the publishing call site.
  *
  * The dispatcher is normally invoked indirectly: a `DbContext`
@@ -21,7 +22,7 @@ type Handler = (event: DomainEvent) => void;
  * ```typescript
  * import { DomainEventDispatcher } from "@litmus/core/events";
  *
- * class OrderPlaced extends DomainEvent<OrderData> {
+ * class OrderPlaced extends DomainEvent<Order> {
  *   constructor(readonly orderId: string) { super(); }
  * }
  *
@@ -43,7 +44,7 @@ export class DomainEventDispatcher {
     this.handlers.set(eventType, existing);
   }
 
-  publish(event: DomainEvent): void {
+  publish(event: DomainEvent<any>): void {
     for (const [eventType, handlers] of this.handlers) {
       if (event instanceof eventType) {
         for (const handler of handlers) {

@@ -24,8 +24,10 @@ class Order extends AggregateRoot<OrderData> {
   }
 }
 
-class OrderPlaced extends DomainEvent<OrderData> {}
-class UserRegistered extends DomainEvent<UserData> {}
+class User extends AggregateRoot<UserData> {}
+
+class OrderPlaced extends DomainEvent<Order> {}
+class UserRegistered extends DomainEvent<User> {}
 
 describe("AggregateRoot", () => {
   // Type-level regression: aggregates cannot raise events belonging to other aggregates.

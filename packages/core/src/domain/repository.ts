@@ -17,6 +17,12 @@ import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
  * aggregate's current version against the stored version, and to dispatch
  * any collected domain events after a successful save.
  *
+ * Repositories return fully hydrated aggregates and are optimised for the
+ * write side (commands). They are usually a poor fit for read-heavy work
+ * like list views or reports — those typically belong in a `QueryHandler`
+ * that talks to the database directly and returns shape-tailored DTOs
+ * (CQRS read side).
+ *
  * @example
  * ```typescript
  * import type { Repository } from "@litmus/core";

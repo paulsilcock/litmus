@@ -1,4 +1,4 @@
-import type { AggregateData } from "#litmus/domain/aggregate-root.ts";
+import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
 
 declare const sourceSymbol: unique symbol;
 
@@ -8,7 +8,7 @@ declare const sourceSymbol: unique symbol;
  * within state-changing methods, collected on the aggregate, and
  * dispatched after the aggregate is successfully persisted.
  *
- * The `TData` type parameter brands an event to its source aggregate.
+ * The `TAggregate` type parameter brands an event to its source aggregate.
  * This prevents an aggregate from accidentally raising an event that
  * belongs to a different aggregate — `Order` cannot emit `UserRegistered`,
  * the type system catches it at compile time.
@@ -24,25 +24,25 @@ declare const sourceSymbol: unique symbol;
  *   status: string;
  * }
  *
- * class OrderPlaced extends DomainEvent<OrderData> {
- *   constructor(readonly orderId: string) {
- *     super();
- *   }
- * }
- *
  * class Order extends AggregateRoot<OrderData> {
  *   place() {
  *     this.data.status = "placed";
  *     this.addDomainEvent(new OrderPlaced(this.id));
  *   }
  * }
+ *
+ * class OrderPlaced extends DomainEvent<Order> {
+ *   constructor(readonly orderId: string) {
+ *     super();
+ *   }
+ * }
  * ```
  */
 export abstract class DomainEvent<
-  TData extends AggregateData<any> = AggregateData<any>,
+  TAggregate extends AggregateRoot<any, any> = AggregateRoot<any, any>,
 > {
   readonly occurredAt: Date;
-  declare readonly [sourceSymbol]: TData;
+  declare readonly [sourceSymbol]: TAggregate;
 
   constructor() {
     this.occurredAt = new Date();

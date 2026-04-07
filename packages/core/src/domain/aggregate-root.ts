@@ -47,9 +47,6 @@ export type AggregateData<TId = string> = {
  *   status: "draft" | "placed" | "shipped";
  * }
  *
- * class OrderPlaced extends DomainEvent<OrderData> {}
- * class OrderShipped extends DomainEvent<OrderData> {}
- *
  * class Order extends AggregateRoot<OrderData> {
  *   get status() {
  *     return this.data.status;
@@ -69,6 +66,9 @@ export type AggregateData<TId = string> = {
  *   }
  * }
  *
+ * class OrderPlaced extends DomainEvent<Order> {}
+ * class OrderShipped extends DomainEvent<Order> {}
+ *
  * const order = new Order({ id: "order_1", status: "draft" });
  * order.place();
  * // order.domainEvents now contains [OrderPlaced]
@@ -78,37 +78,33 @@ export type AggregateData<TId = string> = {
 export abstract class AggregateRoot<
   TData extends AggregateData<TId>,
   TId = string,
-> extends Entity<TId> {
-  #data: TData;
+> extends Entity<TData, TId> {
   #domainEvents: DomainEvent<any>[] = [];
 
   constructor(data: TData) {
-    super(data.id);
-    this.#data = { ...data, version: data.version ?? 0 };
+    super({ ...data, version: data.version ?? 0 });
   }
 
   get version(): number {
-    return this.#data.version!;
+    return this.data.version!;
   }
 
   get domainEvents(): readonly DomainEvent<any>[] {
     return this.#domainEvents;
   }
 
-  protected get data(): TData {
-    return this.#data;
-  }
-
   /** @internal Called by repository after successful save. */
   _incrementVersion(): void {
-    this.#data = { ...this.#data, version: this.#data.version! + 1 };
+    this.setData({ ...this.data, version: this.data.version! + 1 });
   }
 
-  protected addDomainEvent(event: DomainEvent<TData>): void {
+  protected addDomainEvent(
+    event: DomainEvent<AggregateRoot<TData, TId>>,
+  ): void {
     this.#domainEvents.push(event);
   }
 
-  clearDomainEvents(): DomainEvent[] {
+  clearDomainEvents(): DomainEvent<any>[] {
     const events = [...this.#domainEvents];
     this.#domainEvents = [];
     return events;
