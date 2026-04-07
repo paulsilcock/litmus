@@ -1,3 +1,18 @@
+# Litmus
+
+Litmus is a TypeScript framework for building applications with agentic AI capabilities. It combines building blocks that encourage testable architectures with first-class test utilities to make ATDD, TDD, and eval-driven development the path of least resistance.
+
+## Packages
+
+This monorepo contains four packages under `packages/`:
+
+- **`@litmus/core`** — Domain primitives and use case types: `AggregateRoot`, `Entity`, `ValueObject`, `DomainEvent`, `DomainError`, `Repository`, `CommandHandler`, `QueryHandler`. Zero vendor deps. Sub-paths: `./db` (DbContext interface), `./id` (prefixedUlid), `./events` (DomainEventDispatcher).
+- **`@litmus/db`** — Database adapters. Sub-path `@litmus/db/drizzle/postgres` exposes `DrizzleDbContext`, `DrizzlePostgresRepository`, `ConcurrencyError`. `drizzle-orm` is a peer dep.
+- **`@litmus/http`** — HTTP entrypoint adapter wrapping Hono. Exports `routeHandler` (use case → route with zod validation, verb-based status defaults, SSE streaming, custom respond callback) and `serve` (lifecycle wrapper with `onBeforeStart`/`onBeforeStop` and structured `DomainError` → HTTP mapping). `hono` and `@hono/node-server` are peer deps.
+- **`@litmus/test-acceptance`** _(private)_ — Cross-package acceptance tests. Lives outside core/db/http to avoid coupling adapters to acceptance tests of cross-cutting concerns.
+
+Tests use `it()` (not `test()`) and import test utilities from `vite-plus/test`. Test files are co-located with source files using `.test.ts` suffix.
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web

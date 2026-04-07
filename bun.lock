@@ -58,6 +58,19 @@
         "hono": "^4.0.0",
       },
     },
+    "packages/test-acceptance": {
+      "name": "@litmus/test-acceptance",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@electric-sql/pglite": "^0.4.2",
+        "@litmus/core": "workspace:*",
+        "@litmus/db": "workspace:*",
+        "@types/node": "^25.5.0",
+        "drizzle-kit": "^0.31.10",
+        "drizzle-orm": "^0.45.2",
+        "vite-plus": "catalog:",
+      },
+    },
   },
   "overrides": {
     "vite": "catalog:",
@@ -138,6 +151,8 @@
     "@litmus/db": ["@litmus/db@workspace:packages/db"],
 
     "@litmus/http": ["@litmus/http@workspace:packages/http"],
+
+    "@litmus/test-acceptance": ["@litmus/test-acceptance@workspace:packages/test-acceptance"],
 
     "@oxc-project/runtime": ["@oxc-project/runtime@0.122.0", "", {}, "sha512-vevyz3bNjevQFCV2Yg5o6Sp9BSoiYiJVymMrzA3S1ZGj4J8ak4YiywhFyQMueQ3UNlJU6HZOZYDy70TUc99aHw=="],
 
