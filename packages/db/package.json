@@ -21,6 +21,7 @@
     "#litmus-db/*": "./src/*"
   },
   "exports": {
+    ".": "./src/index.ts",
     "./drizzle/postgres": "./src/drizzle/postgres/index.ts",
     "./package.json": "./package.json"
   },
