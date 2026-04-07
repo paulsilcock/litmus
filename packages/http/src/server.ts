@@ -22,7 +22,7 @@ type HandlerClass<TInput, TResult> = new () => {
 
 type ValidationTarget = "json" | "param" | "query";
 
-interface UseCaseOptions {
+interface RouteHandlerOptions {
   target?: ValidationTarget;
   status?: ContentfulStatusCode;
 }
@@ -47,10 +47,10 @@ function validationHook(
   }
 }
 
-export function useCase<TInput extends Record<string, unknown>, TResult>(
+export function routeHandler<TInput extends Record<string, unknown>, TResult>(
   Handler: HandlerClass<TInput, TResult>,
   schema: ZodSchema<TInput>,
-  options: UseCaseOptions = {},
+  options: RouteHandlerOptions = {},
 ) {
   const target = options.target ?? "json";
   const validator = zValidator(target, schema, validationHook);
