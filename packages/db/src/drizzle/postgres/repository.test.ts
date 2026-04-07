@@ -1,11 +1,11 @@
 import { PGlite } from "@electric-sql/pglite";
+import { DomainEventDispatcher } from "@litmus/core/events";
 import { pushSchema } from "drizzle-kit/api";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
-import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
-import { DomainEventDispatcher } from "#litmus/domain/domain-event-dispatcher.ts";
+import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
 import {
   Customer,
   CustomerRepository,
@@ -14,7 +14,7 @@ import {
   customers,
   orders,
   schema,
-} from "#litmus/test-support/fixtures.ts";
+} from "#litmus-db/test-support/fixtures.ts";
 
 describe("DrizzlePostgresRepository", () => {
   let ctx: DrizzleDbContext;

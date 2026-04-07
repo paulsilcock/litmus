@@ -1,3 +1,5 @@
+import { type AggregateData, AggregateRoot, DomainEvent } from "@litmus/core";
+import { prefixedUlid } from "@litmus/core/id";
 import { eq } from "drizzle-orm";
 import {
   integer,
@@ -7,14 +9,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import type { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
-import {
-  type AggregateData,
-  AggregateRoot,
-} from "#litmus/domain/aggregate-root.ts";
-import { DomainEvent } from "#litmus/domain/domain-event.ts";
-import { prefixedUlid } from "#litmus/id.ts";
-import { DrizzlePostgresRepository } from "#litmus/repo/drizzle-postgres/repository.ts";
+import type { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
+import { DrizzlePostgresRepository } from "#litmus-db/drizzle/postgres/repository.ts";
 
 // --- Schema ---
 

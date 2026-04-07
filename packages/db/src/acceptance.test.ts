@@ -1,11 +1,10 @@
 import { PGlite } from "@electric-sql/pglite";
+import { DomainEventDispatcher } from "@litmus/core/events";
 import { pushSchema } from "drizzle-kit/api";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
-import { DomainEventDispatcher } from "#litmus/domain/domain-event-dispatcher.ts";
-
+import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
 import {
   Customer,
   CustomerCreated,
@@ -14,7 +13,7 @@ import {
   OrderPlaced,
   OrderRepository,
   schema,
-} from "./test-support/fixtures.ts";
+} from "#litmus-db/test-support/fixtures.ts";
 
 describe("saving aggregates with domain events", () => {
   let ctx: DrizzleDbContext;
