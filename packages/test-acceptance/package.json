@@ -1,0 +1,20 @@
+{
+  "name": "@litmus/test-acceptance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-package acceptance tests for the Litmus framework. Not published.",
+  "type": "module",
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.4.2",
+    "@litmus/core": "workspace:*",
+    "@litmus/db": "workspace:*",
+    "@types/node": "^25.5.0",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "vite-plus": "catalog:"
+  }
+}

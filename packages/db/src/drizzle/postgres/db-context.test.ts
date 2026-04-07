@@ -1,12 +1,12 @@
 import { PGlite } from "@electric-sql/pglite";
+import { DomainEvent } from "@litmus/core";
+import { DomainEventDispatcher } from "@litmus/core/events";
 import { pushSchema } from "drizzle-kit/api";
 import { integer, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { DrizzleDbContext } from "#litmus/db/drizzle-postgres/db-context.ts";
-import { DomainEventDispatcher } from "#litmus/domain/domain-event-dispatcher.ts";
-import { DomainEvent } from "#litmus/domain/domain-event.ts";
+import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
 
 const items = pgTable("items", {
   id: varchar("id").primaryKey(),
