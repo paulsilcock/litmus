@@ -40,12 +40,6 @@ export const customers = pgTable("customers", {
 
 export const schema = { orders, customers };
 
-// --- Domain Events ---
-
-export class OrderPlaced extends DomainEvent<OrderData> {}
-export class OrderShipped extends DomainEvent<OrderData> {}
-export class CustomerCreated extends DomainEvent<CustomerData> {}
-
 // --- Aggregates ---
 
 interface OrderData extends AggregateData {
@@ -85,6 +79,12 @@ export class Customer extends AggregateRoot<CustomerData> {
     this.addDomainEvent(new CustomerCreated());
   }
 }
+
+// --- Domain Events ---
+
+export class OrderPlaced extends DomainEvent<Order> {}
+export class OrderShipped extends DomainEvent<Order> {}
+export class CustomerCreated extends DomainEvent<Customer> {}
 
 // --- Repositories ---
 
