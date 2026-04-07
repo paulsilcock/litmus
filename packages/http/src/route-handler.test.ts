@@ -9,7 +9,8 @@ import { hc } from "hono/client";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { domainErrorHandler, routeHandler } from "#litmus-http/server.ts";
+import { domainErrorHandler } from "#litmus-http/error-handler.ts";
+import { routeHandler } from "#litmus-http/route-handler.ts";
 
 const PlaceOrderSchema = z.object({
   customerId: z.string(),
