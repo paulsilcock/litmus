@@ -1,5 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Context, Env } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodSchema } from "zod";
 
 type HandlerClass<TInput, TResult> = new () => {
@@ -7,6 +8,11 @@ type HandlerClass<TInput, TResult> = new () => {
 };
 
 type ValidationTarget = "json" | "param" | "query";
+
+interface UseCaseOptions {
+  target?: ValidationTarget;
+  status?: ContentfulStatusCode;
+}
 
 function validationHook(
   result: {
@@ -28,11 +34,12 @@ function validationHook(
   }
 }
 
-function createUseCase<TInput extends Record<string, unknown>, TResult>(
+export function useCase<TInput extends Record<string, unknown>, TResult>(
   Handler: HandlerClass<TInput, TResult>,
   schema: ZodSchema<TInput>,
-  target: ValidationTarget,
+  options: UseCaseOptions = {},
 ) {
+  const target = options.target ?? "json";
   const validator = zValidator(target, schema, validationHook);
   const handler = async (
     c: Context<Env, string, { out: Record<string, TInput> }>,
@@ -40,15 +47,11 @@ function createUseCase<TInput extends Record<string, unknown>, TResult>(
     const input = c.req.valid(target);
     const h = new Handler();
     const result = await h.handle(input);
-    return c.json(result);
+    if (result === undefined) {
+      return c.body(null, 204);
+    }
+    const status = options.status ?? (c.req.method === "POST" ? 201 : 200);
+    return c.json(result, status);
   };
   return [validator, handler] as const;
-}
-
-export function useCase<TInput extends Record<string, unknown>, TResult>(
-  Handler: HandlerClass<TInput, TResult>,
-  schema: ZodSchema<TInput>,
-  target: ValidationTarget = "json",
-) {
-  return createUseCase(Handler, schema, target);
 }

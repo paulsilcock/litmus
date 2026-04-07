@@ -42,7 +42,10 @@ class GetOrder extends QueryHandler<
 {
   const app = new Hono()
     .post("/orders", ...useCase(PlaceOrder, PlaceOrderSchema))
-    .get("/items/:id", ...useCase(GetOrder, GetOrderSchema, "param"));
+    .get(
+      "/items/:id",
+      ...useCase(GetOrder, GetOrderSchema, { target: "param" }),
+    );
 
   type AppRoutes = typeof app;
   const client = hc<AppRoutes>("http://localhost:3000");
@@ -67,7 +70,7 @@ describe("useCase", () => {
       }),
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toEqual({ orderId: "order_cust_1" });
   });
@@ -94,10 +97,113 @@ describe("useCase", () => {
     });
   });
 
+  test("handler returning void yields 204 with no body", async () => {
+    const ShipOrderSchema = z.object({ id: z.string() });
+    type ShipOrderCommand = z.infer<typeof ShipOrderSchema>;
+
+    class ShipOrder extends CommandHandler<ShipOrderCommand, void> {
+      async handle(_cmd: ShipOrderCommand) {
+        // intentionally returns nothing
+      }
+    }
+
+    const app = new Hono().post(
+      "/orders/ship",
+      ...useCase(ShipOrder, ShipOrderSchema),
+    );
+
+    const res = await app.request("/orders/ship", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "order_1" }),
+    });
+
+    expect(res.status).toBe(204);
+    const text = await res.text();
+    expect(text).toBe("");
+  });
+
+  describe("default status codes by HTTP verb", () => {
+    const NoopSchema = z.object({});
+    type NoopInput = z.infer<typeof NoopSchema>;
+
+    class Noop extends CommandHandler<NoopInput, { ok: boolean }> {
+      async handle(_input: NoopInput) {
+        return { ok: true };
+      }
+    }
+
+    test("POST defaults to 201", async () => {
+      const app = new Hono().post("/x", ...useCase(Noop, NoopSchema));
+      const res = await app.request("/x", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      expect(res.status).toBe(201);
+    });
+
+    test("GET defaults to 200", async () => {
+      const app = new Hono().get(
+        "/x",
+        ...useCase(Noop, NoopSchema, { target: "query" }),
+      );
+      const res = await app.request("/x");
+      expect(res.status).toBe(200);
+    });
+
+    test("PUT defaults to 200", async () => {
+      const app = new Hono().put("/x", ...useCase(Noop, NoopSchema));
+      const res = await app.request("/x", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      expect(res.status).toBe(200);
+    });
+
+    test("PATCH defaults to 200", async () => {
+      const app = new Hono().patch("/x", ...useCase(Noop, NoopSchema));
+      const res = await app.request("/x", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      expect(res.status).toBe(200);
+    });
+
+    test("DELETE defaults to 200 when handler returns a body", async () => {
+      const app = new Hono().delete(
+        "/x",
+        ...useCase(Noop, NoopSchema, { target: "query" }),
+      );
+      const res = await app.request("/x", { method: "DELETE" });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  test("explicit status option overrides the default", async () => {
+    const app = new Hono().post(
+      "/orders",
+      ...useCase(PlaceOrder, PlaceOrderSchema, { status: 202 }),
+    );
+
+    const res = await app.request("/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId: "cust_1",
+        items: [{ productId: "prod_1", quantity: 2 }],
+      }),
+    });
+
+    expect(res.status).toBe(202);
+  });
+
   test("invalid path params return 422 with validation errors", async () => {
     const app = new Hono().get(
       "/orders/:id",
-      ...useCase(GetOrder, GetOrderSchema, "param"),
+      ...useCase(GetOrder, GetOrderSchema, { target: "param" }),
     );
 
     const res = await app.request("/orders/bad-id");
