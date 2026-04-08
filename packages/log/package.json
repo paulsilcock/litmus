@@ -1,7 +1,7 @@
 {
-  "name": "@litmus/core",
+  "name": "@litmus/log",
   "version": "0.0.0",
-  "description": "Domain primitives and base classes for the Litmus framework.",
+  "description": "Structured logging with async-scoped context for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
     "url": "https://github.com/paulsilcock/litmus/issues"
@@ -11,21 +11,17 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/paulsilcock/litmus.git",
-    "directory": "packages/core"
+    "directory": "packages/log"
   },
   "files": [
     "dist"
   ],
   "type": "module",
   "imports": {
-    "#litmus/*": "./src/*"
+    "#litmus-log/*": "./src/*"
   },
   "exports": {
     ".": "./src/index.ts",
-    "./db": "./src/db/db-context.ts",
-    "./events": "./src/domain/domain-event-dispatcher.ts",
-    "./id": "./src/id.ts",
-    "./log": "./src/log.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -39,7 +35,8 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "ulidx": "^2.4.1"
+    "@litmus/core": "workspace:*",
+    "pino": "^9.5.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
