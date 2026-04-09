@@ -13,11 +13,12 @@ Litmus is a TypeScript framework that makes test-driven development natural for 
 
 This monorepo contains packages under `packages/`:
 
-- **`@litmus/core`** — Domain primitives and use case types: `AggregateRoot`, `Entity`, `ValueObject`, `DomainEvent`, `DomainError`, `Repository`, `CommandHandler`, `QueryHandler`. Zero vendor deps. Sub-paths: `./db` (DbContext interface), `./id` (prefixedUlid), `./events` (DomainEventDispatcher).
+- **`@litmus/core`** — Domain primitives and use case types: `AggregateRoot`, `Entity`, `ValueObject`, `DomainEvent`, `DomainError`, `Repository`, `CommandHandler`, `QueryHandler`. Sub-paths: `./ai` (AiTask, Agent, Toolbox), `./db` (DbContext interface), `./id` (prefixedUlid), `./events` (DomainEventDispatcher).
 - **`@litmus/db`** — Database adapters. Sub-path `@litmus/db/drizzle/postgres` exposes `DrizzleDbContext`, `DrizzlePostgresRepository`, `ConcurrencyError`. `drizzle-orm` is a peer dep.
 - **`@litmus/http`** — HTTP entrypoint adapter wrapping Hono. Exports `routeHandler` (use case → route with zod validation, verb-based status defaults, SSE streaming, custom respond callback) and `serve` (lifecycle wrapper with `onBeforeStart`/`onBeforeStop` and structured `DomainError` → HTTP mapping). `hono` and `@hono/node-server` are peer deps.
 - **`@litmus/cli`** — CLI entrypoint adapter. Typed command registration, grouped commands, unix socket transport with typed `cliClient` for RPC-style calls. `zod` is a peer dep.
 - **`@litmus/log`** — Structured logging with context propagation via `AsyncLocalStorage`. Pino-backed `Logger` implementation extending the abstract base in core. `pino` is a peer dep.
+- **`@litmus/ai`** — AI SDK adapters. Sub-path `@litmus/ai/vercel` exposes `toVercelTools` for converting a `Toolbox` to Vercel AI SDK tool format. `ai` is a peer dep.
 - **`@litmus/test-acceptance`** _(private)_ — Cross-package acceptance tests. Lives outside core/db/http to avoid coupling adapters to acceptance tests of cross-cutting concerns.
 
 Tests use `it()` (not `test()`) and import test utilities from `vite-plus/test`. Test files are co-located with source files using `.test.ts` suffix.
