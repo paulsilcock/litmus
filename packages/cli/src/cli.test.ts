@@ -50,10 +50,10 @@ class PlaceOrder extends CommandHandler<
   });
 
   // @ts-expect-error — wrong input shape
-  void cli.exec("orders:create", { customerId: 123 });
+  void cli.exec("orders:create", { customerId: 123 }).catch(() => {});
 
   // @ts-expect-error — unknown command name
-  void cli.exec("nonsense", { customerId: "cust_1" });
+  void cli.exec("nonsense", { customerId: "cust_1" }).catch(() => {});
 }
 
 describe("cli", () => {
