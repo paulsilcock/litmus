@@ -26,7 +26,7 @@ export async function serve(
   }
   const httpServer = honoServe({ fetch: app.fetch, port: options.port });
 
-  return {
+  const server: LitmusServer = {
     async stop() {
       if (options.onBeforeStop) {
         await options.onBeforeStop();
@@ -39,4 +39,18 @@ export async function serve(
       });
     },
   };
+
+  const shutdown = async () => {
+    try {
+      await server.stop();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
+  };
+  const onSignal = () => void shutdown();
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+
+  return server;
 }
