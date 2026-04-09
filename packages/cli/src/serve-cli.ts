@@ -1,3 +1,4 @@
+import type { Socket } from "node:net";
 import { createServer } from "node:net";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
@@ -61,9 +62,6 @@ export async function serveCli(
 
   if ("interactive" in argsOrMode) {
     await runInteractive(cli, options);
-    if (options.onBeforeStop) {
-      await options.onBeforeStop();
-    }
     return;
   }
 
@@ -76,9 +74,14 @@ async function runInteractive(
   options: ServeCliOptions,
 ): Promise<void> {
   const stdout = options.stdout ?? ((s: string) => process.stdout.write(s));
+  const exit = options.exit ?? ((code: number) => process.exit(code));
   const input = options.input ?? process.stdin;
 
   const rl = createInterface({ input });
+
+  const onSignal = () => rl.close();
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
   for await (const line of rl) {
     const trimmed = line.trim();
@@ -93,7 +96,12 @@ async function runInteractive(
     });
   }
 
-  const exit = options.exit ?? ((code: number) => process.exit(code));
+  process.off("SIGINT", onSignal);
+  process.off("SIGTERM", onSignal);
+
+  if (options.onBeforeStop) {
+    await options.onBeforeStop();
+  }
   exit(0);
 }
 
@@ -134,18 +142,23 @@ async function runSocket(
   };
 
   const shutdown = async () => {
-    await cliServer.stop();
-    process.exit(0);
+    try {
+      await cliServer.stop();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
   };
-  process.on("SIGINT", () => void shutdown());
-  process.on("SIGTERM", () => void shutdown());
+  const onSignal = () => void shutdown();
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
   return cliServer;
 }
 
 async function handleSocketRequest(
   cli: Cli<any>,
-  connection: import("node:net").Socket,
+  connection: Socket,
   raw: string,
 ): Promise<void> {
   try {

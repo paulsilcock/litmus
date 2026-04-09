@@ -41,11 +41,16 @@ export async function serve(
   };
 
   const shutdown = async () => {
-    await server.stop();
-    process.exit(0);
+    try {
+      await server.stop();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
   };
-  process.on("SIGINT", () => void shutdown());
-  process.on("SIGTERM", () => void shutdown());
+  const onSignal = () => void shutdown();
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
   return server;
 }
