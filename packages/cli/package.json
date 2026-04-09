@@ -1,0 +1,47 @@
+{
+  "name": "@litmus/cli",
+  "version": "0.0.0",
+  "description": "CLI entrypoint adapter for the Litmus framework.",
+  "homepage": "https://github.com/paulsilcock/litmus#readme",
+  "bugs": {
+    "url": "https://github.com/paulsilcock/litmus/issues"
+  },
+  "license": "MIT",
+  "author": "Paul Silcock",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulsilcock/litmus.git",
+    "directory": "packages/cli"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "imports": {
+    "#litmus-cli/*": "./src/*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "@litmus/core": "workspace:*",
+    "yargs-parser": "^21.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/yargs-parser": "^21.0.3",
+    "vite-plus": "catalog:",
+    "zod": "^3.24.0"
+  }
+}
