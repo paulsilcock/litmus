@@ -21,7 +21,7 @@
     "#litmus-http/*": "./src/*"
   },
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": "./src/index.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {

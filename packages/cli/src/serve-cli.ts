@@ -119,7 +119,7 @@ async function runSocket(
     server.listen(socketPath, resolve);
   });
 
-  return {
+  const cliServer: CliServer = {
     async stop() {
       if (options.onBeforeStop) {
         await options.onBeforeStop();
@@ -132,6 +132,15 @@ async function runSocket(
       });
     },
   };
+
+  const shutdown = async () => {
+    await cliServer.stop();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => void shutdown());
+  process.on("SIGTERM", () => void shutdown());
+
+  return cliServer;
 }
 
 async function handleSocketRequest(
