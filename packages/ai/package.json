@@ -21,6 +21,7 @@
     "#litmus-ai/*": "./src/*"
   },
   "exports": {
+    ".": "./src/index.ts",
     "./vercel": "./src/vercel/index.ts",
     "./package.json": "./package.json"
   },
