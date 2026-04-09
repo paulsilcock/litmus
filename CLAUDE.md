@@ -1,14 +1,24 @@
 # Litmus
 
-Litmus is a TypeScript framework for building applications with agentic AI capabilities. It combines building blocks that encourage testable architectures with first-class test utilities to make ATDD, TDD, and eval-driven development the path of least resistance.
+Litmus is a TypeScript framework that makes test-driven development natural for modern applications — including those with non-deterministic AI components. Litmus provides domain primitives and entrypoint adapters that encourage modular, testable architectures, alongside test utilities that bring TDD discipline to acceptance tests and AI evaluations.
+
+## Philosophy
+
+- **TDD as a design methodology.** The primitives are shaped so that writing the test first is the easiest way to build. Acceptance tests, unit tests, and evals all follow the same RED → GREEN → REFACTOR loop.
+- **Agents are actors, not framework features.** An AI agent interacts with the system through use cases — the same way a user would via HTTP or CLI. Litmus provides the entrypoint adapters and the testable boundaries, not the control loop.
+- **Separate deterministic from non-deterministic.** Domain logic, orchestration, and routing are deterministic and tested with conventional assertions. AI tasks (single LLM calls) are the non-deterministic boundary, tested with evaluations and probabilistic assertions.
+- **Only mock dependencies you own.** AI SDK calls are wrapped in application-defined task interfaces, keeping the mockable surface under your control.
 
 ## Packages
 
-This monorepo contains four packages under `packages/`:
+This monorepo contains packages under `packages/`:
 
-- **`@litmus/core`** — Domain primitives and use case types: `AggregateRoot`, `Entity`, `ValueObject`, `DomainEvent`, `DomainError`, `Repository`, `CommandHandler`, `QueryHandler`. Zero vendor deps. Sub-paths: `./db` (DbContext interface), `./id` (prefixedUlid), `./events` (DomainEventDispatcher).
+- **`@litmus/core`** — Domain primitives and use case types: `AggregateRoot`, `Entity`, `ValueObject`, `DomainEvent`, `DomainError`, `Repository`, `CommandHandler`, `QueryHandler`. Sub-paths: `./ai` (AiTask, Agent, Toolbox), `./db` (DbContext interface), `./id` (prefixedUlid), `./events` (DomainEventDispatcher).
 - **`@litmus/db`** — Database adapters. Sub-path `@litmus/db/drizzle/postgres` exposes `DrizzleDbContext`, `DrizzlePostgresRepository`, `ConcurrencyError`. `drizzle-orm` is a peer dep.
 - **`@litmus/http`** — HTTP entrypoint adapter wrapping Hono. Exports `routeHandler` (use case → route with zod validation, verb-based status defaults, SSE streaming, custom respond callback) and `serve` (lifecycle wrapper with `onBeforeStart`/`onBeforeStop` and structured `DomainError` → HTTP mapping). `hono` and `@hono/node-server` are peer deps.
+- **`@litmus/cli`** — CLI entrypoint adapter. Typed command registration, grouped commands, unix socket transport with typed `cliClient` for RPC-style calls. `zod` is a peer dep.
+- **`@litmus/log`** — Structured logging with context propagation via `AsyncLocalStorage`. Pino-backed `Logger` implementation extending the abstract base in core. `pino` is a peer dep.
+- **`@litmus/ai`** — AI SDK adapters. Sub-path `@litmus/ai/vercel` exposes `toVercelTools` for converting a `Toolbox` to Vercel AI SDK tool format. `ai` is a peer dep.
 - **`@litmus/test-acceptance`** _(private)_ — Cross-package acceptance tests. Lives outside core/db/http to avoid coupling adapters to acceptance tests of cross-cutting concerns.
 
 Tests use `it()` (not `test()`) and import test utilities from `vite-plus/test`. Test files are co-located with source files using `.test.ts` suffix.

@@ -59,4 +59,5 @@ For features where multiple classes must collaborate, wrap the inner loop in an 
 ## Stubs
 
 - When a test needs types that don't exist yet, add minimal stubs so it compiles.
+- **Stubs must not make the test pass.** A stub exists only to satisfy the compiler — it should throw or return nothing. If your stubs contain real logic, the test will go GREEN before you've built anything, defeating the entire RED → GREEN → REFACTOR loop. The implementation is built incrementally through the inner loop, not front-loaded into stubs.
 - No "stub" or "not yet implemented" comments.
