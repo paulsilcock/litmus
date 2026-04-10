@@ -47,6 +47,34 @@ describe("trial", () => {
     expect(seen).toEqual(["alice", "bob"]);
   });
 
+  it("fixtures each accepts a name function for dynamic labels", async () => {
+    const fixtures = [
+      { name: "alice", role: "admin" },
+      { name: "bob", role: "user" },
+    ];
+
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
+
+    try {
+      await expect(
+        trial({ fixtures, passRate: 0.5 }).each(
+          ({ name, role }) => `${name} (${role})`,
+          async (fixture) => {
+            if (fixture.name === "bob") throw new Error("denied");
+          },
+        ),
+      ).resolves.toBeUndefined();
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("bob (user)");
+    expect(warnings[0]).toContain("denied");
+  });
+
   it("extend provides fresh context per run", async () => {
     const contextIds: number[] = [];
     let setupCount = 0;

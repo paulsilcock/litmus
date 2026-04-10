@@ -30,13 +30,13 @@ interface SamplesRunner {
 
 interface FixturesRunner<T> {
   each(
-    name: string,
+    name: string | ((fixture: T) => string),
     fn: (fixture: T) => Promise<void>,
     options?: EachOptions,
   ): Promise<void>;
   concurrent: {
     each(
-      name: string,
+      name: string | ((fixture: T) => string),
       fn: (fixture: T) => Promise<void>,
       options?: EachOptions,
     ): Promise<void>;
@@ -50,6 +50,13 @@ function fixtureLabel(fixture: unknown): string {
     if ("id" in fixture && typeof fixture.id === "string") return fixture.id;
   }
   return "fixture";
+}
+
+function resolveLabel<T>(
+  name: string | ((fixture: T) => string),
+  fixture: T,
+): string {
+  return typeof name === "function" ? name(fixture) : fixtureLabel(fixture);
 }
 
 function warnFailure(label: string, e: unknown) {
@@ -154,13 +161,13 @@ interface ContextSamplesRunner<TContext> {
 
 interface ContextFixturesRunner<TFixture, TContext> {
   each(
-    name: string,
+    name: string | ((fixture: TFixture) => string),
     fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
     options?: EachOptions,
   ): Promise<void>;
   concurrent: {
     each(
-      name: string,
+      name: string | ((fixture: TFixture) => string),
       fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
       options?: EachOptions,
     ): Promise<void>;
@@ -183,12 +190,12 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
       const fixtures = options.fixtures;
       return {
         async each(
-          _name: string,
+          name: string | ((fixture: TFixture) => string),
           fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
           const tasks = fixtures.map((fixture) => ({
-            label: fixtureLabel(fixture),
+            label: resolveLabel(name, fixture),
             run: () =>
               setup(async (ctx) => {
                 await fn(fixture, ctx);
@@ -198,12 +205,12 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
         },
         concurrent: {
           async each(
-            _name: string,
+            name: string | ((fixture: TFixture) => string),
             fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
             eachOptions?: EachOptions,
           ) {
             const tasks = fixtures.map((fixture) => ({
-              label: fixtureLabel(fixture),
+              label: resolveLabel(name, fixture),
               run: () =>
                 setup(async (ctx) => {
                   await fn(fixture, ctx);
@@ -274,24 +281,24 @@ export function trial<T>(
     const fixtures = options.fixtures;
     return {
       async each(
-        _name: string,
+        name: string | ((fixture: T) => string),
         fn: (fixture: T) => Promise<void>,
         eachOptions?: EachOptions,
       ) {
         const tasks = fixtures.map((fixture) => ({
-          label: fixtureLabel(fixture),
+          label: resolveLabel(name, fixture),
           run: () => fn(fixture),
         }));
         await runSequential(tasks, passRate, eachOptions?.timeout);
       },
       concurrent: {
         async each(
-          _name: string,
+          name: string | ((fixture: T) => string),
           fn: (fixture: T) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
           const tasks = fixtures.map((fixture) => ({
-            label: fixtureLabel(fixture),
+            label: resolveLabel(name, fixture),
             run: () => fn(fixture),
           }));
           await runConcurrent(
