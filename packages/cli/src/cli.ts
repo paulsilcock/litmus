@@ -3,7 +3,6 @@ import { container } from "tsyringe";
 import yargsParser from "yargs-parser";
 import { ZodError, type ZodSchema } from "zod";
 
-// oxlint-disable-next-line no-unsafe-type-assertion -- container.resolve requires any[] constructor
 type HandlerClass<TInput, TResult> = new (...args: any[]) => {
   handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;
 };

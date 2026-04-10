@@ -63,7 +63,7 @@ describe("serveCli", () => {
     await serveCli(cli, ["orders:create", "--customerId", "cust_1"], {
       stdout: (s) => io.stdout.push(s),
       stderr: (s) => io.stderr.push(s),
-      exit: io.exit,
+      exit: (code) => io.exit(code),
     });
 
     expect(io.exitCode).toBe(0);
@@ -83,7 +83,7 @@ describe("serveCli", () => {
     await serveCli(cli, ["orders:create", "--customerId", "cust_1"], {
       stdout: (s) => io.stdout.push(s),
       stderr: (s) => io.stderr.push(s),
-      exit: io.exit,
+      exit: (code) => io.exit(code),
       onBeforeStart: async () => {
         await new Promise((r) => setTimeout(r, 5));
         started = true;
@@ -107,7 +107,7 @@ describe("serveCli", () => {
     await serveCli(cli, ["orders:create", "--customerId", "cust_1"], {
       stdout: (s) => io.stdout.push(s),
       stderr: (s) => io.stderr.push(s),
-      exit: io.exit,
+      exit: (code) => io.exit(code),
       onBeforeStop: async () => {
         stopped = true;
       },
@@ -132,7 +132,7 @@ describe("serveCli", () => {
       {
         stdout: (s) => io.stdout.push(s),
         stderr: (s) => io.stderr.push(s),
-        exit: io.exit,
+        exit: (code) => io.exit(code),
         input,
       },
     );
@@ -165,7 +165,7 @@ describe("serveCli", () => {
       {
         stdout: (s) => io.stdout.push(s),
         stderr: (s) => io.stderr.push(s),
-        exit: io.exit,
+        exit: (code) => io.exit(code),
         input,
       },
     );
@@ -254,7 +254,7 @@ describe("serveCli", () => {
     await serveCli(cli, ["orders:create", "--customerId", "cust_1"], {
       stdout: (s) => io.stdout.push(s),
       stderr: (s) => io.stderr.push(s),
-      exit: io.exit,
+      exit: (code) => io.exit(code),
       onBeforeStart: async () => {
         throw new Error("db failed");
       },
