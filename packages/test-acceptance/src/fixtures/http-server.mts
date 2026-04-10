@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { serve } from "@litmus/http";
 import { Hono } from "hono";
 

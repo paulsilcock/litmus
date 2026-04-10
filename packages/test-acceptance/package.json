@@ -9,19 +9,20 @@
     "check": "vp check"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.4.2",
-    "@hono/node-server": "^1.19.13",
+    "@electric-sql/pglite": "catalog:",
+    "@hono/node-server": "catalog:",
     "@litmus/ai": "workspace:*",
     "@litmus/cli": "workspace:*",
     "@litmus/core": "workspace:*",
     "@litmus/db": "workspace:*",
     "@litmus/http": "workspace:*",
-    "@types/node": "^25.5.0",
-    "ai": "^6.0.0",
-    "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.2",
-    "hono": "^4.0.0",
+    "@types/node": "catalog:",
+    "ai": "catalog:",
+    "drizzle-kit": "catalog:",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "reflect-metadata": "catalog:",
     "vite-plus": "catalog:",
-    "zod": "^3.24.0"
+    "zod": "catalog:"
   }
 }

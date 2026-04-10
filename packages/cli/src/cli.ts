@@ -1,10 +1,7 @@
-import { DomainError, isAsyncIterable } from "@litmus/core";
+import { DomainError, type HandlerClass, isAsyncIterable } from "@litmus/core";
+import { container } from "tsyringe";
 import yargsParser from "yargs-parser";
 import { ZodError, type ZodSchema } from "zod";
-
-type HandlerClass<TInput, TResult> = new () => {
-  handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;
-};
 
 interface CommandOptions {
   description?: string;
@@ -42,6 +39,33 @@ type PrefixKeys<
   [K in keyof T as K extends string ? `${TPrefix}:${K}` : never]: T[K];
 };
 
+/**
+ * CLI entrypoint adapter with typed command registration and
+ * grouped commands. Follows the same declarative pattern as
+ * HTTP routes and system tools.
+ *
+ * Handler classes are resolved via tsyringe's container, so
+ * constructor dependencies are injected automatically.
+ *
+ * @example
+ * ```typescript
+ * import { Cli } from "@litmus/cli";
+ *
+ * const orderCommands = new Cli()
+ *   .command("create", PlaceOrder, PlaceOrderSchema)
+ *   .command("get", GetOrder, GetOrderSchema);
+ *
+ * const cli = new Cli()
+ *   .command("orders", orderCommands)
+ *   .command("healthcheck", Healthcheck, HealthcheckSchema);
+ *
+ * // Typed programmatic execution
+ * const order = await cli.exec("orders:create", { customerId: "cust_1" });
+ *
+ * // argv execution
+ * await cli.run(process.argv.slice(2));
+ * ```
+ */
 export class Cli<
   TCommands extends Record<string, CommandSchema<any, any>> = {},
 > {
@@ -51,6 +75,15 @@ export class Cli<
     this.#entries = entries ?? new Map();
   }
 
+  /**
+   * Register a command or mount a command group.
+   *
+   * @param name - Command name (used in argv and `exec`). Groups prefix
+   *   sub-command names with `name:` (e.g. `"orders"` → `"orders:create"`).
+   * @param Handler - Use case class. Resolved via tsyringe.
+   * @param schema - Zod schema for input validation from argv flags.
+   * @param options.description - Shown in `--help` output.
+   */
   command<
     TName extends string,
     TInput extends Record<string, unknown>,
@@ -62,6 +95,7 @@ export class Cli<
     options?: CommandOptions,
   ): Cli<TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
 
+  /** Mount a sub-CLI as a command group. */
   command<
     TName extends string,
     TSub extends Record<string, CommandSchema<any, any>>,
@@ -98,7 +132,7 @@ export class Cli<
     const flat = this.#entries.get(name);
     if (flat && !isGroup(flat)) {
       const validated = flat.schema.parse(input);
-      const handler = new flat.Handler();
+      const handler = container.resolve(flat.Handler);
       return handler.handle(validated);
     }
 
@@ -162,7 +196,7 @@ export class Cli<
       throw e;
     }
 
-    const handler = new entry.Handler();
+    const handler = container.resolve(entry.Handler);
     try {
       const result = await handler.handle(input);
       if (isAsyncIterable<unknown>(result)) {

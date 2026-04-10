@@ -39,12 +39,16 @@
     "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/node": "catalog:",
     "@types/yargs-parser": "^21.0.3",
+    "reflect-metadata": "catalog:",
+    "tsyringe": "catalog:",
     "vite-plus": "catalog:",
-    "zod": "^3.24.0"
+    "zod": "catalog:"
   },
   "peerDependencies": {
-    "zod": "^3.24.0"
+    "reflect-metadata": "catalog:",
+    "tsyringe": "catalog:",
+    "zod": "catalog:"
   }
 }

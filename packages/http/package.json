@@ -38,17 +38,21 @@
     "@litmus/core": "workspace:*"
   },
   "devDependencies": {
-    "@hono/node-server": "^1.19.13",
+    "@hono/node-server": "catalog:",
     "@hono/zod-validator": "^0.7.6",
-    "@types/node": "^25.5.0",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
     "get-port": "^7.2.0",
-    "hono": "^4.0.0",
+    "hono": "catalog:",
+    "reflect-metadata": "catalog:",
+    "tsyringe": "catalog:",
     "vite-plus": "catalog:",
-    "zod": "^3.24.0"
+    "zod": "catalog:"
   },
   "peerDependencies": {
-    "@hono/node-server": "^1.19.13",
-    "hono": "^4.0.0"
+    "@hono/node-server": "catalog:",
+    "hono": "catalog:",
+    "reflect-metadata": "catalog:",
+    "tsyringe": "catalog:"
   }
 }

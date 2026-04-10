@@ -1,4 +1,7 @@
+import { container } from "tsyringe";
 import type { ZodSchema } from "zod";
+
+import type { HandlerClass } from "#litmus/use-case/handlers.ts";
 
 /**
  * A bounded unit of AI reasoning with a typed input and output.
@@ -134,11 +137,19 @@ export class Toolbox<TNames extends string = never> {
     this.#entries = entries ?? new Map();
   }
 
+  /**
+   * Register a use case as a system tool.
+   *
+   * @param name - Tool name visible to the LLM.
+   * @param Handler - Use case class (CommandHandler or QueryHandler). Resolved via tsyringe.
+   * @param schema - Zod schema describing the tool's input. Field descriptions
+   *   help the LLM generate correct arguments. Use `.transform()` to map
+   *   LLM-friendly field names to the handler's expected input shape.
+   * @param options.description - Tool description used by the LLM for tool selection.
+   */
   tool<TName extends string, TInput extends Record<string, unknown>, TOutput>(
     name: TName,
-    Handler: new () => {
-      handle(input: TInput): Promise<TOutput> | AsyncIterable<TOutput>;
-    },
+    Handler: HandlerClass<TInput, TOutput>,
     schema: ZodSchema<TInput>,
     options: { description: string },
   ): Toolbox<TNames | TName> {
@@ -146,7 +157,7 @@ export class Toolbox<TNames extends string = never> {
     newEntries.set(name, {
       description: options.description,
       schema,
-      handler: new Handler() as Tool["handler"],
+      handler: container.resolve(Handler) as Tool["handler"],
     });
     return new Toolbox(newEntries);
   }

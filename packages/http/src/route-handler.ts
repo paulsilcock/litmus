@@ -1,13 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { isAsyncIterable } from "@litmus/core";
+import { type HandlerClass, isAsyncIterable } from "@litmus/core";
 import type { Context, Env } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { container } from "tsyringe";
 import type { ZodSchema } from "zod";
-
-type HandlerClass<TInput, TResult> = new () => {
-  handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;
-};
 
 type ValidationTarget = "json" | "param" | "query";
 
@@ -40,6 +37,35 @@ function validationHook(
   }
 }
 
+/**
+ * Adapts a use case handler to a Hono route. Returns a
+ * `[validator, handler]` tuple that spreads into Hono's
+ * route methods, preserving RPC type inference.
+ *
+ * The handler class is resolved via tsyringe's container,
+ * so constructor dependencies are injected automatically.
+ *
+ * Behaviour defaults:
+ * - Invalid input returns 422 with structured validation errors
+ * - `void` results return 204 with no body
+ * - `AsyncIterable` results are streamed as SSE
+ * - POST defaults to 201, all other verbs default to 200
+ *
+ * @param Handler - Use case class (CommandHandler or QueryHandler). Resolved via tsyringe.
+ * @param schema - Zod schema for input validation. Invalid input returns 422.
+ * @param options.target - Where to read input from: `"json"` (default), `"param"`, or `"query"`.
+ * @param options.status - Override the default HTTP status code.
+ * @param options.respond - Custom response callback, bypasses all default response handling.
+ *
+ * @example
+ * ```typescript
+ * import { routeHandler } from "@litmus/http";
+ *
+ * const app = new Hono()
+ *   .post("/orders", ...routeHandler(PlaceOrder, PlaceOrderSchema))
+ *   .get("/orders/:id", ...routeHandler(GetOrder, GetOrderSchema, { target: "param" }));
+ * ```
+ */
 export function routeHandler<TInput extends Record<string, unknown>, TResult>(
   Handler: HandlerClass<TInput, TResult>,
   schema: ZodSchema<TInput>,
@@ -51,7 +77,7 @@ export function routeHandler<TInput extends Record<string, unknown>, TResult>(
     c: Context<Env, string, { out: Record<string, TInput> }>,
   ) => {
     const input = c.req.valid(target);
-    const h = new Handler();
+    const h = container.resolve(Handler);
     const result = await h.handle(input);
     if (options.respond) {
       return options.respond(result, c);

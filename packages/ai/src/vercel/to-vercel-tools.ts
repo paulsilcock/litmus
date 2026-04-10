@@ -6,6 +6,8 @@ import { tool, type Tool } from "ai";
  * compatible tools, suitable for passing to `generateText` or
  * `streamText`.
  *
+ * @param selection - A scoped subset of tools from {@link Toolbox.pick}.
+ *
  * @example
  * ```typescript
  * import { toVercelTools } from "@litmus/ai/vercel";

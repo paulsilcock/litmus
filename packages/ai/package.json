@@ -39,12 +39,12 @@
     "@litmus/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "ai": "^6.0.0",
+    "@types/node": "catalog:",
+    "ai": "catalog:",
     "vite-plus": "catalog:",
-    "zod": "^3.24.0"
+    "zod": "catalog:"
   },
   "peerDependencies": {
-    "ai": "^6.0.0"
+    "ai": "catalog:"
   }
 }
