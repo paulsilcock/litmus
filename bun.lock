@@ -6,6 +6,7 @@
       "name": "litmus",
       "devDependencies": {
         "@typescript/native-preview": "7.0.0-dev.20260328.1",
+        "reflect-metadata": "catalog:",
         "vite-plus": "catalog:",
       },
     },
@@ -130,6 +131,7 @@
         "drizzle-kit": "catalog:",
         "drizzle-orm": "catalog:",
         "hono": "catalog:",
+        "reflect-metadata": "catalog:",
         "vite-plus": "catalog:",
         "zod": "catalog:",
       },
