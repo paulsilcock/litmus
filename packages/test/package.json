@@ -1,0 +1,42 @@
+{
+  "name": "@litmus/test",
+  "version": "0.0.0",
+  "description": "Test utilities for the Litmus framework — trial runner, graders, and simulators.",
+  "homepage": "https://github.com/paulsilcock/litmus#readme",
+  "bugs": {
+    "url": "https://github.com/paulsilcock/litmus/issues"
+  },
+  "license": "MIT",
+  "author": "Paul Silcock",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulsilcock/litmus.git",
+    "directory": "packages/test"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "imports": {
+    "#litmus-test/*": "./src/*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
