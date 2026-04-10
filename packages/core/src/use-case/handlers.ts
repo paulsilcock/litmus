@@ -1,4 +1,13 @@
 /**
+ * A use case handler class that can be resolved by the DI container.
+ * Used by entrypoint adapters (HTTP, CLI, Toolbox) to accept handler
+ * classes and resolve them with injected dependencies.
+ */
+export type HandlerClass<TInput, TResult> = new (...args: any[]) => {
+  handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;
+};
+
+/**
  * Handler for commands (operations that change state).
  *
  * Dependencies are injected via the constructor.

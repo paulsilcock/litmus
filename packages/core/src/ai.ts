@@ -1,6 +1,8 @@
 import { container } from "tsyringe";
 import type { ZodSchema } from "zod";
 
+import type { HandlerClass } from "#litmus/use-case/handlers.ts";
+
 /**
  * A bounded unit of AI reasoning with a typed input and output.
  *
@@ -137,10 +139,7 @@ export class Toolbox<TNames extends string = never> {
 
   tool<TName extends string, TInput extends Record<string, unknown>, TOutput>(
     name: TName,
-    // oxlint-disable-next-line no-unsafe-type-assertion -- container.resolve requires any[] constructor
-    Handler: new (...args: any[]) => {
-      handle(input: TInput): Promise<TOutput> | AsyncIterable<TOutput>;
-    },
+    Handler: HandlerClass<TInput, TOutput>,
     schema: ZodSchema<TInput>,
     options: { description: string },
   ): Toolbox<TNames | TName> {

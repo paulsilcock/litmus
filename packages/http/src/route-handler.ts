@@ -1,14 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { isAsyncIterable } from "@litmus/core";
+import { type HandlerClass, isAsyncIterable } from "@litmus/core";
 import type { Context, Env } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { container } from "tsyringe";
 import type { ZodSchema } from "zod";
-
-type HandlerClass<TInput, TResult> = new (...args: any[]) => {
-  handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;
-};
 
 type ValidationTarget = "json" | "param" | "query";
 

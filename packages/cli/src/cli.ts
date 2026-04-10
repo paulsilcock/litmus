@@ -1,11 +1,7 @@
-import { DomainError, isAsyncIterable } from "@litmus/core";
+import { DomainError, type HandlerClass, isAsyncIterable } from "@litmus/core";
 import { container } from "tsyringe";
 import yargsParser from "yargs-parser";
 import { ZodError, type ZodSchema } from "zod";
-
-type HandlerClass<TInput, TResult> = new (...args: any[]) => {
-  handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;
-};
 
 interface CommandOptions {
   description?: string;
