@@ -75,6 +75,15 @@ export class Cli<
     this.#entries = entries ?? new Map();
   }
 
+  /**
+   * Register a command or mount a command group.
+   *
+   * @param name - Command name (used in argv and `exec`). Groups prefix
+   *   sub-command names with `name:` (e.g. `"orders"` → `"orders:create"`).
+   * @param Handler - Use case class. Resolved via tsyringe.
+   * @param schema - Zod schema for input validation from argv flags.
+   * @param options.description - Shown in `--help` output.
+   */
   command<
     TName extends string,
     TInput extends Record<string, unknown>,
@@ -86,6 +95,7 @@ export class Cli<
     options?: CommandOptions,
   ): Cli<TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
 
+  /** Mount a sub-CLI as a command group. */
   command<
     TName extends string,
     TSub extends Record<string, CommandSchema<any, any>>,

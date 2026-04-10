@@ -137,6 +137,16 @@ export class Toolbox<TNames extends string = never> {
     this.#entries = entries ?? new Map();
   }
 
+  /**
+   * Register a use case as a system tool.
+   *
+   * @param name - Tool name visible to the LLM.
+   * @param Handler - Use case class (CommandHandler or QueryHandler). Resolved via tsyringe.
+   * @param schema - Zod schema describing the tool's input. Field descriptions
+   *   help the LLM generate correct arguments. Use `.transform()` to map
+   *   LLM-friendly field names to the handler's expected input shape.
+   * @param options.description - Tool description used by the LLM for tool selection.
+   */
   tool<TName extends string, TInput extends Record<string, unknown>, TOutput>(
     name: TName,
     Handler: HandlerClass<TInput, TOutput>,

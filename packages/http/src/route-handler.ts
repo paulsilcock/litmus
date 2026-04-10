@@ -51,6 +51,12 @@ function validationHook(
  * - `AsyncIterable` results are streamed as SSE
  * - POST defaults to 201, all other verbs default to 200
  *
+ * @param Handler - Use case class (CommandHandler or QueryHandler). Resolved via tsyringe.
+ * @param schema - Zod schema for input validation. Invalid input returns 422.
+ * @param options.target - Where to read input from: `"json"` (default), `"param"`, or `"query"`.
+ * @param options.status - Override the default HTTP status code.
+ * @param options.respond - Custom response callback, bypasses all default response handling.
+ *
  * @example
  * ```typescript
  * import { routeHandler } from "@litmus/http";
