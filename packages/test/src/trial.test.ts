@@ -107,4 +107,102 @@ describe("trial", () => {
 
     expect(maxActive).toBe(3);
   });
+
+  it("warns on individual sample failures even when trial passes", async () => {
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
+
+    let run = 0;
+    try {
+      await trial({ samples: 3, passRate: 0.5 }).each("some fail", async () => {
+        run++;
+        if (run === 2) throw new Error("boom");
+      });
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("sample 2");
+    expect(warnings[0]).toContain("boom");
+  });
+
+  it("fixtures runner supports concurrent execution", async () => {
+    const sleep = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms));
+
+    const fixtures = [
+      { name: "a" },
+      { name: "b" },
+      { name: "c" },
+      { name: "d" },
+      { name: "e" },
+    ];
+
+    let active = 0;
+    let maxActive = 0;
+
+    await trial({ fixtures }).concurrent.each(
+      "concurrent fixtures",
+      async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await sleep(1);
+        active--;
+      },
+    );
+
+    expect(maxActive).toEqual(5);
+  });
+
+  it("extend with samples supports concurrent execution", async () => {
+    const sleep = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms));
+
+    let active = 0;
+    let maxActive = 0;
+
+    const withCtx = trial.extend<{ n: number }>(async (use) => {
+      await use({ n: 1 });
+    });
+
+    await withCtx({ samples: 5 }).concurrent.each(
+      "concurrent context",
+      async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await sleep(1);
+        active--;
+      },
+    );
+
+    expect(maxActive).toEqual(5);
+  });
+
+  it("times out individual runs that exceed the timeout", async () => {
+    const sleep = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms));
+
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
+
+    try {
+      await expect(
+        trial({ samples: 1 }).each(
+          "slow",
+          async () => {
+            await sleep(500);
+          },
+          { timeout: 10 },
+        ),
+      ).rejects.toThrow("Trial failed");
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("timed out");
+  });
 });

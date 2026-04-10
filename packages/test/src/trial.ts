@@ -10,10 +10,15 @@ interface FixturesOptions<T> {
 
 interface EachOptions {
   concurrency?: number;
+  timeout?: number;
 }
 
 interface SamplesRunner {
-  each(name: string, fn: () => Promise<void>): Promise<void>;
+  each(
+    name: string,
+    fn: () => Promise<void>,
+    options?: EachOptions,
+  ): Promise<void>;
   concurrent: {
     each(
       name: string,
@@ -24,7 +29,32 @@ interface SamplesRunner {
 }
 
 interface FixturesRunner<T> {
-  each(name: string, fn: (fixture: T) => Promise<void>): Promise<void>;
+  each(
+    name: string,
+    fn: (fixture: T) => Promise<void>,
+    options?: EachOptions,
+  ): Promise<void>;
+  concurrent: {
+    each(
+      name: string,
+      fn: (fixture: T) => Promise<void>,
+      options?: EachOptions,
+    ): Promise<void>;
+  };
+}
+
+function fixtureLabel(fixture: unknown): string {
+  if (typeof fixture === "object" && fixture !== null) {
+    if ("name" in fixture && typeof fixture.name === "string")
+      return fixture.name;
+    if ("id" in fixture && typeof fixture.id === "string") return fixture.id;
+  }
+  return "fixture";
+}
+
+function warnFailure(label: string, e: unknown) {
+  const message = e instanceof Error ? e.message : String(e);
+  console.warn(`Trial warning: ${label} failed — ${message}`);
 }
 
 function assertPassRate(passed: number, total: number, required: number) {
@@ -36,19 +66,105 @@ function assertPassRate(passed: number, total: number, required: number) {
   }
 }
 
+interface RunTask {
+  label: string;
+  run: () => Promise<void>;
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms,
+      ),
+    ),
+  ]);
+}
+
+async function runSequential(
+  tasks: RunTask[],
+  passRate: number,
+  timeout?: number,
+) {
+  let passed = 0;
+  for (const task of tasks) {
+    try {
+      const p = task.run();
+      await (timeout ? withTimeout(p, timeout, task.label) : p);
+      passed++;
+    } catch (e) {
+      warnFailure(task.label, e);
+    }
+  }
+  assertPassRate(passed, tasks.length, passRate);
+}
+
+async function runConcurrent(
+  tasks: RunTask[],
+  passRate: number,
+  concurrency: number,
+  timeout?: number,
+) {
+  let passed = 0;
+  let index = 0;
+
+  async function worker() {
+    while (index < tasks.length) {
+      const task = tasks[index++]!;
+      try {
+        const p = task.run();
+        await (timeout ? withTimeout(p, timeout, task.label) : p);
+        passed++;
+      } catch (e) {
+        warnFailure(task.label, e);
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker()),
+  );
+  assertPassRate(passed, tasks.length, passRate);
+}
+
 type SetupFn<TContext> = (
   use: (ctx: TContext) => Promise<void>,
 ) => Promise<void>;
 
 interface ContextSamplesRunner<TContext> {
-  each(name: string, fn: (ctx: TContext) => Promise<void>): Promise<void>;
+  each(
+    name: string,
+    fn: (ctx: TContext) => Promise<void>,
+    options?: EachOptions,
+  ): Promise<void>;
+  concurrent: {
+    each(
+      name: string,
+      fn: (ctx: TContext) => Promise<void>,
+      options?: EachOptions,
+    ): Promise<void>;
+  };
 }
 
 interface ContextFixturesRunner<TFixture, TContext> {
   each(
     name: string,
     fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+    options?: EachOptions,
   ): Promise<void>;
+  concurrent: {
+    each(
+      name: string,
+      fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+      options?: EachOptions,
+    ): Promise<void>;
+  };
 }
 
 trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
@@ -69,38 +185,77 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
         async each(
           _name: string,
           fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+          eachOptions?: EachOptions,
         ) {
-          let passed = 0;
-          for (const fixture of fixtures) {
-            try {
-              await setup(async (ctx) => {
+          const tasks = fixtures.map((fixture) => ({
+            label: fixtureLabel(fixture),
+            run: () =>
+              setup(async (ctx) => {
                 await fn(fixture, ctx);
-              });
-              passed++;
-            } catch {
-              // tracked as failure
-            }
-          }
-          assertPassRate(passed, fixtures.length, passRate);
+              }),
+          }));
+          await runSequential(tasks, passRate, eachOptions?.timeout);
+        },
+        concurrent: {
+          async each(
+            _name: string,
+            fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+            eachOptions?: EachOptions,
+          ) {
+            const tasks = fixtures.map((fixture) => ({
+              label: fixtureLabel(fixture),
+              run: () =>
+                setup(async (ctx) => {
+                  await fn(fixture, ctx);
+                }),
+            }));
+            await runConcurrent(
+              tasks,
+              passRate,
+              eachOptions?.concurrency ?? 5,
+              eachOptions?.timeout,
+            );
+          },
         },
       };
     }
 
     const samples = options.samples;
     return {
-      async each(_name: string, fn: (ctx: TContext) => Promise<void>) {
-        let passed = 0;
-        for (let i = 0; i < samples; i++) {
-          try {
-            await setup(async (ctx) => {
+      async each(
+        _name: string,
+        fn: (ctx: TContext) => Promise<void>,
+        eachOptions?: EachOptions,
+      ) {
+        const tasks = Array.from({ length: samples }, (_, i) => ({
+          label: `sample ${i + 1}`,
+          run: () =>
+            setup(async (ctx) => {
               await fn(ctx);
-            });
-            passed++;
-          } catch {
-            // tracked as failure
-          }
-        }
-        assertPassRate(passed, samples, passRate);
+            }),
+        }));
+        await runSequential(tasks, passRate, eachOptions?.timeout);
+      },
+      concurrent: {
+        async each(
+          _name: string,
+          fn: (ctx: TContext) => Promise<void>,
+          eachOptions?: EachOptions,
+        ) {
+          const tasks = Array.from({ length: samples }, (_, i) => ({
+            label: `sample ${i + 1}`,
+            run: () =>
+              setup(async (ctx) => {
+                await fn(ctx);
+              }),
+          }));
+          await runConcurrent(
+            tasks,
+            passRate,
+            eachOptions?.concurrency ?? 5,
+            eachOptions?.timeout,
+          );
+        },
       },
     };
   }
@@ -118,34 +273,50 @@ export function trial<T>(
   if ("fixtures" in options) {
     const fixtures = options.fixtures;
     return {
-      async each(_name: string, fn: (fixture: T) => Promise<void>) {
-        let passed = 0;
-        for (const fixture of fixtures) {
-          try {
-            await fn(fixture);
-            passed++;
-          } catch {
-            // tracked as failure
-          }
-        }
-        assertPassRate(passed, fixtures.length, passRate);
+      async each(
+        _name: string,
+        fn: (fixture: T) => Promise<void>,
+        eachOptions?: EachOptions,
+      ) {
+        const tasks = fixtures.map((fixture) => ({
+          label: fixtureLabel(fixture),
+          run: () => fn(fixture),
+        }));
+        await runSequential(tasks, passRate, eachOptions?.timeout);
+      },
+      concurrent: {
+        async each(
+          _name: string,
+          fn: (fixture: T) => Promise<void>,
+          eachOptions?: EachOptions,
+        ) {
+          const tasks = fixtures.map((fixture) => ({
+            label: fixtureLabel(fixture),
+            run: () => fn(fixture),
+          }));
+          await runConcurrent(
+            tasks,
+            passRate,
+            eachOptions?.concurrency ?? 5,
+            eachOptions?.timeout,
+          );
+        },
       },
     };
   }
 
   const samples = options.samples;
   return {
-    async each(_name: string, fn: () => Promise<void>) {
-      let passed = 0;
-      for (let i = 0; i < samples; i++) {
-        try {
-          await fn();
-          passed++;
-        } catch {
-          // tracked as failure
-        }
-      }
-      assertPassRate(passed, samples, passRate);
+    async each(
+      _name: string,
+      fn: () => Promise<void>,
+      eachOptions?: EachOptions,
+    ) {
+      const tasks = Array.from({ length: samples }, (_, i) => ({
+        label: `sample ${i + 1}`,
+        run: fn,
+      }));
+      await runSequential(tasks, passRate, eachOptions?.timeout);
     },
     concurrent: {
       async each(
@@ -153,26 +324,16 @@ export function trial<T>(
         fn: () => Promise<void>,
         options?: EachOptions,
       ) {
-        const limit = options?.concurrency ?? 5;
-        let passed = 0;
-        let index = 0;
-
-        async function runNext() {
-          while (index < samples) {
-            index++;
-            try {
-              await fn();
-              passed++;
-            } catch {
-              // tracked as failure
-            }
-          }
-        }
-
-        await Promise.all(
-          Array.from({ length: Math.min(limit, samples) }, () => runNext()),
+        const tasks = Array.from({ length: samples }, (_, i) => ({
+          label: `sample ${i + 1}`,
+          run: fn,
+        }));
+        await runConcurrent(
+          tasks,
+          passRate,
+          options?.concurrency ?? 5,
+          options?.timeout,
         );
-        assertPassRate(passed, samples, passRate);
       },
     },
   };

@@ -120,7 +120,11 @@
       "version": "0.0.0",
       "devDependencies": {
         "@types/node": "catalog:",
+        "ai": "catalog:",
         "vite-plus": "catalog:",
+      },
+      "peerDependencies": {
+        "ai": "catalog:",
       },
     },
     "packages/test-acceptance": {
