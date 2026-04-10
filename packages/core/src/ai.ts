@@ -1,3 +1,4 @@
+import { container } from "tsyringe";
 import type { ZodSchema } from "zod";
 
 /**
@@ -136,7 +137,8 @@ export class Toolbox<TNames extends string = never> {
 
   tool<TName extends string, TInput extends Record<string, unknown>, TOutput>(
     name: TName,
-    Handler: new () => {
+    // oxlint-disable-next-line no-unsafe-type-assertion -- container.resolve requires any[] constructor
+    Handler: new (...args: any[]) => {
       handle(input: TInput): Promise<TOutput> | AsyncIterable<TOutput>;
     },
     schema: ZodSchema<TInput>,
@@ -146,7 +148,7 @@ export class Toolbox<TNames extends string = never> {
     newEntries.set(name, {
       description: options.description,
       schema,
-      handler: new Handler() as Tool["handler"],
+      handler: container.resolve(Handler) as Tool["handler"],
     });
     return new Toolbox(newEntries);
   }

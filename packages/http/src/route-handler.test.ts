@@ -369,6 +369,47 @@ describe("routeHandler", () => {
     expect(res.status).toBe(202);
   });
 
+  it("resolves handlers with constructor dependencies via tsyringe", async () => {
+    const { container, inject, injectable } = await import("tsyringe");
+
+    interface OrderRepository {
+      findById(id: string): Promise<{ id: string; status: string }>;
+    }
+
+    const fakeRepo: OrderRepository = {
+      async findById(id: string) {
+        return { id, status: "shipped" };
+      },
+    };
+
+    container.register("OrderRepository", { useValue: fakeRepo });
+
+    @injectable()
+    class GetOrderWithDeps extends QueryHandler<
+      { id: string },
+      { id: string; status: string }
+    > {
+      constructor(@inject("OrderRepository") private repo: OrderRepository) {
+        super();
+      }
+
+      async handle(query: { id: string }) {
+        return this.repo.findById(query.id);
+      }
+    }
+
+    const app = new Hono().get(
+      "/orders/:id",
+      ...routeHandler(GetOrderWithDeps, GetOrderSchema, { target: "param" }),
+    );
+
+    const res = await app.request("/orders/order_1");
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body).toEqual({ id: "order_1", status: "shipped" });
+  });
+
   it("invalid path params return 422 with validation errors", async () => {
     const app = new Hono().get(
       "/orders/:id",

@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { Cli, serveCli } from "@litmus/cli";
 import { CommandHandler } from "@litmus/core";
 import { z } from "zod";

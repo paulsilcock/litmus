@@ -40,13 +40,13 @@
     "@litmus/core": "workspace:*"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.4.2",
-    "@types/node": "^25.5.0",
-    "drizzle-kit": "^0.31.10",
-    "drizzle-orm": "^0.45.2",
+    "@electric-sql/pglite": "catalog:",
+    "@types/node": "catalog:",
+    "drizzle-kit": "catalog:",
+    "drizzle-orm": "catalog:",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "catalog:"
   }
 }

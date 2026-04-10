@@ -1,8 +1,10 @@
 import { DomainError, isAsyncIterable } from "@litmus/core";
+import { container } from "tsyringe";
 import yargsParser from "yargs-parser";
 import { ZodError, type ZodSchema } from "zod";
 
-type HandlerClass<TInput, TResult> = new () => {
+// oxlint-disable-next-line no-unsafe-type-assertion -- container.resolve requires any[] constructor
+type HandlerClass<TInput, TResult> = new (...args: any[]) => {
   handle(input: TInput): Promise<TResult> | AsyncIterable<TResult>;
 };
 
@@ -42,6 +44,33 @@ type PrefixKeys<
   [K in keyof T as K extends string ? `${TPrefix}:${K}` : never]: T[K];
 };
 
+/**
+ * CLI entrypoint adapter with typed command registration and
+ * grouped commands. Follows the same declarative pattern as
+ * HTTP routes and system tools.
+ *
+ * Handler classes are resolved via tsyringe's container, so
+ * constructor dependencies are injected automatically.
+ *
+ * @example
+ * ```typescript
+ * import { Cli } from "@litmus/cli";
+ *
+ * const orderCommands = new Cli()
+ *   .command("create", PlaceOrder, PlaceOrderSchema)
+ *   .command("get", GetOrder, GetOrderSchema);
+ *
+ * const cli = new Cli()
+ *   .command("orders", orderCommands)
+ *   .command("healthcheck", Healthcheck, HealthcheckSchema);
+ *
+ * // Typed programmatic execution
+ * const order = await cli.exec("orders:create", { customerId: "cust_1" });
+ *
+ * // argv execution
+ * await cli.run(process.argv.slice(2));
+ * ```
+ */
 export class Cli<
   TCommands extends Record<string, CommandSchema<any, any>> = {},
 > {
@@ -98,7 +127,7 @@ export class Cli<
     const flat = this.#entries.get(name);
     if (flat && !isGroup(flat)) {
       const validated = flat.schema.parse(input);
-      const handler = new flat.Handler();
+      const handler = container.resolve(flat.Handler);
       return handler.handle(validated);
     }
 
@@ -162,7 +191,7 @@ export class Cli<
       throw e;
     }
 
-    const handler = new entry.Handler();
+    const handler = container.resolve(entry.Handler);
     try {
       const result = await handler.handle(input);
       if (isAsyncIterable<unknown>(result)) {

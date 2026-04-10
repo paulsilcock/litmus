@@ -8,6 +8,8 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "noUnusedLocals": true,
     "declaration": false,
     "noEmit": true,
