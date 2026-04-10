@@ -115,6 +115,14 @@
         "vite-plus": "catalog:",
       },
     },
+    "packages/test": {
+      "name": "@litmus/test",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "catalog:",
+        "vite-plus": "catalog:",
+      },
+    },
     "packages/test-acceptance": {
       "name": "@litmus/test-acceptance",
       "version": "0.0.0",
@@ -126,6 +134,7 @@
         "@litmus/core": "workspace:*",
         "@litmus/db": "workspace:*",
         "@litmus/http": "workspace:*",
+        "@litmus/test": "workspace:*",
         "@types/node": "catalog:",
         "ai": "catalog:",
         "drizzle-kit": "catalog:",
@@ -238,6 +247,8 @@
     "@litmus/http": ["@litmus/http@workspace:packages/http"],
 
     "@litmus/log": ["@litmus/log@workspace:packages/log"],
+
+    "@litmus/test": ["@litmus/test@workspace:packages/test"],
 
     "@litmus/test-acceptance": ["@litmus/test-acceptance@workspace:packages/test-acceptance"],
 
