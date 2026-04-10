@@ -21,6 +21,7 @@
     "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
+    "reflect-metadata": "catalog:",
     "vite-plus": "catalog:",
     "zod": "catalog:"
   }
