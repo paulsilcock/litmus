@@ -11,8 +11,16 @@ import {
   schema,
 } from "@litmus/db/test-support/fixtures";
 import { pushSchema } from "drizzle-kit/api";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import {
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vite-plus/test";
 
 describe("saving aggregates with domain events", () => {
   let ctx: DrizzleDbContext;
@@ -20,7 +28,7 @@ describe("saving aggregates with domain events", () => {
   let customerRepo: CustomerRepository;
   let dispatcher: DomainEventDispatcher;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const client = new PGlite();
     const rawDb = drizzle(client);
     const { apply } = await pushSchema(schema, rawDb);
@@ -31,6 +39,10 @@ describe("saving aggregates with domain events", () => {
     ctx = new DrizzleDbContext(db, dispatcher);
     orderRepo = new OrderRepository(ctx);
     customerRepo = new CustomerRepository(ctx);
+  });
+
+  beforeEach(async () => {
+    await ctx.db.execute(sql`TRUNCATE orders, customers`);
   });
 
   it("event handlers are called after saving", async () => {

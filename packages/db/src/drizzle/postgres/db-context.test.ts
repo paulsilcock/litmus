@@ -4,7 +4,7 @@ import { DomainEventDispatcher } from "@litmus/core/events";
 import { pushSchema } from "drizzle-kit/api";
 import { integer, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
 
@@ -24,9 +24,8 @@ const schema = { items };
 describe("DrizzleDbContext", () => {
   let ctx: DrizzleDbContext;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const client = new PGlite();
-
     const rawDb = drizzle(client);
     const { apply } = await pushSchema(schema, rawDb);
     await apply();
