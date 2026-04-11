@@ -49,4 +49,39 @@ describe("UserSimulator", () => {
     ]);
     expect(conversation.outcome).toBe("goal_met");
   });
+
+  it("gives up after max turns when the user never reaches their goal", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ message: "still trying", done: false }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const simulator = new UserSimulator({
+      model,
+      persona: "Stubborn customer",
+      goal: "Get a refund",
+      maxTurns: 3,
+    });
+
+    const handler = async () => "I can't help with that";
+
+    const conversation = await simulator.simulate({ handler });
+
+    expect(conversation.outcome).toBe("max_turns");
+    expect(conversation.turns).toHaveLength(6);
+    expect(
+      conversation.turns.filter((t) => t.role === "user"),
+    ).toHaveLength(3);
+    expect(
+      conversation.turns.filter((t) => t.role === "assistant"),
+    ).toHaveLength(3);
+  });
 });
