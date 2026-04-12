@@ -174,6 +174,30 @@ interface ContextFixturesRunner<TFixture, TContext> {
   };
 }
 
+/**
+ * Creates a trial runner with per-run setup and teardown.
+ * Each run gets a fresh context — essential for concurrent execution
+ * where shared state would cause interference.
+ *
+ * @param setup - Async function that creates context, passes it to
+ *   `use()`, and runs teardown after `use()` returns.
+ *
+ * @example
+ * ```typescript
+ * const withDsl = trial.extend<{ dsl: Dsl }>(async (use) => {
+ *   const dsl = new Dsl();
+ *   await dsl.setup();
+ *   await use({ dsl });
+ *   await dsl.cleanup();
+ * });
+ *
+ * withDsl({ fixtures, passRate: 0.8 })
+ *   .concurrent.each("screens $name correctly", async (fixture, { dsl }) => {
+ *     await dsl.submitApplication(fixture.cv);
+ *     await dsl.assertScreeningResult(fixture.expected);
+ *   });
+ * ```
+ */
 trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
   function extended(options: SamplesOptions): ContextSamplesRunner<TContext>;
   function extended<TFixture>(
@@ -270,6 +294,41 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
   return extended;
 };
 
+/**
+ * Probabilistic test runner for non-deterministic behaviour.
+ * Runs a test function multiple times and asserts that enough
+ * runs pass to meet a threshold.
+ *
+ * Two modes:
+ * - **Samples**: run N times with random/repeated input
+ * - **Fixtures**: run once per fixture from an array
+ *
+ * Supports sequential (default) and concurrent execution via
+ * `.concurrent.each()`, with configurable concurrency limits
+ * and per-run timeouts.
+ *
+ * @param options.samples - Number of times to run the test.
+ * @param options.fixtures - Array of test cases to iterate.
+ * @param options.passRate - Minimum pass ratio (0–1, default 1).
+ *
+ * @example
+ * ```typescript
+ * // Samples mode: 80% of 10 runs must pass
+ * await trial({ samples: 10, passRate: 0.8 })
+ *   .each("classifies intent", async () => {
+ *     const result = await classifier.run("I want a refund");
+ *     expect(result.intent).toBe("refund");
+ *   });
+ *
+ * // Fixtures mode: run against each test case
+ * await trial({ fixtures: candidates, passRate: 0.8 })
+ *   .concurrent.each(
+ *     ({ name }) => `screens ${name}`,
+ *     async (fixture) => { ... },
+ *     { concurrency: 5, timeout: 30_000 },
+ *   );
+ * ```
+ */
 export function trial(options: SamplesOptions): SamplesRunner;
 export function trial<T>(options: FixturesOptions<T>): FixturesRunner<T>;
 export function trial<T>(
