@@ -11,6 +11,7 @@ interface UserSimulatorOptions {
 type HandlerResult = string | { done: boolean; reason: string };
 
 interface SimulationInput {
+  opening?: string;
   handler: (message: string) => Promise<HandlerResult>;
 }
 
@@ -65,20 +66,29 @@ export class UserSimulator {
     const turns: ConversationTurn[] = [];
 
     for (let i = 0; i < this.#maxTurns; i++) {
-      const result = await generateText({
-        model: this.#model,
-        prompt: buildPrompt(this.#persona, this.#goal, turns),
-        output: Output.object({ schema: userResponseSchema }),
-      });
+      let userMessage: string;
+      let done: boolean;
 
-      const userResponse = result.output;
-      turns.push({ role: "user", content: userResponse.message });
+      if (i === 0 && input.opening) {
+        userMessage = input.opening;
+        done = false;
+      } else {
+        const result = await generateText({
+          model: this.#model,
+          prompt: buildPrompt(this.#persona, this.#goal, turns),
+          output: Output.object({ schema: userResponseSchema }),
+        });
+        userMessage = result.output.message;
+        done = result.output.done;
+      }
 
-      if (userResponse.done) {
+      turns.push({ role: "user", content: userMessage });
+
+      if (done) {
         return { turns, outcome: "goal_met" };
       }
 
-      const assistantResponse = await input.handler(userResponse.message);
+      const assistantResponse = await input.handler(userMessage);
       if (typeof assistantResponse !== "string") {
         return { turns, outcome: "system_terminated" };
       }

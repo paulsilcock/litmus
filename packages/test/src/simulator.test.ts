@@ -117,4 +117,39 @@ describe("UserSimulator", () => {
       content: "you're useless",
     });
   });
+
+  it("uses the provided opening message instead of generating one", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ message: "Great, thanks!", done: true }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const simulator = new UserSimulator({
+      model,
+      persona: "Customer",
+      goal: "Get my balance",
+    });
+
+    const conversation = await simulator.simulate({
+      opening: "What's my balance?",
+      handler: async () => "$1250",
+    });
+
+    expect(conversation.turns[0]).toEqual({
+      role: "user",
+      content: "What's my balance?",
+    });
+    expect(conversation.turns[1]).toEqual({
+      role: "assistant",
+      content: "$1250",
+    });
+  });
 });
