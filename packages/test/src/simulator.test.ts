@@ -35,12 +35,12 @@ describe("UserSimulator", () => {
       goal: "Find out my account balance",
     });
 
-    const handler = async (message: string) => {
+    const onMessage = async (message: string) => {
       if (message.toLowerCase().includes("balance")) return "$1250";
       return "OK";
     };
 
-    const conversation = await simulator.simulate({ handler });
+    const conversation = await simulator.run({ onMessage });
 
     expect(conversation.turns).toEqual([
       { role: "user", content: "What's my balance?" },
@@ -71,9 +71,9 @@ describe("UserSimulator", () => {
       maxTurns: 3,
     });
 
-    const handler = async () => "I can't help with that";
+    const onMessage = async () => "I can't help with that";
 
-    const conversation = await simulator.simulate({ handler });
+    const conversation = await simulator.run({ onMessage });
 
     expect(conversation.outcome).toBe("max_turns");
     expect(conversation.turns).toHaveLength(6);
@@ -103,14 +103,14 @@ describe("UserSimulator", () => {
       goal: "Win the argument",
     });
 
-    const handler = async () => ({
+    const onMessage = async () => ({
       done: true,
       reason: "abusive language",
     });
 
-    const conversation = await simulator.simulate({ handler });
+    const conversation = await simulator.run({ onMessage });
 
-    expect(conversation.outcome).toBe("system_terminated");
+    expect(conversation.outcome).toBe("terminated");
     expect(conversation.turns).toHaveLength(1);
     expect(conversation.turns[0]).toEqual({
       role: "user",
@@ -138,9 +138,9 @@ describe("UserSimulator", () => {
       goal: "Get my balance",
     });
 
-    const conversation = await simulator.simulate({
+    const conversation = await simulator.run({
       opening: "What's my balance?",
-      handler: async () => "$1250",
+      onMessage: async () => "$1250",
     });
 
     expect(conversation.turns[0]).toEqual({
@@ -215,8 +215,8 @@ describe("UserSimulator", () => {
       },
     });
 
-    const conversation = await simulator.simulate({
-      handler: async () => "$45.00",
+    const conversation = await simulator.run({
+      onMessage: async () => "$45.00",
     });
 
     expect(toolCalls).toEqual([{ code: "SAVE10" }]);
