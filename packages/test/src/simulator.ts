@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel, Output } from "ai";
+import { generateText, type LanguageModel, Output, stepCountIs } from "ai";
 import { z } from "zod";
 
 interface UserSimulatorOptions {
@@ -6,6 +6,7 @@ interface UserSimulatorOptions {
   persona: string;
   goal: string;
   maxTurns?: number;
+  tools?: Record<string, any>;
 }
 
 type HandlerResult = string | { done: boolean; reason: string };
@@ -54,12 +55,14 @@ export class UserSimulator {
   readonly #persona: string;
   readonly #goal: string;
   readonly #maxTurns: number;
+  readonly #tools: Record<string, any> | undefined;
 
   constructor(options: UserSimulatorOptions) {
     this.#model = options.model;
     this.#persona = options.persona;
     this.#goal = options.goal;
     this.#maxTurns = options.maxTurns ?? 10;
+    this.#tools = options.tools;
   }
 
   async simulate(input: SimulationInput): Promise<Conversation> {
@@ -77,6 +80,8 @@ export class UserSimulator {
           model: this.#model,
           prompt: buildPrompt(this.#persona, this.#goal, turns),
           output: Output.object({ schema: userResponseSchema }),
+          tools: this.#tools,
+          stopWhen: this.#tools ? stepCountIs(this.#maxTurns) : undefined,
         });
         userMessage = result.output.message;
         done = result.output.done;

@@ -152,4 +152,82 @@ describe("UserSimulator", () => {
       content: "$1250",
     });
   });
+
+  it("simulated user can take actions via tools before responding", async () => {
+    const toolCalls: Array<{ code: string }> = [];
+
+    const responses = [
+      {
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: "call_1",
+            toolName: "apply_discount",
+            input: JSON.stringify({ code: "SAVE10" }),
+          },
+        ],
+        finishReason: { unified: "tool-calls" as const, raw: undefined },
+      },
+      {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              message: "I've applied my discount code, what's the total?",
+              done: false,
+            }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      },
+      {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ message: "Thanks!", done: true }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      },
+    ];
+    let callIndex = 0;
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        ...responses[callIndex++],
+      }),
+    });
+
+    const simulator = new UserSimulator({
+      model,
+      persona: "Bargain hunter",
+      goal: "Apply discount code and check total",
+      tools: {
+        apply_discount: {
+          description: "Apply a discount code",
+          parameters: { code: { type: "string" } },
+          execute: async (args: { code: string }) => {
+            toolCalls.push(args);
+            return { applied: true };
+          },
+        },
+      },
+    });
+
+    const conversation = await simulator.simulate({
+      handler: async () => "$45.00",
+    });
+
+    expect(toolCalls).toEqual([{ code: "SAVE10" }]);
+    expect(conversation.turns).toEqual([
+      {
+        role: "user",
+        content: "I've applied my discount code, what's the total?",
+      },
+      { role: "assistant", content: "$45.00" },
+      { role: "user", content: "Thanks!" },
+    ]);
+    expect(conversation.outcome).toBe("goal_met");
+  });
 });
