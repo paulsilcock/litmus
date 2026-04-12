@@ -8,8 +8,10 @@ interface UserSimulatorOptions {
   maxTurns?: number;
 }
 
+type HandlerResult = string | { done: boolean; reason: string };
+
 interface SimulationInput {
-  handler: (message: string) => Promise<string>;
+  handler: (message: string) => Promise<HandlerResult>;
 }
 
 interface ConversationTurn {
@@ -19,7 +21,7 @@ interface ConversationTurn {
 
 interface Conversation {
   turns: ConversationTurn[];
-  outcome: "goal_met" | "max_turns";
+  outcome: "goal_met" | "max_turns" | "system_terminated";
 }
 
 const userResponseSchema = z.object({
@@ -77,6 +79,9 @@ export class UserSimulator {
       }
 
       const assistantResponse = await input.handler(userResponse.message);
+      if (typeof assistantResponse !== "string") {
+        return { turns, outcome: "system_terminated" };
+      }
       turns.push({ role: "assistant", content: assistantResponse });
     }
 

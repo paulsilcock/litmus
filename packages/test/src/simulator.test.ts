@@ -77,11 +77,44 @@ describe("UserSimulator", () => {
 
     expect(conversation.outcome).toBe("max_turns");
     expect(conversation.turns).toHaveLength(6);
-    expect(
-      conversation.turns.filter((t) => t.role === "user"),
-    ).toHaveLength(3);
+    expect(conversation.turns.filter((t) => t.role === "user")).toHaveLength(3);
     expect(
       conversation.turns.filter((t) => t.role === "assistant"),
     ).toHaveLength(3);
+  });
+
+  it("ends the conversation when the system terminates it", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ message: "you're useless", done: false }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const simulator = new UserSimulator({
+      model,
+      persona: "Abusive customer",
+      goal: "Win the argument",
+    });
+
+    const handler = async () => ({
+      done: true,
+      reason: "abusive language",
+    });
+
+    const conversation = await simulator.simulate({ handler });
+
+    expect(conversation.outcome).toBe("system_terminated");
+    expect(conversation.turns).toHaveLength(1);
+    expect(conversation.turns[0]).toEqual({
+      role: "user",
+      content: "you're useless",
+    });
   });
 });
