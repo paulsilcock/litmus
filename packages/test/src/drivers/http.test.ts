@@ -13,6 +13,10 @@ const app = new Hono()
   .post("/orders", async (c) => {
     const body = await c.req.json();
     return c.json({ id: "order_2", ...body }, 201);
+  })
+  .post("/login", async (c) => {
+    const body = await c.req.parseBody();
+    return c.json({ username: body.username, authenticated: true });
   });
 
 describe("BaseHttpDriver", () => {
@@ -44,5 +48,17 @@ describe("BaseHttpDriver", () => {
 
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ id: "order_2", customerId: "cust_1" });
+  });
+
+  it("posts form data with automatic content-type", async () => {
+    const res = await driver.post("/login", {
+      form: { username: "alice", password: "secret" },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      username: "alice",
+      authenticated: true,
+    });
   });
 });
