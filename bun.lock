@@ -89,7 +89,6 @@
         "@hono/zod-validator": "^0.7.6",
         "@types/node": "catalog:",
         "@typescript/native-preview": "7.0.0-dev.20260328.1",
-        "get-port": "^7.2.0",
         "hono": "catalog:",
         "reflect-metadata": "catalog:",
         "tsyringe": "catalog:",
@@ -118,9 +117,14 @@
     "packages/test": {
       "name": "@litmus/test",
       "version": "0.0.0",
+      "dependencies": {
+        "zod": "catalog:",
+      },
       "devDependencies": {
+        "@hono/node-server": "catalog:",
         "@types/node": "catalog:",
         "ai": "catalog:",
+        "hono": "catalog:",
         "vite-plus": "catalog:",
       },
       "peerDependencies": {
@@ -429,8 +433,6 @@
     "fdir": ["fdir@6.5.0", "", { "peerDependencies": { "picomatch": "^3 || ^4" }, "optionalPeers": ["picomatch"] }, "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg=="],
 
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
-
-    "get-port": ["get-port@7.2.0", "", {}, "sha512-afP4W205ONCuMoPBqcR6PSXnzX35KTcJygfJfcp+QY+uwm3p20p1YczWXhlICIzGMCxYBQcySEcOgsJcrkyobg=="],
 
     "get-tsconfig": ["get-tsconfig@4.13.7", "", { "dependencies": { "resolve-pkg-maps": "^1.0.0" } }, "sha512-7tN6rFgBlMgpBML5j8typ92BKFi2sFQvIdpAqLA2beia5avZDrMs0FLZiM5etShWq5irVyGcGMEA1jcDaK7A/Q=="],
 

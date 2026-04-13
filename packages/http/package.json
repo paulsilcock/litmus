@@ -42,7 +42,6 @@
     "@hono/zod-validator": "^0.7.6",
     "@types/node": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
-    "get-port": "^7.2.0",
     "hono": "catalog:",
     "reflect-metadata": "catalog:",
     "tsyringe": "catalog:",

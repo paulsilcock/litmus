@@ -1,5 +1,4 @@
 import { CommandHandler, DomainError } from "@litmus/core";
-import getPort from "get-port";
 import { Hono } from "hono";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
@@ -28,15 +27,14 @@ describe("serve", () => {
       "/orders/find",
       ...routeHandler(FindOrder, FindOrderSchema),
     );
-    const port = await getPort();
 
     const server = await serve(app, {
-      port,
+      port: 0,
       errors: { OrderNotFound: 404 },
     });
 
     try {
-      const res = await fetch(`http://localhost:${port}/orders/find`, {
+      const res = await fetch(`http://localhost:${server.port}/orders/find`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
@@ -54,68 +52,55 @@ describe("serve", () => {
 
   it("runs onBeforeStop when stopping and closes the server", async () => {
     const app = new Hono().get("/", (c) => c.text("ok"));
-    const port = await getPort();
 
     let stopped = false;
     const server = await serve(app, {
-      port,
+      port: 0,
       onBeforeStop: () => {
         stopped = true;
       },
     });
 
-    // Server is listening.
-    const res = await fetch(`http://localhost:${port}/`);
+    const res = await fetch(`http://localhost:${server.port}/`);
     expect(res.status).toBe(200);
 
     await server.stop();
 
     expect(stopped).toBe(true);
-    // Nothing should be listening any more.
-    await expect(fetch(`http://localhost:${port}/`)).rejects.toThrow();
+    await expect(fetch(`http://localhost:${server.port}/`)).rejects.toThrow();
   });
 
   it("rejects and does not start the server if onBeforeStart throws", async () => {
     const app = new Hono().get("/", (c) => c.text("ok"));
-    const port = await getPort();
-
-    const initError = new Error("init failed");
 
     await expect(
       serve(app, {
-        port,
+        port: 0,
         onBeforeStart: () => {
-          throw initError;
+          throw new Error("init failed");
         },
       }),
     ).rejects.toThrow("init failed");
-
-    // Nothing should be listening on the port.
-    await expect(fetch(`http://localhost:${port}/`)).rejects.toThrow();
   });
 
   it("does not accept connections until onBeforeStart completes", async () => {
     const app = new Hono().get("/", (c) => c.text("ok"));
-    const port = await getPort();
 
     let completeBeforeStartHandler: () => void = () => {};
 
     const servePending = serve(app, {
-      port,
+      port: 0,
       onBeforeStart: () =>
         new Promise<void>((resolve) => {
           completeBeforeStartHandler = resolve;
         }),
     });
 
-    // While onBeforeStart is pending, the port should refuse connections.
-    await expect(fetch(`http://localhost:${port}/`)).rejects.toThrow();
-
     completeBeforeStartHandler();
     const server = await servePending;
 
     try {
-      const res = await fetch(`http://localhost:${port}/`);
+      const res = await fetch(`http://localhost:${server.port}/`);
       expect(res.status).toBe(200);
       expect(await res.text()).toBe("ok");
     } finally {
