@@ -13,5 +13,18 @@ export abstract class BaseHttpDriver {
     return fetch(`${this.#baseUrl}${path}`);
   }
 
+  async post(
+    path: string,
+    options?: { json?: unknown },
+  ): Promise<Response> {
+    return fetch(`${this.#baseUrl}${path}`, {
+      method: "POST",
+      headers: options?.json
+        ? { "Content-Type": "application/json" }
+        : undefined,
+      body: options?.json ? JSON.stringify(options.json) : undefined,
+    });
+  }
+
   abstract cleanup(): Promise<void>;
 }

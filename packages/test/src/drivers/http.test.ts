@@ -8,7 +8,12 @@ class TestDriver extends BaseHttpDriver {
   async cleanup() {}
 }
 
-const app = new Hono().get("/orders", (c) => c.json([{ id: "order_1" }]));
+const app = new Hono()
+  .get("/orders", (c) => c.json([{ id: "order_1" }]))
+  .post("/orders", async (c) => {
+    const body = await c.req.json();
+    return c.json({ id: "order_2", ...body }, 201);
+  });
 
 describe("BaseHttpDriver", () => {
   let server: ReturnType<typeof serve>;
@@ -30,5 +35,14 @@ describe("BaseHttpDriver", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([{ id: "order_1" }]);
+  });
+
+  it("posts JSON with automatic content-type", async () => {
+    const res = await driver.post("/orders", {
+      json: { customerId: "cust_1" },
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: "order_2", customerId: "cust_1" });
   });
 });
