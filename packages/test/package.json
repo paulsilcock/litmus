@@ -38,11 +38,18 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@hono/node-server": "catalog:",
+    "@litmus/cli": "workspace:*",
     "@types/node": "catalog:",
     "ai": "catalog:",
+    "hono": "catalog:",
+    "playwright": "catalog:",
+    "reflect-metadata": "catalog:",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "ai": "catalog:"
+    "@litmus/cli": "workspace:*",
+    "ai": "catalog:",
+    "playwright": "catalog:"
   }
 }

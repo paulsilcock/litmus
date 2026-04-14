@@ -19,6 +19,7 @@ This monorepo contains packages under `packages/`:
 - **`@litmus/cli`** — CLI entrypoint adapter. Typed command registration, grouped commands, unix socket transport with typed `cliClient` for RPC-style calls. `zod` is a peer dep.
 - **`@litmus/log`** — Structured logging with context propagation via `AsyncLocalStorage`. Pino-backed `Logger` implementation extending the abstract base in core. `pino` is a peer dep.
 - **`@litmus/ai`** — AI SDK adapters. Sub-path `@litmus/ai/vercel` exposes `toVercelTools` for converting a `Toolbox` to Vercel AI SDK tool format. `ai` is a peer dep.
+- **`@litmus/test`** — Test utilities for non-deterministic and acceptance testing. `trial()` probabilistic runner (samples, fixtures, pass rates, extend, concurrent), `Grader` type for LLM-as-judge functions, `UserSimulator` for multi-turn conversation simulation, and abstract base drivers for ATDD: `BaseHttpDriver`, `BaseHonoDriver<T>`, `BaseLitmusCliDriver<T>`, `BaseBrowserDriver`. All drivers extend `BaseDriver` with async `init()` and `cleanup()` lifecycle. `ai`, `playwright`, and `@litmus/cli` are peer deps. For browser tests: `vp dlx playwright install --with-deps chromium`.
 - **`@litmus/test-acceptance`** _(private)_ — Cross-package acceptance tests. Lives outside core/db/http to avoid coupling adapters to acceptance tests of cross-cutting concerns.
 
 Tests use `it()` (not `test()`) and import test utilities from `vite-plus/test`. Test files are co-located with source files using `.test.ts` suffix.

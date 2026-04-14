@@ -12,6 +12,7 @@ interface ServeOptions {
 }
 
 export interface LitmusServer {
+  port: number;
   stop(): Promise<void>;
 }
 
@@ -26,7 +27,12 @@ export async function serve(
   }
   const httpServer = honoServe({ fetch: app.fetch, port: options.port });
 
+  const address = httpServer.address();
+  const port =
+    typeof address === "object" && address ? address.port : (options.port ?? 0);
+
   const server: LitmusServer = {
+    port,
     async stop() {
       if (options.onBeforeStop) {
         await options.onBeforeStop();
