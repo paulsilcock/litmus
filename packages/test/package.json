@@ -43,11 +43,13 @@
     "@types/node": "catalog:",
     "ai": "catalog:",
     "hono": "catalog:",
+    "playwright": "catalog:",
     "reflect-metadata": "catalog:",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
     "@litmus/cli": "workspace:*",
-    "ai": "catalog:"
+    "ai": "catalog:",
+    "playwright": "catalog:"
   }
 }
