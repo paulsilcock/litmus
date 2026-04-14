@@ -9,6 +9,10 @@ const app = new Hono().get("/orders", (c) => c.json([{ id: "order_1" }]));
 type App = typeof app;
 
 class TestDriver extends BaseHonoDriver<App> {
+  async listOrders() {
+    const res = await this.client.orders.$get();
+    return res.json();
+  }
   async cleanup() {}
 }
 
@@ -27,10 +31,9 @@ describe("BaseHonoDriver", () => {
     server.close();
   });
 
-  it("can make type-safe requests via the hono client", async () => {
-    const res = await driver.client.orders.$get();
+  it("subclasses can make type-safe requests via the hono client", async () => {
+    const orders = await driver.listOrders();
 
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([{ id: "order_1" }]);
+    expect(orders).toEqual([{ id: "order_1" }]);
   });
 });

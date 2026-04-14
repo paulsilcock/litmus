@@ -6,7 +6,7 @@ interface HonoDriverOptions {
 }
 
 export abstract class BaseHonoDriver<T extends Hono> {
-  readonly client: ReturnType<typeof hc<T>>;
+  protected readonly client: ReturnType<typeof hc<T>>;
 
   constructor(options: HonoDriverOptions) {
     this.client = hc<T>(options.baseUrl);
