@@ -22,6 +22,11 @@ interface BrowserDriverOptions {
  * synchronously, then call `await driver.init()` to launch the
  * browser before use, and `await driver.cleanup()` to release it.
  *
+ * **Prefer semantic locators** like `page.getByRole("button", { name: "Submit" })`
+ * over CSS or XPath selectors. They're resilient to markup changes,
+ * mirror how users find elements, and surface accessibility issues.
+ * Avoid IDs and class names tied to styling.
+ *
  * **Setup:** Playwright is a peer dependency. Install it and the
  * Chromium binary before running browser tests:
  *
@@ -40,8 +45,8 @@ interface BrowserDriverOptions {
  * class OrderDriver extends BaseBrowserDriver {
  *   async placeOrder(customerId: string) {
  *     await this.page.goto("/orders/new");
- *     await this.page.fill("#customer", customerId);
- *     await this.page.click("button[type=submit]");
+ *     await this.page.getByLabel("Customer").fill(customerId);
+ *     await this.page.getByRole("button", { name: "Place order" }).click();
  *   }
  * }
  *
