@@ -12,7 +12,7 @@ export interface OrderLine {
   price: number;
 }
 
-export type OrderStatus = "placed";
+export type OrderStatus = "placed" | "failed";
 
 interface OrderData extends AggregateData<OrderId> {
   customerId: CustomerId;
@@ -32,6 +32,19 @@ export class Order extends AggregateRoot<OrderData, OrderId> {
     lines: OrderLine[];
   }): Order {
     return new Order({ ...init, status: "placed" });
+  }
+
+  /**
+   * Record a failed checkout attempt. Kept as an audit trail so the
+   * customer (and operators) can see that a purchase was attempted
+   * but payment was rejected — money was never taken.
+   */
+  static fail(init: {
+    id: OrderId;
+    customerId: CustomerId;
+    lines: OrderLine[];
+  }): Order {
+    return new Order({ ...init, status: "failed" });
   }
 
   get customerId(): CustomerId {

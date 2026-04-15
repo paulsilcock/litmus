@@ -23,7 +23,7 @@ describe("bookshop", () => {
   });
 
   beforeEach(() => {
-    dsl = new BookshopDsl(bookshop.baseUrl);
+    dsl = new BookshopDsl(bookshop.baseUrl, bookshop.emailStubBaseUrl);
   });
 
   afterEach(async () => {
@@ -36,7 +36,10 @@ describe("bookshop", () => {
       author: "Tolkien",
       price: 12.99,
     });
-    await dsl.ensureCustomerIsRegistered({ name: "Alice" });
+    await dsl.ensureCustomerIsRegistered({
+      name: "Alice",
+      email: "alice@example.com",
+    });
 
     await dsl.loginAsCustomer({ name: "Alice" });
     await dsl.searchForBook({ author: "Tolkien" });
@@ -44,5 +47,24 @@ describe("bookshop", () => {
     await dsl.checkOut();
 
     await dsl.assertBookPurchased({ title: "The Hobbit" });
+  });
+
+  it("customer is emailed a confirmation after purchase", async () => {
+    await dsl.ensureBookIsInStock({
+      title: "The Fellowship of the Ring",
+      author: "Tolkien",
+      price: 14.99,
+    });
+    await dsl.ensureCustomerIsRegistered({
+      name: "Bob",
+      email: "bob@example.com",
+    });
+
+    await dsl.loginAsCustomer({ name: "Bob" });
+    await dsl.searchForBook({ author: "Tolkien" });
+    await dsl.addBookToCart({ title: "The Fellowship of the Ring" });
+    await dsl.checkOut();
+
+    await dsl.assertOrderConfirmationEmailSentTo("bob@example.com");
   });
 });

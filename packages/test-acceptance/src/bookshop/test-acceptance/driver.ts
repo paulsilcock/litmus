@@ -1,6 +1,7 @@
 import { BaseHonoDriver } from "@litmus/test";
 
 import type { BookshopApp } from "../entrypoints/http/app.ts";
+import { EmailStubClient } from "./email-stub-client.ts";
 
 interface BookSearchResult {
   title: string;
@@ -53,11 +54,13 @@ function isOrderSummaryArray(value: unknown): value is OrderSummary[] {
 }
 
 export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
+  readonly #emailStub: EmailStubClient;
   #currentCustomer?: string;
   #lastSearchResults: BookSearchResult[] = [];
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, emailStubBaseUrl: string) {
     super({ baseUrl });
+    this.#emailStub = new EmailStubClient(emailStubBaseUrl);
   }
 
   loginAs(name: string): void {
@@ -74,6 +77,7 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
   async cleanup(): Promise<void> {
     this.#currentCustomer = undefined;
     this.#lastSearchResults = [];
+    await this.#emailStub.clear();
   }
 
   async putBookOnSale(input: {
@@ -87,10 +91,24 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
     }
   }
 
-  async registerCustomer(name: string): Promise<void> {
-    const res = await this.client.customers.$post({ json: { name } });
+  async registerCustomer(name: string, email: string): Promise<void> {
+    const res = await this.client.customers.$post({
+      json: { name, email },
+    });
     if (!res.ok) {
       throw new Error(`registerCustomer failed: ${res.status}`);
+    }
+  }
+
+  async assertConfirmationEmailSent(to: string): Promise<void> {
+    const received = await this.#emailStub.received();
+    const match = received.find(
+      (email) => email.to === to && /confirm/i.test(email.subject),
+    );
+    if (!match) {
+      throw new Error(
+        `Expected a confirmation email to ${to}, got ${JSON.stringify(received)}`,
+      );
     }
   }
 

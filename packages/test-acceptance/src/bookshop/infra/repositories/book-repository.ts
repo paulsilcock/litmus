@@ -6,7 +6,7 @@ import {
 import { eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
-import { Book } from "../../domain/book.ts";
+import { Book, BookNotFound } from "../../domain/book.ts";
 import { books } from "../db/schema.ts";
 
 @singleton()
@@ -30,14 +30,14 @@ export class BookRepository extends DrizzlePostgresRepository<
     };
   }
 
-  async findByTitle(title: string): Promise<Book | null> {
+  async findByTitle(title: string): Promise<Book> {
     const rows = await this.db
       .select()
       .from(books)
       .where(eq(books.title, title))
       .limit(1);
     const row = rows[0];
-    if (!row) return null;
+    if (!row) throw new BookNotFound(title);
     return new Book({
       id: row.id,
       title: row.title,

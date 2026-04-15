@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { Cart } from "./cart.ts";
+import { Cart, EmptyCartCheckout } from "./cart.ts";
 
 describe("Cart", () => {
   it("starts empty", () => {
@@ -42,6 +42,6 @@ describe("Cart", () => {
   it("cannot be checked out when empty", () => {
     const cart = new Cart({ id: "cart_1", customerId: "customer_1" });
 
-    expect(() => cart.checkOut()).toThrow("Cannot check out an empty cart");
+    expect(() => cart.checkOut()).toThrow(EmptyCartCheckout);
   });
 });

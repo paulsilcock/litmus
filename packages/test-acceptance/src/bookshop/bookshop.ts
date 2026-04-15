@@ -9,11 +9,18 @@ import { container } from "tsyringe";
 
 import { createBookshopApp } from "./entrypoints/http/app.ts";
 import { schema } from "./infra/db/schema.ts";
+import { EMAIL_SERVICE } from "./infra/email/email-service.ts";
+import { HttpEmailService } from "./infra/email/http-email-service.ts";
 import { PAYMENT_GATEWAY } from "./infra/payments/payment-gateway.ts";
 import { StubPaymentGateway } from "./infra/payments/stub-payment-gateway.ts";
+import {
+  type EmailStubServer,
+  startEmailStubServer,
+} from "./test-acceptance/email-stub-server.ts";
 
 export interface RunningBookshop {
   baseUrl: string;
+  emailStubBaseUrl: string;
   stop(): Promise<void>;
 }
 
@@ -37,13 +44,29 @@ export async function bootstrapBookshop(): Promise<RunningBookshop> {
   container.registerInstance(DrizzleDbContext, ctx);
   container.registerSingleton(PAYMENT_GATEWAY, StubPaymentGateway);
 
+  const emailStub: EmailStubServer = await startEmailStubServer();
+  container.registerInstance(
+    EMAIL_SERVICE,
+    new HttpEmailService(emailStub.baseUrl),
+  );
+
   const app = createBookshopApp();
-  const server = await serve(app, { port: 0 });
+  const server = await serve(app, {
+    port: 0,
+    errors: {
+      CustomerNotFound: 404,
+      BookNotFound: 404,
+      NoOpenCart: 400,
+      EmptyCartCheckout: 400,
+    },
+  });
 
   return {
     baseUrl: `http://localhost:${server.port}`,
+    emailStubBaseUrl: emailStub.baseUrl,
     async stop() {
       await server.stop();
+      await emailStub.stop();
       container.reset();
     },
   };

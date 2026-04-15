@@ -31,7 +31,6 @@ export class GetCustomerOrders extends QueryHandler<
 
   async handle({ customer }: GetCustomerOrdersQuery): Promise<OrderSummary[]> {
     const c = await this.customers.findByName(customer);
-    if (!c) return [];
 
     const rows = await this.ctx.connection
       .select()

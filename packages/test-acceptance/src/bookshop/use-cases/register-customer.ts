@@ -6,6 +6,7 @@ import { CustomerRepository } from "../infra/repositories/customer-repository.ts
 
 interface RegisterCustomerCommand extends Record<string, unknown> {
   name: string;
+  email: string;
 }
 
 @injectable()
@@ -14,8 +15,8 @@ export class RegisterCustomer extends CommandHandler<RegisterCustomerCommand> {
     super();
   }
 
-  async handle({ name }: RegisterCustomerCommand): Promise<void> {
+  async handle({ name, email }: RegisterCustomerCommand): Promise<void> {
     const id = this.customers.nextId();
-    await this.customers.add(new Customer({ id, name }));
+    await this.customers.add(new Customer({ id, name, email }));
   }
 }

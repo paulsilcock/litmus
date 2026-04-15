@@ -6,7 +6,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
-import { Cart } from "../../domain/cart.ts";
+import { Cart, NoOpenCart } from "../../domain/cart.ts";
 import type { CustomerId } from "../../domain/customer.ts";
 import { carts } from "../db/schema.ts";
 
@@ -46,5 +46,11 @@ export class CartRepository extends DrizzlePostgresRepository<
       lines: row.lines,
       version: row.version,
     });
+  }
+
+  async findOpenForCheckout(customerId: CustomerId): Promise<Cart> {
+    const cart = await this.findOpenForCustomer(customerId);
+    if (!cart) throw new NoOpenCart(customerId);
+    return cart;
   }
 }

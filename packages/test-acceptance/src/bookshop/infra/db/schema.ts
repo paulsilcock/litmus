@@ -29,6 +29,7 @@ export const books = pgTable("books", {
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().$type<CustomerId>(),
   name: varchar("name").notNull(),
+  email: varchar("email").notNull(),
   version: integer("version").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

@@ -23,9 +23,7 @@ export class AddBookToCart extends CommandHandler<AddBookToCartCommand> {
 
   async handle({ customer, title }: AddBookToCartCommand): Promise<void> {
     const c = await this.customers.findByName(customer);
-    if (!c) throw new Error(`Unknown customer: ${customer}`);
     const b = await this.books.findByTitle(title);
-    if (!b) throw new Error(`Unknown book: ${title}`);
 
     const existing = await this.carts.findOpenForCustomer(c.id);
     if (existing) {

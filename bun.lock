@@ -154,6 +154,7 @@
         "drizzle-orm": "catalog:",
         "hono": "catalog:",
         "reflect-metadata": "catalog:",
+        "tsyringe": "catalog:",
         "vite-plus": "catalog:",
         "zod": "catalog:",
       },

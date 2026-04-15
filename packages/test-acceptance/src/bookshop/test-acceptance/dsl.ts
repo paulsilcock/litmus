@@ -11,9 +11,9 @@ interface BookDetails {
 export class BookshopDsl extends Dsl {
   readonly #driver: BookshopDriver;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, emailStubBaseUrl: string) {
     super();
-    this.#driver = new BookshopDriver(baseUrl);
+    this.#driver = new BookshopDriver(baseUrl, emailStubBaseUrl);
   }
 
   async cleanup(): Promise<void> {
@@ -24,8 +24,11 @@ export class BookshopDsl extends Dsl {
     await this.#driver.putBookOnSale(details);
   }
 
-  async ensureCustomerIsRegistered(details: { name: string }): Promise<void> {
-    await this.#driver.registerCustomer(details.name);
+  async ensureCustomerIsRegistered(details: {
+    name: string;
+    email: string;
+  }): Promise<void> {
+    await this.#driver.registerCustomer(details.name, details.email);
   }
 
   async loginAsCustomer(details: { name: string }): Promise<void> {
@@ -46,5 +49,9 @@ export class BookshopDsl extends Dsl {
 
   async assertBookPurchased(expected: { title: string }): Promise<void> {
     await this.#driver.assertBookPurchased(expected.title);
+  }
+
+  async assertOrderConfirmationEmailSentTo(address: string): Promise<void> {
+    await this.#driver.assertConfirmationEmailSent(address);
   }
 }

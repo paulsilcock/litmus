@@ -7,6 +7,7 @@ import { RegisterCustomer } from "../../../use-cases/register-customer.ts";
 
 const RegisterCustomerSchema = z.object({
   name: z.string(),
+  email: z.string().email(),
 });
 
 const GetCustomerOrdersSchema = z.object({

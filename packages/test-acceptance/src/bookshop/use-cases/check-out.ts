@@ -3,6 +3,10 @@ import { inject, injectable } from "tsyringe";
 
 import { Order } from "../domain/order.ts";
 import {
+  EMAIL_SERVICE,
+  type EmailService,
+} from "../infra/email/email-service.ts";
+import {
   PAYMENT_GATEWAY,
   type PaymentGateway,
 } from "../infra/payments/payment-gateway.ts";
@@ -21,18 +25,26 @@ export class CheckOut extends CommandHandler<CheckOutCommand> {
     private readonly carts: CartRepository,
     @inject(PAYMENT_GATEWAY) private readonly payments: PaymentGateway,
     private readonly orders: OrderRepository,
+    @inject(EMAIL_SERVICE) private readonly email: EmailService,
   ) {
     super();
   }
 
   async handle({ customer }: CheckOutCommand): Promise<void> {
     const c = await this.customers.findByName(customer);
-    if (!c) throw new Error(`Unknown customer: ${customer}`);
+    const cart = await this.carts.findOpenForCheckout(c.id);
 
-    const cart = await this.carts.findOpenForCustomer(c.id);
-    if (!cart) throw new Error(`No open cart for customer ${customer}`);
-
-    await this.payments.charge(cart.total);
+    try {
+      await this.payments.charge(cart.total);
+    } catch (err) {
+      const failed = Order.fail({
+        id: this.orders.nextId(),
+        customerId: c.id,
+        lines: [...cart.items],
+      });
+      await this.orders.add(failed);
+      throw err;
+    }
 
     cart.checkOut();
     await this.carts.update(cart);
@@ -43,5 +55,11 @@ export class CheckOut extends CommandHandler<CheckOutCommand> {
       lines: [...cart.items],
     });
     await this.orders.add(order);
+
+    await this.email.send({
+      to: c.email,
+      subject: `Your order is confirmed`,
+      body: `Thanks for your order, ${c.name}. Total: £${order.total.toFixed(2)}.`,
+    });
   }
 }

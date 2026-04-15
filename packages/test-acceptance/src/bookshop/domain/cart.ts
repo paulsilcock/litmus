@@ -1,10 +1,22 @@
-import { AggregateRoot, type AggregateData } from "@litmus/core";
+import { AggregateRoot, type AggregateData, DomainError } from "@litmus/core";
 import type { PrefixedUlid } from "@litmus/core/id";
 
 import type { BookId } from "./book.ts";
 import type { CustomerId } from "./customer.ts";
 
 export type CartId = PrefixedUlid<"cart">;
+
+export class EmptyCartCheckout extends DomainError {
+  constructor(cartId: CartId) {
+    super("EMPTY_CART_CHECKOUT", `Cannot check out empty cart ${cartId}`);
+  }
+}
+
+export class NoOpenCart extends DomainError {
+  constructor(customerId: CustomerId) {
+    super("NO_OPEN_CART", `Customer ${customerId} has no open cart`);
+  }
+}
 
 export interface CartLine {
   bookId: BookId;
@@ -61,7 +73,7 @@ export class Cart extends AggregateRoot<CartData, CartId> {
 
   checkOut(): void {
     if (this.data.lines.length === 0) {
-      throw new Error("Cannot check out an empty cart");
+      throw new EmptyCartCheckout(this.id);
     }
     this.data.status = "checked-out";
   }
