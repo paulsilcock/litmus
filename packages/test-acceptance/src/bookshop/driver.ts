@@ -1,20 +1,6 @@
-import "reflect-metadata";
-import { PGlite } from "@electric-sql/pglite";
-import { DomainEventDispatcher } from "@litmus/core/events";
-import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
-import { type LitmusServer, serve } from "@litmus/http";
 import { BaseHonoDriver } from "@litmus/test";
-import { pushSchema } from "drizzle-kit/api";
-import { drizzle } from "drizzle-orm/pglite";
-import { container } from "tsyringe";
 
-import { type BookshopApp, createBookshopApp } from "./http/app.ts";
-import { BookRepository } from "./infra/book-repository.ts";
-import { CartRepository } from "./infra/cart-repository.ts";
-import { CustomerRepository } from "./infra/customer-repository.ts";
-import { PurchaseRepository } from "./infra/purchase-repository.ts";
-import { schema } from "./infra/schema.ts";
-import { StubPaymentGateway } from "./infra/stub-payment-gateway.ts";
+import type { BookshopApp } from "./entrypoints/http/app.ts";
 
 interface BookSearchResult {
   title: string;
@@ -33,12 +19,11 @@ function isBookSearchResult(value: unknown): value is BookSearchResult {
 }
 
 export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
-  #server?: LitmusServer;
   #currentCustomer?: string;
   #lastSearchResults: BookSearchResult[] = [];
 
-  constructor() {
-    super({ baseUrl: "http://localhost:0" });
+  constructor(baseUrl: string) {
+    super({ baseUrl });
   }
 
   loginAs(name: string): void {
@@ -52,39 +37,9 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
     return this.#currentCustomer;
   }
 
-  async init(): Promise<void> {
-    const pg = new PGlite();
-    const rawDb = drizzle(pg);
-    const { apply } = await pushSchema(schema, rawDb);
-    await apply();
-
-    const db = drizzle(pg, { schema });
-    const dispatcher = new DomainEventDispatcher();
-    const ctx = new DrizzleDbContext(db, dispatcher);
-
-    const bookRepo = new BookRepository(ctx);
-    const customerRepo = new CustomerRepository(ctx);
-    const cartRepo = new CartRepository(ctx);
-    const purchaseRepo = new PurchaseRepository(ctx);
-    const paymentGateway = new StubPaymentGateway();
-
-    container.register("BookRepository", { useValue: bookRepo });
-    container.register("CustomerRepository", { useValue: customerRepo });
-    container.register("CartRepository", { useValue: cartRepo });
-    container.register("PurchaseRepository", { useValue: purchaseRepo });
-    container.register("PaymentGateway", { useValue: paymentGateway });
-    container.register("BookLookup", { useValue: bookRepo });
-    container.register("CustomerLookup", { useValue: customerRepo });
-    container.register("DrizzleDbContext", { useValue: ctx });
-
-    const app = createBookshopApp();
-    this.#server = await serve(app, { port: 0 });
-    this.setBaseUrl(`http://localhost:${this.#server.port}`);
-  }
-
   async cleanup(): Promise<void> {
-    await this.#server?.stop();
-    container.reset();
+    this.#currentCustomer = undefined;
+    this.#lastSearchResults = [];
   }
 
   async putBookOnSale(input: {

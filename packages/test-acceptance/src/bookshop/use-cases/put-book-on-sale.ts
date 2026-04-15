@@ -1,12 +1,8 @@
 import { CommandHandler } from "@litmus/core";
-import { inject, injectable } from "tsyringe";
+import { injectable } from "tsyringe";
 
 import { Book } from "../domain/book.ts";
-
-interface BookRepository {
-  nextId(): string;
-  add(book: Book): Promise<void>;
-}
+import { BookRepository } from "../infra/repositories/book-repository.ts";
 
 interface PutBookOnSaleCommand extends Record<string, unknown> {
   title: string;
@@ -16,9 +12,7 @@ interface PutBookOnSaleCommand extends Record<string, unknown> {
 
 @injectable()
 export class PutBookOnSale extends CommandHandler<PutBookOnSaleCommand> {
-  constructor(
-    @inject("BookRepository") private readonly books: BookRepository,
-  ) {
+  constructor(private readonly books: BookRepository) {
     super();
   }
 

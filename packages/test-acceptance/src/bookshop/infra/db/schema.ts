@@ -48,9 +48,13 @@ export const carts = pgTable("carts", {
     .defaultNow(),
 });
 
-export const purchases = pgTable("purchases", {
+export const orders = pgTable("orders", {
   id: varchar("id").primaryKey(),
-  data: jsonb("data").notNull().$type<{ customerId: string; bookId: string }>(),
+  data: jsonb("data").notNull().$type<{
+    customerId: string;
+    status: "placed";
+    lines: Array<{ bookId: string; title: string; price: number }>;
+  }>(),
   version: integer("version").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -60,4 +64,4 @@ export const purchases = pgTable("purchases", {
     .defaultNow(),
 });
 
-export const schema = { books, customers, carts, purchases };
+export const schema = { books, customers, carts, orders };

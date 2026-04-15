@@ -9,10 +9,11 @@ interface BookDetails {
 }
 
 export class BookshopDsl extends Dsl {
-  readonly #driver = new BookshopDriver();
+  readonly #driver: BookshopDriver;
 
-  async init(): Promise<void> {
-    await this.#driver.init();
+  constructor(baseUrl: string) {
+    super();
+    this.#driver = new BookshopDriver(baseUrl);
   }
 
   async cleanup(): Promise<void> {

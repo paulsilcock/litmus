@@ -1,4 +1,4 @@
-import type { PaymentGateway } from "../use-cases/check-out.ts";
+import type { PaymentGateway } from "./payment-gateway.ts";
 
 /**
  * Success-by-default payment gateway for the bookshop example.

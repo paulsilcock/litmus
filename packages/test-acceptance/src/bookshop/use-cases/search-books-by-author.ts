@@ -1,9 +1,9 @@
 import { QueryHandler } from "@litmus/core";
-import type { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
+import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
 import { sql } from "drizzle-orm";
-import { inject, injectable } from "tsyringe";
+import { injectable } from "tsyringe";
 
-import { books } from "../infra/schema.ts";
+import { books } from "../infra/db/schema.ts";
 
 interface SearchBooksByAuthorQuery extends Record<string, unknown> {
   author: string;
@@ -20,9 +20,7 @@ export class SearchBooksByAuthor extends QueryHandler<
   SearchBooksByAuthorQuery,
   SearchResult[]
 > {
-  constructor(
-    @inject("DrizzleDbContext") private readonly ctx: DrizzleDbContext,
-  ) {
+  constructor(private readonly ctx: DrizzleDbContext) {
     super();
   }
 

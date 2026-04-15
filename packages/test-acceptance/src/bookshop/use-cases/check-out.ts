@@ -1,27 +1,14 @@
 import { CommandHandler } from "@litmus/core";
 import { inject, injectable } from "tsyringe";
 
-import type { Cart } from "../domain/cart.ts";
-import type { Customer } from "../domain/customer.ts";
-import { Purchase } from "../domain/purchase.ts";
-
-interface CustomerLookup {
-  findByName(name: string): Promise<Customer | null>;
-}
-
-interface CartRepository {
-  findOpenForCustomer(customerId: string): Promise<Cart | null>;
-  update(cart: Cart): Promise<void>;
-}
-
-export interface PaymentGateway {
-  charge(amount: number): Promise<void>;
-}
-
-interface PurchaseRepository {
-  nextId(): string;
-  add(purchase: Purchase): Promise<void>;
-}
+import { Order } from "../domain/order.ts";
+import {
+  PAYMENT_GATEWAY,
+  type PaymentGateway,
+} from "../infra/payments/payment-gateway.ts";
+import { CartRepository } from "../infra/repositories/cart-repository.ts";
+import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
+import { OrderRepository } from "../infra/repositories/order-repository.ts";
 
 interface CheckOutCommand extends Record<string, unknown> {
   customer: string;
@@ -30,11 +17,10 @@ interface CheckOutCommand extends Record<string, unknown> {
 @injectable()
 export class CheckOut extends CommandHandler<CheckOutCommand> {
   constructor(
-    @inject("CustomerLookup") private readonly customers: CustomerLookup,
-    @inject("CartRepository") private readonly carts: CartRepository,
-    @inject("PaymentGateway") private readonly payments: PaymentGateway,
-    @inject("PurchaseRepository")
-    private readonly purchases: PurchaseRepository,
+    private readonly customers: CustomerRepository,
+    private readonly carts: CartRepository,
+    @inject(PAYMENT_GATEWAY) private readonly payments: PaymentGateway,
+    private readonly orders: OrderRepository,
   ) {
     super();
   }
@@ -51,14 +37,11 @@ export class CheckOut extends CommandHandler<CheckOutCommand> {
     cart.checkOut();
     await this.carts.update(cart);
 
-    for (const line of cart.items) {
-      await this.purchases.add(
-        new Purchase({
-          id: this.purchases.nextId(),
-          customerId: c.id,
-          bookId: line.bookId,
-        }),
-      );
-    }
+    const order = Order.place({
+      id: this.orders.nextId(),
+      customerId: c.id,
+      lines: [...cart.items],
+    });
+    await this.orders.add(order);
   }
 }

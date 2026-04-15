@@ -1,12 +1,8 @@
 import { CommandHandler } from "@litmus/core";
-import { inject, injectable } from "tsyringe";
+import { injectable } from "tsyringe";
 
 import { Customer } from "../domain/customer.ts";
-
-interface CustomerRepository {
-  nextId(): string;
-  add(customer: Customer): Promise<void>;
-}
+import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
 
 interface RegisterCustomerCommand extends Record<string, unknown> {
   name: string;
@@ -14,10 +10,7 @@ interface RegisterCustomerCommand extends Record<string, unknown> {
 
 @injectable()
 export class RegisterCustomer extends CommandHandler<RegisterCustomerCommand> {
-  constructor(
-    @inject("CustomerRepository")
-    private readonly customers: CustomerRepository,
-  ) {
+  constructor(private readonly customers: CustomerRepository) {
     super();
   }
 

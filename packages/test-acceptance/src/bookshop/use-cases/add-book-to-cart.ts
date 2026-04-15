@@ -1,24 +1,10 @@
 import { CommandHandler } from "@litmus/core";
-import { inject, injectable } from "tsyringe";
+import { injectable } from "tsyringe";
 
-import type { Book } from "../domain/book.ts";
 import { Cart } from "../domain/cart.ts";
-import type { Customer } from "../domain/customer.ts";
-
-interface CustomerLookup {
-  findByName(name: string): Promise<Customer | null>;
-}
-
-interface BookLookup {
-  findByTitle(title: string): Promise<Book | null>;
-}
-
-interface CartRepository {
-  nextId(): string;
-  findOpenForCustomer(customerId: string): Promise<Cart | null>;
-  add(cart: Cart): Promise<void>;
-  update(cart: Cart): Promise<void>;
-}
+import { BookRepository } from "../infra/repositories/book-repository.ts";
+import { CartRepository } from "../infra/repositories/cart-repository.ts";
+import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
 
 interface AddBookToCartCommand extends Record<string, unknown> {
   customer: string;
@@ -28,9 +14,9 @@ interface AddBookToCartCommand extends Record<string, unknown> {
 @injectable()
 export class AddBookToCart extends CommandHandler<AddBookToCartCommand> {
   constructor(
-    @inject("CustomerLookup") private readonly customers: CustomerLookup,
-    @inject("BookLookup") private readonly books: BookLookup,
-    @inject("CartRepository") private readonly carts: CartRepository,
+    private readonly customers: CustomerRepository,
+    private readonly books: BookRepository,
+    private readonly carts: CartRepository,
   ) {
     super();
   }

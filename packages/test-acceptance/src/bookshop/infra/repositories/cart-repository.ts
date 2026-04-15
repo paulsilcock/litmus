@@ -1,13 +1,15 @@
 import { prefixedUlid } from "@litmus/core/id";
 import {
-  type DrizzleDbContext,
+  DrizzleDbContext,
   DrizzlePostgresRepository,
 } from "@litmus/db/drizzle/postgres";
 import { sql } from "drizzle-orm";
+import { singleton } from "tsyringe";
 
-import { Cart } from "../domain/cart.ts";
-import { carts } from "./schema.ts";
+import { Cart } from "../../domain/cart.ts";
+import { carts } from "../db/schema.ts";
 
+@singleton()
 export class CartRepository extends DrizzlePostgresRepository<
   Cart,
   typeof carts

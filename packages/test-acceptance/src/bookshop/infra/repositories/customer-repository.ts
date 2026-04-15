@@ -1,13 +1,15 @@
 import { prefixedUlid } from "@litmus/core/id";
 import {
-  type DrizzleDbContext,
+  DrizzleDbContext,
   DrizzlePostgresRepository,
 } from "@litmus/db/drizzle/postgres";
 import { sql } from "drizzle-orm";
+import { singleton } from "tsyringe";
 
-import { Customer } from "../domain/customer.ts";
-import { customers } from "./schema.ts";
+import { Customer } from "../../domain/customer.ts";
+import { customers } from "../db/schema.ts";
 
+@singleton()
 export class CustomerRepository extends DrizzlePostgresRepository<
   Customer,
   typeof customers

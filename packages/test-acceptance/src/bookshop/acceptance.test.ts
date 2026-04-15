@@ -1,13 +1,29 @@
-import { afterEach, beforeEach, describe, it } from "vite-plus/test";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  it,
+} from "vite-plus/test";
 
+import { bootstrapBookshop, type RunningBookshop } from "./bookshop.ts";
 import { BookshopDsl } from "./dsl.ts";
 
 describe("bookshop", () => {
+  let bookshop: RunningBookshop;
   let dsl: BookshopDsl;
 
-  beforeEach(async () => {
-    dsl = new BookshopDsl();
-    await dsl.init();
+  beforeAll(async () => {
+    bookshop = await bootstrapBookshop();
+  });
+
+  afterAll(async () => {
+    await bookshop.stop();
+  });
+
+  beforeEach(() => {
+    dsl = new BookshopDsl(bookshop.baseUrl);
   });
 
   afterEach(async () => {
