@@ -33,10 +33,18 @@ interface HonoDriverOptions {
  * ```
  */
 export abstract class BaseHonoDriver<T extends Hono> extends BaseDriver {
-  protected readonly client: ReturnType<typeof hc<T>>;
+  protected client: ReturnType<typeof hc<T>>;
 
   constructor(options: HonoDriverOptions) {
     super();
     this.client = hc<T>(options.baseUrl);
+  }
+
+  /**
+   * Rebind the RPC client to a new base URL. Useful when the server's
+   * address is only known after `init()` — e.g. when binding to port 0.
+   */
+  protected setBaseUrl(baseUrl: string): void {
+    this.client = hc<T>(baseUrl);
   }
 }
