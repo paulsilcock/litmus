@@ -1,12 +1,15 @@
 import { AggregateRoot, type AggregateData } from "@litmus/core";
+import type { PrefixedUlid } from "@litmus/core/id";
 
-interface BookData extends AggregateData {
+export type BookId = PrefixedUlid<"book">;
+
+interface BookData extends AggregateData<BookId> {
   title: string;
   author: string;
   price: number;
 }
 
-export class Book extends AggregateRoot<BookData> {
+export class Book extends AggregateRoot<BookData, BookId> {
   get title(): string {
     return this.data.title;
   }

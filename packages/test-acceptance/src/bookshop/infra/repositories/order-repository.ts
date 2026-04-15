@@ -23,11 +23,9 @@ export class OrderRepository extends DrizzlePostgresRepository<
 
   protected toPersistence(order: Order) {
     return {
-      data: {
-        customerId: order.customerId,
-        status: order.status,
-        lines: [...order.lines],
-      },
+      customerId: order.customerId,
+      status: order.status,
+      lines: [...order.lines],
     };
   }
 }

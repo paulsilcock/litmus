@@ -27,17 +27,13 @@ export class SearchBooksByAuthor extends QueryHandler<
   async handle({ author }: SearchBooksByAuthorQuery): Promise<SearchResult[]> {
     const rows = await this.ctx.connection
       .select({
-        title: sql<string>`${books.data}->>'title'`,
-        author: sql<string>`${books.data}->>'author'`,
-        price: sql<number>`(${books.data}->>'price')::numeric`,
+        title: books.title,
+        author: books.author,
+        price: books.price,
       })
       .from(books)
-      .where(sql`LOWER(${books.data}->>'author') = LOWER(${author})`);
+      .where(sql`LOWER(${books.author}) = LOWER(${author})`);
 
-    return rows.map((row) => ({
-      title: row.title,
-      author: row.author,
-      price: Number(row.price),
-    }));
+    return rows;
   }
 }

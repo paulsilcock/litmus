@@ -1,34 +1,40 @@
 import { AggregateRoot, type AggregateData } from "@litmus/core";
+import type { PrefixedUlid } from "@litmus/core/id";
+
+import type { BookId } from "./book.ts";
+import type { CustomerId } from "./customer.ts";
+
+export type OrderId = PrefixedUlid<"order">;
 
 export interface OrderLine {
-  bookId: string;
+  bookId: BookId;
   title: string;
   price: number;
 }
 
 export type OrderStatus = "placed";
 
-interface OrderData extends AggregateData {
-  customerId: string;
+interface OrderData extends AggregateData<OrderId> {
+  customerId: CustomerId;
   status: OrderStatus;
   lines: OrderLine[];
 }
 
-export class Order extends AggregateRoot<OrderData> {
+export class Order extends AggregateRoot<OrderData, OrderId> {
   /**
    * Place a new order with the given lines. The order's lines are a
    * snapshot taken at checkout — later changes to the underlying books
    * (price, title) do not rewrite history.
    */
   static place(init: {
-    id: string;
-    customerId: string;
+    id: OrderId;
+    customerId: CustomerId;
     lines: OrderLine[];
   }): Order {
     return new Order({ ...init, status: "placed" });
   }
 
-  get customerId(): string {
+  get customerId(): CustomerId {
     return this.data.customerId;
   }
 

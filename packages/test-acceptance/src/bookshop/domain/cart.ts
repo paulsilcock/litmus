@@ -1,23 +1,29 @@
 import { AggregateRoot, type AggregateData } from "@litmus/core";
+import type { PrefixedUlid } from "@litmus/core/id";
+
+import type { BookId } from "./book.ts";
+import type { CustomerId } from "./customer.ts";
+
+export type CartId = PrefixedUlid<"cart">;
 
 export interface CartLine {
-  bookId: string;
+  bookId: BookId;
   title: string;
   price: number;
 }
 
 export type CartStatus = "open" | "checked-out";
 
-interface CartData extends AggregateData {
-  customerId: string;
+interface CartData extends AggregateData<CartId> {
+  customerId: CustomerId;
   status: CartStatus;
   lines: CartLine[];
 }
 
-export class Cart extends AggregateRoot<CartData> {
+export class Cart extends AggregateRoot<CartData, CartId> {
   constructor(init: {
-    id: string;
-    customerId: string;
+    id: CartId;
+    customerId: CustomerId;
     status?: CartStatus;
     lines?: CartLine[];
     version?: number;
@@ -29,7 +35,7 @@ export class Cart extends AggregateRoot<CartData> {
     });
   }
 
-  get customerId(): string {
+  get customerId(): CustomerId {
     return this.data.customerId;
   }
 

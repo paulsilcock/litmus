@@ -1,6 +1,6 @@
 import { QueryHandler } from "@litmus/core";
 import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { injectable } from "tsyringe";
 
 import { orders } from "../infra/db/schema.ts";
@@ -36,19 +36,19 @@ export class GetCustomerOrders extends QueryHandler<
     const rows = await this.ctx.connection
       .select()
       .from(orders)
-      .where(sql`${orders.data}->>'customerId' = ${c.id}`)
+      .where(eq(orders.customerId, c.id))
       .orderBy(orders.createdAt);
 
     return rows.map((row) => {
-      const cents = row.data.lines.reduce(
+      const cents = row.lines.reduce(
         (sum, line) => sum + Math.round(line.price * 100),
         0,
       );
       return {
         id: row.id,
-        status: row.data.status,
+        status: row.status,
         total: cents / 100,
-        lines: row.data.lines.map((line) => ({
+        lines: row.lines.map((line) => ({
           title: line.title,
           price: line.price,
         })),

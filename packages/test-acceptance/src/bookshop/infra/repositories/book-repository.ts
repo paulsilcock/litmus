@@ -3,7 +3,7 @@ import {
   DrizzleDbContext,
   DrizzlePostgresRepository,
 } from "@litmus/db/drizzle/postgres";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
 import { Book } from "../../domain/book.ts";
@@ -24,11 +24,9 @@ export class BookRepository extends DrizzlePostgresRepository<
 
   protected toPersistence(book: Book) {
     return {
-      data: {
-        title: book.title,
-        author: book.author,
-        price: book.price,
-      },
+      title: book.title,
+      author: book.author,
+      price: book.price,
     };
   }
 
@@ -36,15 +34,15 @@ export class BookRepository extends DrizzlePostgresRepository<
     const rows = await this.db
       .select()
       .from(books)
-      .where(sql`${books.data}->>'title' = ${title}`)
+      .where(eq(books.title, title))
       .limit(1);
     const row = rows[0];
     if (!row) return null;
     return new Book({
       id: row.id,
-      title: row.data.title,
-      author: row.data.author,
-      price: row.data.price,
+      title: row.title,
+      author: row.author,
+      price: row.price,
       version: row.version,
     });
   }

@@ -3,10 +3,11 @@ import {
   DrizzleDbContext,
   DrizzlePostgresRepository,
 } from "@litmus/db/drizzle/postgres";
-import { sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
 import { Cart } from "../../domain/cart.ts";
+import type { CustomerId } from "../../domain/customer.ts";
 import { carts } from "../db/schema.ts";
 
 @singleton()
@@ -24,29 +25,25 @@ export class CartRepository extends DrizzlePostgresRepository<
 
   protected toPersistence(cart: Cart) {
     return {
-      data: {
-        customerId: cart.customerId,
-        status: cart.status,
-        lines: [...cart.items],
-      },
+      customerId: cart.customerId,
+      status: cart.status,
+      lines: [...cart.items],
     };
   }
 
-  async findOpenForCustomer(customerId: string): Promise<Cart | null> {
+  async findOpenForCustomer(customerId: CustomerId): Promise<Cart | null> {
     const rows = await this.db
       .select()
       .from(carts)
-      .where(
-        sql`${carts.data}->>'customerId' = ${customerId} AND ${carts.data}->>'status' = 'open'`,
-      )
+      .where(and(eq(carts.customerId, customerId), eq(carts.status, "open")))
       .limit(1);
     const row = rows[0];
     if (!row) return null;
     return new Cart({
       id: row.id,
-      customerId: row.data.customerId,
-      status: row.data.status,
-      lines: row.data.lines,
+      customerId: row.customerId,
+      status: row.status,
+      lines: row.lines,
       version: row.version,
     });
   }

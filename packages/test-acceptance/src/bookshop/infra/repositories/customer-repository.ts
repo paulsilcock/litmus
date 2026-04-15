@@ -3,7 +3,7 @@ import {
   DrizzleDbContext,
   DrizzlePostgresRepository,
 } from "@litmus/db/drizzle/postgres";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
 import { Customer } from "../../domain/customer.ts";
@@ -23,20 +23,20 @@ export class CustomerRepository extends DrizzlePostgresRepository<
   }
 
   protected toPersistence(customer: Customer) {
-    return { data: { name: customer.name } };
+    return { name: customer.name };
   }
 
   async findByName(name: string): Promise<Customer | null> {
     const rows = await this.db
       .select()
       .from(customers)
-      .where(sql`${customers.data}->>'name' = ${name}`)
+      .where(eq(customers.name, name))
       .limit(1);
     const row = rows[0];
     if (!row) return null;
     return new Customer({
       id: row.id,
-      name: row.data.name,
+      name: row.name,
       version: row.version,
     });
   }
