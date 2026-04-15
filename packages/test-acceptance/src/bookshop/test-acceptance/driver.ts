@@ -1,6 +1,6 @@
 import { BaseHonoDriver } from "@litmus/test";
 
-import type { BookshopApp } from "./entrypoints/http/app.ts";
+import type { BookshopApp } from "../entrypoints/http/app.ts";
 
 interface BookSearchResult {
   title: string;
@@ -8,14 +8,48 @@ interface BookSearchResult {
   price: number;
 }
 
+interface OrderSummary {
+  id: string;
+  status: string;
+  total: number;
+  lines: Array<{ title: string; price: number }>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function isBookSearchResult(value: unknown): value is BookSearchResult {
-  if (typeof value !== "object" || value === null) return false;
-  const v: Record<string, unknown> = { ...value };
+  if (!isRecord(value)) return false;
   return (
-    typeof v["title"] === "string" &&
-    typeof v["author"] === "string" &&
-    typeof v["price"] === "number"
+    typeof value["title"] === "string" &&
+    typeof value["author"] === "string" &&
+    typeof value["price"] === "number"
   );
+}
+
+function isOrderLine(
+  value: unknown,
+): value is { title: string; price: number } {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value["title"] === "string" && typeof value["price"] === "number"
+  );
+}
+
+function isOrderSummary(value: unknown): value is OrderSummary {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value["id"] === "string" &&
+    typeof value["status"] === "string" &&
+    typeof value["total"] === "number" &&
+    Array.isArray(value["lines"]) &&
+    value["lines"].every(isOrderLine)
+  );
+}
+
+function isOrderSummaryArray(value: unknown): value is OrderSummary[] {
+  return Array.isArray(value) && value.every(isOrderSummary);
 }
 
 export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
@@ -97,16 +131,22 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
   }
 
   async assertBookPurchased(title: string): Promise<void> {
-    const res = await this.client.purchases.check.$get({
-      query: { customer: this.#customer, title },
+    const res = await this.client.customers[":customer"].orders.$get({
+      param: { customer: this.#customer },
     });
     if (!res.ok) {
-      throw new Error(`assertBookPurchased failed: ${res.status}`);
+      throw new Error(`order history fetch failed: ${res.status}`);
     }
-    const owned: unknown = await res.json();
-    if (owned !== true) {
+    const orders: unknown = await res.json();
+    if (!isOrderSummaryArray(orders)) {
+      throw new Error("order history: unexpected response shape");
+    }
+    const found = orders.some((order) =>
+      order.lines.some((line) => line.title === title),
+    );
+    if (!found) {
       throw new Error(
-        `Expected ${this.#customer} to own "${title}" but they do not`,
+        `Expected an order containing "${title}" in ${this.#customer}'s history, found none`,
       );
     }
   }

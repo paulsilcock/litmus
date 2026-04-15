@@ -7,7 +7,7 @@ import {
   it,
 } from "vite-plus/test";
 
-import { bootstrapBookshop, type RunningBookshop } from "./bookshop.ts";
+import { bootstrapBookshop, type RunningBookshop } from "../bookshop.ts";
 import { BookshopDsl } from "./dsl.ts";
 
 describe("bookshop", () => {
