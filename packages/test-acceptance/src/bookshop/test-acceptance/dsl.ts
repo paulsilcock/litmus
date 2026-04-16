@@ -31,8 +31,8 @@ export class BookshopDsl extends Dsl {
     await this.#driver.registerCustomer(details.name, details.email);
   }
 
-  async loginAsCustomer(details: { name: string }): Promise<void> {
-    this.#driver.loginAs(details.name);
+  async loginAsCustomer(details: { email: string }): Promise<void> {
+    this.#driver.loginAs(details.email);
   }
 
   async searchForBook(criteria: { author: string }): Promise<void> {

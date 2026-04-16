@@ -4,8 +4,12 @@ import type { PrefixedUlid } from "@litmus/core/id";
 export type CustomerId = PrefixedUlid<"customer">;
 
 export class CustomerNotFound extends DomainError {
-  constructor(name: string) {
-    super("CUSTOMER_NOT_FOUND", `No customer found with name: ${name}`);
+  constructor(identifier: { email: string } | { id: CustomerId }) {
+    const message =
+      "email" in identifier
+        ? `No customer found with email: ${identifier.email}`
+        : `No customer found with id: ${identifier.id}`;
+    super("CUSTOMER_NOT_FOUND", message);
   }
 }
 

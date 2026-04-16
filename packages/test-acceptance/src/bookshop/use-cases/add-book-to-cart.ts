@@ -7,7 +7,7 @@ import { CartRepository } from "../infra/repositories/cart-repository.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
 
 interface AddBookToCartCommand extends Record<string, unknown> {
-  customer: string;
+  customerEmail: string;
   title: string;
 }
 
@@ -21,17 +21,21 @@ export class AddBookToCart extends CommandHandler<AddBookToCartCommand> {
     super();
   }
 
-  async handle({ customer, title }: AddBookToCartCommand): Promise<void> {
-    const c = await this.customers.findByName(customer);
-    const b = await this.books.findByTitle(title);
+  async handle({ customerEmail, title }: AddBookToCartCommand): Promise<void> {
+    const customer = await this.customers.findByEmail(customerEmail);
+    const book = await this.books.findByTitle(title);
+    const line = { bookId: book.id, title: book.title, price: book.price };
 
-    const existing = await this.carts.findOpenForCustomer(c.id);
+    const existing = await this.carts.findOpenForCustomer(customer.id);
     if (existing) {
-      existing.add({ bookId: b.id, title: b.title, price: b.price });
+      existing.add(line);
       await this.carts.update(existing);
     } else {
-      const cart = new Cart({ id: this.carts.nextId(), customerId: c.id });
-      cart.add({ bookId: b.id, title: b.title, price: b.price });
+      const cart = new Cart({
+        id: this.carts.nextId(),
+        customerId: customer.id,
+      });
+      cart.add(line);
       await this.carts.add(cart);
     }
   }

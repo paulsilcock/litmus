@@ -5,7 +5,7 @@ import { z } from "zod";
 import { AddBookToCart } from "../../../use-cases/add-book-to-cart.ts";
 
 const AddBookToCartSchema = z.object({
-  customer: z.string(),
+  customerEmail: z.string().email(),
   title: z.string(),
 });
 

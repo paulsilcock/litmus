@@ -2,17 +2,27 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { DomainEvent } from "@litmus/core";
 import type { DbContext } from "@litmus/core/db";
-import type { DomainEventDispatcher } from "@litmus/core/events";
+import { DomainEventDispatcher } from "@litmus/core/events";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { inject, singleton } from "tsyringe";
 
 type PgDb = PgDatabase<PgQueryResultHKT, Record<string, unknown>>;
 
+/**
+ * Injection token for the raw Drizzle database instance. Bootstrap
+ * registers the constructed Drizzle handle under this token so
+ * `DrizzleDbContext` can be DI-resolved.
+ */
+export const DRIZZLE_DB = Symbol.for("@litmus/db/DrizzleDb");
+
+@singleton()
 export class DrizzleDbContext implements DbContext<PgDb> {
   private readonly txStorage = new AsyncLocalStorage<PgDb>();
   private readonly eventBuffer = new AsyncLocalStorage<DomainEvent[]>();
 
   constructor(
-    readonly db: PgDb,
+    @inject(DRIZZLE_DB) readonly db: PgDb,
+    @inject(DomainEventDispatcher)
     private readonly dispatcher: DomainEventDispatcher,
   ) {}
 
@@ -30,26 +40,26 @@ export class DrizzleDbContext implements DbContext<PgDb> {
       });
     });
 
-    this.dispatchEvents(buffered);
+    await this.dispatchEvents(buffered);
   }
 
   get connection(): PgDb {
     return this.txStorage.getStore() ?? this.db;
   }
 
-  publishEvents(events: DomainEvent[]): void {
+  async publishEvents(events: DomainEvent[]): Promise<void> {
     const buffer = this.eventBuffer.getStore();
     if (buffer) {
       buffer.push(...events);
       return;
     }
 
-    this.dispatchEvents(events);
+    await this.dispatchEvents(events);
   }
 
-  private dispatchEvents(events: DomainEvent[]): void {
+  private async dispatchEvents(events: DomainEvent[]): Promise<void> {
     for (const event of events) {
-      this.dispatcher.publish(event);
+      await this.dispatcher.publish(event);
     }
   }
 }

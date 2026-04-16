@@ -1,7 +1,8 @@
-import { AggregateRoot, type AggregateData } from "@litmus/core";
+import { AggregateRoot, type AggregateData, DomainEvent } from "@litmus/core";
 import type { PrefixedUlid } from "@litmus/core/id";
 
 import type { BookId } from "./book.ts";
+import type { CartId } from "./cart.ts";
 import type { CustomerId } from "./customer.ts";
 
 export type OrderId = PrefixedUlid<"order">;
@@ -24,14 +25,26 @@ export class Order extends AggregateRoot<OrderData, OrderId> {
   /**
    * Place a new order with the given lines. The order's lines are a
    * snapshot taken at checkout — later changes to the underlying books
-   * (price, title) do not rewrite history.
+   * (price, title) do not rewrite history. The lines array is copied
+   * so callers cannot mutate the order's state after construction.
    */
   static place(init: {
     id: OrderId;
     customerId: CustomerId;
-    lines: OrderLine[];
+    cartId: CartId;
+    lines: readonly OrderLine[];
   }): Order {
-    return new Order({ ...init, status: "placed" });
+    const lines = [...init.lines];
+    const order = new Order({
+      id: init.id,
+      customerId: init.customerId,
+      status: "placed",
+      lines,
+    });
+    order.addDomainEvent(
+      new OrderPlaced(order.id, order.customerId, init.cartId, lines),
+    );
+    return order;
   }
 
   /**
@@ -42,9 +55,9 @@ export class Order extends AggregateRoot<OrderData, OrderId> {
   static fail(init: {
     id: OrderId;
     customerId: CustomerId;
-    lines: OrderLine[];
+    lines: readonly OrderLine[];
   }): Order {
-    return new Order({ ...init, status: "failed" });
+    return new Order({ ...init, lines: [...init.lines], status: "failed" });
   }
 
   get customerId(): CustomerId {
@@ -65,5 +78,16 @@ export class Order extends AggregateRoot<OrderData, OrderId> {
       0,
     );
     return cents / 100;
+  }
+}
+
+export class OrderPlaced extends DomainEvent<Order> {
+  constructor(
+    readonly orderId: OrderId,
+    readonly customerId: CustomerId,
+    readonly cartId: CartId,
+    readonly lines: readonly OrderLine[],
+  ) {
+    super();
   }
 }

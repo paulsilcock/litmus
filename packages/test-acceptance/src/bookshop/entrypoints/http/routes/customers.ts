@@ -11,13 +11,13 @@ const RegisterCustomerSchema = z.object({
 });
 
 const GetCustomerOrdersSchema = z.object({
-  customer: z.string(),
+  customerEmail: z.string().email(),
 });
 
 export const customersRoutes = new Hono()
   .post("/", ...routeHandler(RegisterCustomer, RegisterCustomerSchema))
   .get(
-    "/:customer/orders",
+    "/:customerEmail/orders",
     ...routeHandler(GetCustomerOrders, GetCustomerOrdersSchema, {
       target: "param",
     }),

@@ -41,14 +41,16 @@ describe("CheckOut", () => {
     cart.add({ bookId: prefixedUlid("book"), title: "Dune", price: 14.5 });
     await carts.add(cart);
 
-    await container.resolve(CheckOut).handle({ customer: "Alice" });
+    await container
+      .resolve(CheckOut)
+      .handle({ customerEmail: "alice@example.com" });
 
     const payment = container.resolve<StubPaymentGateway>(PAYMENT_GATEWAY);
     expect(payment.charges).toEqual([27.49]);
 
     const orders = await container
       .resolve(GetCustomerOrders)
-      .handle({ customer: "Alice" });
+      .handle({ customerEmail: "alice@example.com" });
     expect(orders).toHaveLength(1);
     expect(orders[0]?.status).toBe("placed");
     expect(orders[0]?.total).toBe(27.49);
@@ -84,12 +86,14 @@ describe("CheckOut", () => {
     await carts.add(cart);
 
     await expect(
-      container.resolve(CheckOut).handle({ customer: "Alice" }),
+      container
+        .resolve(CheckOut)
+        .handle({ customerEmail: "alice@example.com" }),
     ).rejects.toThrow("card declined");
 
     const orders = await container
       .resolve(GetCustomerOrders)
-      .handle({ customer: "Alice" });
+      .handle({ customerEmail: "alice@example.com" });
     expect(orders).toHaveLength(1);
     expect(orders[0]?.status).toBe("failed");
   });

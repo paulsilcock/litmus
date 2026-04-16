@@ -41,7 +41,7 @@ describe("bookshop", () => {
       email: "alice@example.com",
     });
 
-    await dsl.loginAsCustomer({ name: "Alice" });
+    await dsl.loginAsCustomer({ email: "alice@example.com" });
     await dsl.searchForBook({ author: "Tolkien" });
     await dsl.addBookToCart({ title: "The Hobbit" });
     await dsl.checkOut();
@@ -60,7 +60,7 @@ describe("bookshop", () => {
       email: "bob@example.com",
     });
 
-    await dsl.loginAsCustomer({ name: "Bob" });
+    await dsl.loginAsCustomer({ email: "bob@example.com" });
     await dsl.searchForBook({ author: "Tolkien" });
     await dsl.addBookToCart({ title: "The Fellowship of the Ring" });
     await dsl.checkOut();

@@ -7,7 +7,7 @@ import { orders } from "../infra/db/schema.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
 
 interface GetCustomerOrdersQuery extends Record<string, unknown> {
-  customer: string;
+  customerEmail: string;
 }
 
 interface OrderSummary {
@@ -29,13 +29,15 @@ export class GetCustomerOrders extends QueryHandler<
     super();
   }
 
-  async handle({ customer }: GetCustomerOrdersQuery): Promise<OrderSummary[]> {
-    const c = await this.customers.findByName(customer);
+  async handle({
+    customerEmail,
+  }: GetCustomerOrdersQuery): Promise<OrderSummary[]> {
+    const customer = await this.customers.findByEmail(customerEmail);
 
     const rows = await this.ctx.connection
       .select()
       .from(orders)
-      .where(eq(orders.customerId, c.id))
+      .where(eq(orders.customerId, customer.id))
       .orderBy(orders.createdAt);
 
     return rows.map((row) => {

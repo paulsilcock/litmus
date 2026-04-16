@@ -66,6 +66,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@litmus/core": "workspace:*",
+        "reflect-metadata": "catalog:",
+        "tsyringe": "catalog:",
       },
       "devDependencies": {
         "@electric-sql/pglite": "catalog:",

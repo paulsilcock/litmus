@@ -6,7 +6,8 @@ import {
 import { and, eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
-import { Cart, NoOpenCart } from "../../domain/cart.ts";
+import type { CartId, CartLine, CartStatus } from "../../domain/cart.ts";
+import { Cart } from "../../domain/cart.ts";
 import type { CustomerId } from "../../domain/customer.ts";
 import { carts } from "../db/schema.ts";
 
@@ -39,6 +40,27 @@ export class CartRepository extends DrizzlePostgresRepository<
       .limit(1);
     const row = rows[0];
     if (!row) return null;
+    return this.hydrate(row);
+  }
+
+  async findById(id: CartId): Promise<Cart | null> {
+    const rows = await this.db
+      .select()
+      .from(carts)
+      .where(eq(carts.id, id))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    return this.hydrate(row);
+  }
+
+  private hydrate(row: {
+    id: CartId;
+    customerId: CustomerId;
+    status: CartStatus;
+    lines: CartLine[];
+    version: number;
+  }): Cart {
     return new Cart({
       id: row.id,
       customerId: row.customerId,
@@ -46,11 +68,5 @@ export class CartRepository extends DrizzlePostgresRepository<
       lines: row.lines,
       version: row.version,
     });
-  }
-
-  async findOpenForCheckout(customerId: CustomerId): Promise<Cart> {
-    const cart = await this.findOpenForCustomer(customerId);
-    if (!cart) throw new NoOpenCart(customerId);
-    return cart;
   }
 }

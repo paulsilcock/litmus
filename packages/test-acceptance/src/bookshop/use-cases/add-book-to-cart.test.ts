@@ -47,8 +47,14 @@ describe("AddBookToCart", () => {
     );
 
     const addBookToCart = container.resolve(AddBookToCart);
-    await addBookToCart.handle({ customer: "Alice", title: "The Hobbit" });
-    await addBookToCart.handle({ customer: "Alice", title: "Dune" });
+    await addBookToCart.handle({
+      customerEmail: "alice@example.com",
+      title: "The Hobbit",
+    });
+    await addBookToCart.handle({
+      customerEmail: "alice@example.com",
+      title: "Dune",
+    });
 
     const cart = await container
       .resolve(CartRepository)

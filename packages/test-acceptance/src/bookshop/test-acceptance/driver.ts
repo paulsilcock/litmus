@@ -55,7 +55,7 @@ function isOrderSummaryArray(value: unknown): value is OrderSummary[] {
 
 export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
   readonly #emailStub: EmailStubClient;
-  #currentCustomer?: string;
+  #currentCustomerEmail?: string;
   #lastSearchResults: BookSearchResult[] = [];
 
   constructor(baseUrl: string, emailStubBaseUrl: string) {
@@ -63,19 +63,19 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
     this.#emailStub = new EmailStubClient(emailStubBaseUrl);
   }
 
-  loginAs(name: string): void {
-    this.#currentCustomer = name;
+  loginAs(email: string): void {
+    this.#currentCustomerEmail = email;
   }
 
-  get #customer(): string {
-    if (!this.#currentCustomer) {
+  get #customerEmail(): string {
+    if (!this.#currentCustomerEmail) {
       throw new Error("No customer is logged in");
     }
-    return this.#currentCustomer;
+    return this.#currentCustomerEmail;
   }
 
   async cleanup(): Promise<void> {
-    this.#currentCustomer = undefined;
+    this.#currentCustomerEmail = undefined;
     this.#lastSearchResults = [];
     await this.#emailStub.clear();
   }
@@ -132,7 +132,7 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
       );
     }
     const res = await this.client.cart.items.$post({
-      json: { customer: this.#customer, title },
+      json: { customerEmail: this.#customerEmail, title },
     });
     if (!res.ok) {
       throw new Error(`addBookToCart failed: ${res.status}`);
@@ -141,7 +141,7 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
 
   async checkOut(): Promise<void> {
     const res = await this.client.checkout.$post({
-      json: { customer: this.#customer },
+      json: { customerEmail: this.#customerEmail },
     });
     if (!res.ok) {
       throw new Error(`checkOut failed: ${res.status}`);
@@ -149,8 +149,8 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
   }
 
   async assertBookPurchased(title: string): Promise<void> {
-    const res = await this.client.customers[":customer"].orders.$get({
-      param: { customer: this.#customer },
+    const res = await this.client.customers[":customerEmail"].orders.$get({
+      param: { customerEmail: this.#customerEmail },
     });
     if (!res.ok) {
       throw new Error(`order history fetch failed: ${res.status}`);
@@ -164,7 +164,7 @@ export class BookshopDriver extends BaseHonoDriver<BookshopApp> {
     );
     if (!found) {
       throw new Error(
-        `Expected an order containing "${title}" in ${this.#customer}'s history, found none`,
+        `Expected an order containing "${title}" in ${this.#customerEmail}'s history, found none`,
       );
     }
   }

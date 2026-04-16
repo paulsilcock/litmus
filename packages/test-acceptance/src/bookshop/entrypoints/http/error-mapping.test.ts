@@ -17,13 +17,13 @@ describe("bookshop HTTP error mapping", () => {
     const res = await fetch(`${bookshop.baseUrl}/checkout`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ customer: "Ghost" }),
+      body: JSON.stringify({ customerEmail: "ghost@example.com" }),
     });
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({
       code: "CUSTOMER_NOT_FOUND",
-      message: "No customer found with name: Ghost",
+      message: "No customer found with email: ghost@example.com",
     });
   });
 });

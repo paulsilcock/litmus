@@ -1,12 +1,16 @@
 import "reflect-metadata";
 import { PGlite } from "@electric-sql/pglite";
-import { DomainEventDispatcher } from "@litmus/core/events";
-import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
+import {
+  DomainEventDispatcher,
+  registerDomainEventHandlers,
+} from "@litmus/core/events";
+import { DRIZZLE_DB } from "@litmus/db/drizzle/postgres";
 import { serve } from "@litmus/http";
 import { pushSchema } from "drizzle-kit/api";
 import { drizzle } from "drizzle-orm/pglite";
 import { container } from "tsyringe";
 
+import { OrderPlaced } from "./domain/order.ts";
 import { createBookshopApp } from "./entrypoints/http/app.ts";
 import { schema } from "./infra/db/schema.ts";
 import { EMAIL_SERVICE } from "./infra/email/email-service.ts";
@@ -17,6 +21,8 @@ import {
   type EmailStubServer,
   startEmailStubServer,
 } from "./test-acceptance/email-stub-server.ts";
+import { CloseCart } from "./use-cases/close-cart.ts";
+import { SendOrderConfirmation } from "./use-cases/send-order-confirmation.ts";
 
 export interface RunningBookshop {
   baseUrl: string;
@@ -39,9 +45,9 @@ export async function bootstrapBookshop(): Promise<RunningBookshop> {
   await apply();
 
   const db = drizzle(pg, { schema });
-  const ctx = new DrizzleDbContext(db, new DomainEventDispatcher());
 
-  container.registerInstance(DrizzleDbContext, ctx);
+  container.registerInstance(DRIZZLE_DB, db);
+  container.registerSingleton(DomainEventDispatcher);
   container.registerSingleton(PAYMENT_GATEWAY, StubPaymentGateway);
 
   const emailStub: EmailStubServer = await startEmailStubServer();
@@ -49,6 +55,15 @@ export async function bootstrapBookshop(): Promise<RunningBookshop> {
     EMAIL_SERVICE,
     new HttpEmailService(emailStub.baseUrl),
   );
+
+  registerDomainEventHandlers([
+    [OrderPlaced, CloseCart, (event) => ({ cartId: event.cartId })],
+    [
+      OrderPlaced,
+      SendOrderConfirmation,
+      (event) => ({ customerId: event.customerId, lines: event.lines }),
+    ],
+  ]);
 
   const app = createBookshopApp();
   const server = await serve(app, {

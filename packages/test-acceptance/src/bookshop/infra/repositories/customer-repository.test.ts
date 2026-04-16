@@ -14,7 +14,7 @@ describe("CustomerRepository", () => {
     container.reset();
   });
 
-  it("finds a customer by name", async () => {
+  it("finds a customer by email", async () => {
     const customers = container.resolve(CustomerRepository);
     const alice = new Customer({
       id: customers.nextId(),
@@ -23,16 +23,39 @@ describe("CustomerRepository", () => {
     });
     await customers.add(alice);
 
-    const found = await customers.findByName("Alice");
+    const found = await customers.findByEmail("alice@example.com");
 
     expect(found.id).toBe(alice.id);
+    expect(found.name).toBe("Alice");
+  });
+
+  it("throws CustomerNotFound when no customer matches the email", async () => {
+    const customers = container.resolve(CustomerRepository);
+
+    await expect(
+      customers.findByEmail("ghost@example.com"),
+    ).rejects.toBeInstanceOf(CustomerNotFound);
+  });
+
+  it("finds a customer by id", async () => {
+    const customers = container.resolve(CustomerRepository);
+    const alice = new Customer({
+      id: customers.nextId(),
+      name: "Alice",
+      email: "alice@example.com",
+    });
+    await customers.add(alice);
+
+    const found = await customers.findById(alice.id);
+
+    expect(found.name).toBe("Alice");
     expect(found.email).toBe("alice@example.com");
   });
 
-  it("throws CustomerNotFound when no customer matches the name", async () => {
+  it("throws CustomerNotFound when no customer matches the id", async () => {
     const customers = container.resolve(CustomerRepository);
 
-    await expect(customers.findByName("Ghost")).rejects.toBeInstanceOf(
+    await expect(customers.findById(customers.nextId())).rejects.toBeInstanceOf(
       CustomerNotFound,
     );
   });

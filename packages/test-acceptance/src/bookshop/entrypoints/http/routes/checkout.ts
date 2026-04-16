@@ -5,7 +5,7 @@ import { z } from "zod";
 import { CheckOut } from "../../../use-cases/check-out.ts";
 
 const CheckOutSchema = z.object({
-  customer: z.string(),
+  customerEmail: z.string().email(),
 });
 
 export const checkoutRoutes = new Hono().post(
