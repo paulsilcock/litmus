@@ -8,7 +8,7 @@ Cross-package acceptance tests for the Litmus framework. Lives outside `@litmus/
 
 ## The bookshop
 
-A realistic example application — customers, books, carts, orders, email confirmations — used to exercise the framework end-to-end. It is not a starter template and is not published. Its job is to answer: *if you build a real application on Litmus, does the framework hold up?*
+A realistic example application — customers, books, carts, orders, email confirmations — used to exercise the framework end-to-end. It is not a starter template and is not published. Its job is to answer: _if you build a real application on Litmus, does the framework hold up?_
 
 Concretely, the bookshop demonstrates:
 

@@ -4,7 +4,7 @@ import {
   DomainEventDispatcher,
   registerDomainEventHandlers,
 } from "@litmus/core/events";
-import { DRIZZLE_DB } from "@litmus/db/drizzle/postgres";
+import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
 import { serve } from "@litmus/http";
 import { pushSchema } from "drizzle-kit/api";
 import { drizzle } from "drizzle-orm/pglite";
@@ -46,7 +46,7 @@ export async function bootstrapBookshop(): Promise<RunningBookshop> {
 
   const db = drizzle(pg, { schema });
 
-  container.registerInstance(DRIZZLE_DB, db);
+  DrizzleDbContext.register(db);
   container.registerSingleton(DomainEventDispatcher);
   container.registerSingleton(PAYMENT_GATEWAY, StubPaymentGateway);
 

@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { PGlite } from "@electric-sql/pglite";
 import { DomainEventDispatcher } from "@litmus/core/events";
-import { DRIZZLE_DB } from "@litmus/db/drizzle/postgres";
+import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
 import { pushSchema } from "drizzle-kit/api";
 import { drizzle } from "drizzle-orm/pglite";
 import { container } from "tsyringe";
@@ -44,7 +44,7 @@ export async function initBookshopTestContainer(): Promise<void> {
 
   const db = drizzle(pg, { schema });
 
-  container.registerInstance(DRIZZLE_DB, db);
+  DrizzleDbContext.register(db);
   container.registerSingleton(DomainEventDispatcher);
   container.registerSingleton(PAYMENT_GATEWAY, StubPaymentGateway);
   container.registerInstance(EMAIL_SERVICE, new FakeEmailService());

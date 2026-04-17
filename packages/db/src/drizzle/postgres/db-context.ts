@@ -4,7 +4,7 @@ import type { DomainEvent } from "@litmus/core";
 import type { DbContext } from "@litmus/core/db";
 import { DomainEventDispatcher } from "@litmus/core/events";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-import { inject, singleton } from "tsyringe";
+import { container, inject, singleton } from "tsyringe";
 
 type PgDb = PgDatabase<PgQueryResultHKT, Record<string, unknown>>;
 
@@ -19,6 +19,14 @@ export const DRIZZLE_DB = Symbol.for("@litmus/db/DrizzleDb");
 export class DrizzleDbContext implements DbContext<PgDb> {
   private readonly txStorage = new AsyncLocalStorage<PgDb>();
   private readonly eventBuffer = new AsyncLocalStorage<DomainEvent[]>();
+
+  /**
+   * Register the Drizzle database handle so `DrizzleDbContext` can
+   * be resolved from the container. Call once during bootstrap.
+   */
+  static register(db: PgDb): void {
+    container.registerInstance(DRIZZLE_DB, db);
+  }
 
   constructor(
     @inject(DRIZZLE_DB) readonly db: PgDb,
