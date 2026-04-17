@@ -66,6 +66,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@litmus/core": "workspace:*",
+        "reflect-metadata": "catalog:",
+        "tsyringe": "catalog:",
       },
       "devDependencies": {
         "@electric-sql/pglite": "catalog:",
@@ -154,6 +156,7 @@
         "drizzle-orm": "catalog:",
         "hono": "catalog:",
         "reflect-metadata": "catalog:",
+        "tsyringe": "catalog:",
         "vite-plus": "catalog:",
         "zod": "catalog:",
       },

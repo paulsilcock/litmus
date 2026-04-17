@@ -56,7 +56,7 @@ describe("DrizzleDbContext", () => {
     const ctxWithDispatcher = new DrizzleDbContext(ctx.db, dispatcher);
 
     await ctxWithDispatcher.transaction(async () => {
-      ctxWithDispatcher.publishEvents([new TestEvent()]);
+      await ctxWithDispatcher.publishEvents([new TestEvent()]);
       expect(handler).not.toHaveBeenCalled();
     });
 

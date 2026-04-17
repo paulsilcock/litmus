@@ -37,7 +37,9 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@litmus/core": "workspace:*"
+    "@litmus/core": "workspace:*",
+    "reflect-metadata": "catalog:",
+    "tsyringe": "catalog:"
   },
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
