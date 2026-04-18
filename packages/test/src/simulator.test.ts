@@ -12,6 +12,34 @@ const mockResult = {
 };
 
 describe("UserSimulator", () => {
+  it("uses the provided prompt builder as-is when given", async () => {
+    let captured = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async ({ prompt }) => {
+        captured = JSON.stringify(prompt);
+        return {
+          ...mockResult,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ message: "hi", done: true }),
+            },
+          ],
+          finishReason: { unified: "stop", raw: undefined },
+        };
+      },
+    });
+
+    const simulator = new UserSimulator({
+      model,
+      prompt: () => "custom-prompt-text",
+    });
+
+    await simulator.run({ onMessage: async () => "ok" });
+
+    expect(captured).toContain("custom-prompt-text");
+  });
+
   it("ends the conversation once the user has the answer they were looking for", async () => {
     const responses = [
       { message: "What's my balance?", done: false },
