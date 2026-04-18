@@ -1,13 +1,20 @@
 import { generateText, type LanguageModel, Output, stepCountIs } from "ai";
 import { z } from "zod";
 
-interface UserSimulatorOptions {
-  model: LanguageModel;
-  persona: string;
-  goal: string;
-  maxTurns?: number;
-  tools?: Record<string, any>;
-}
+type UserSimulatorOptions =
+  | {
+      model: LanguageModel;
+      persona: string;
+      goal: string;
+      maxTurns?: number;
+      tools?: Record<string, any>;
+    }
+  | {
+      model: LanguageModel;
+      prompt: (turns: readonly Turn[]) => string;
+      maxTurns?: number;
+      tools?: Record<string, any>;
+    };
 
 /** Response from the message callback — either a text reply or a termination signal. */
 type MessageResponse = string | { done: boolean; reason: string };
@@ -37,7 +44,11 @@ const userResponseSchema = z.object({
   done: z.boolean(),
 });
 
-function buildPrompt(persona: string, goal: string, turns: Turn[]): string {
+function defaultPrompt(
+  persona: string,
+  goal: string,
+  turns: readonly Turn[],
+): string {
   const history = turns
     .map((t) => `${t.role === "user" ? "You" : "Assistant"}: ${t.content}`)
     .join("\n");
@@ -55,15 +66,14 @@ Decide your next message and whether your goal has been met.`;
 /**
  * Simulates a user interacting with whatever is being tested —
  * an agent, a use case, or a full system. Uses an LLM to generate
- * realistic user messages based on a persona and goal, driving
- * multi-turn conversations.
+ * realistic user messages driving multi-turn conversations.
  *
- * @param options.model - Language model for generating user behaviour.
- * @param options.persona - Description of who the simulated user is.
- * @param options.goal - What the simulated user is trying to achieve.
- * @param options.maxTurns - Safety limit for conversation length (default 10).
- * @param options.tools - Optional tools the simulated user can invoke
- *   (e.g. UI actions like applying a discount code).
+ * Two modes:
+ * - **Persona/goal** (simple): supply `persona` and `goal`; the
+ *   simulator builds a default prompt per turn.
+ * - **Prompt** (full control): supply `prompt: (turns) => string`;
+ *   you own the entire prompt. The simulator still enforces the
+ *   `{ message, done }` output contract.
  *
  * @example
  * ```typescript
@@ -82,17 +92,18 @@ Decide your next message and whether your goal has been met.`;
  */
 export class UserSimulator {
   readonly #model: LanguageModel;
-  readonly #persona: string;
-  readonly #goal: string;
+  readonly #buildPrompt: (turns: readonly Turn[]) => string;
   readonly #maxTurns: number;
   readonly #tools: Record<string, any> | undefined;
 
   constructor(options: UserSimulatorOptions) {
     this.#model = options.model;
-    this.#persona = options.persona;
-    this.#goal = options.goal;
     this.#maxTurns = options.maxTurns ?? 10;
     this.#tools = options.tools;
+    this.#buildPrompt =
+      "prompt" in options
+        ? options.prompt
+        : (turns) => defaultPrompt(options.persona, options.goal, turns);
   }
 
   /**
@@ -119,7 +130,7 @@ export class UserSimulator {
       } else {
         const result = await generateText({
           model: this.#model,
-          prompt: buildPrompt(this.#persona, this.#goal, turns),
+          prompt: this.#buildPrompt(turns),
           output: Output.object({ schema: userResponseSchema }),
           tools: this.#tools,
           stopWhen: this.#tools ? stepCountIs(this.#maxTurns) : undefined,
