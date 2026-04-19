@@ -23,6 +23,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./drizzle/postgres": "./src/drizzle/postgres/index.ts",
+    "./drizzle/postgres/test": "./src/drizzle/postgres/test/index.ts",
     "./test-support/fixtures": "./src/test-support/fixtures.ts",
     "./package.json": "./package.json"
   },

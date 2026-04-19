@@ -1,11 +1,9 @@
-import { PGlite } from "@electric-sql/pglite";
-import { DomainEventDispatcher } from "@litmus/core/events";
-import { pushSchema } from "drizzle-kit/api";
-import { eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/pglite";
-import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
+import { eq } from "drizzle-orm";
+import { container } from "tsyringe";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
+import { setupTestDb } from "#litmus-db/drizzle/postgres/test/setup-test-db.ts";
 import {
   Customer,
   CustomerRepository,
@@ -17,24 +15,16 @@ import {
 } from "#litmus-db/test-support/fixtures.ts";
 
 describe("DrizzlePostgresRepository", () => {
+  setupTestDb({ schema });
+
   let ctx: DrizzleDbContext;
   let orderRepo: OrderRepository;
   let customerRepo: CustomerRepository;
 
-  beforeAll(async () => {
-    const client = new PGlite();
-    const rawDb = drizzle(client);
-    const { apply } = await pushSchema(schema, rawDb);
-    await apply();
-
-    const db = drizzle(client, { schema });
-    ctx = new DrizzleDbContext(db, new DomainEventDispatcher());
+  beforeEach(() => {
+    ctx = container.resolve(DrizzleDbContext);
     orderRepo = new OrderRepository(ctx);
     customerRepo = new CustomerRepository(ctx);
-  });
-
-  beforeEach(async () => {
-    await ctx.db.execute(sql`TRUNCATE orders, customers`);
   });
 
   it("can persist new aggregates", async () => {
