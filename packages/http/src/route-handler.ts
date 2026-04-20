@@ -79,7 +79,6 @@ function validationHook(
  *   );
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: matches Hono's Context<E = any> default
 export function createRouteHandler<TEnv extends Env = any>() {
   function typedRouteHandler<TInput extends Record<string, unknown>, TResult>(
     Handler: HandlerClass<TInput, TResult>,

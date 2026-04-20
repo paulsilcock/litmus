@@ -308,7 +308,6 @@ export class Cli<
   }
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: typed via public CliContext interface; the impl stores values erased to unknown
 class CliContextImpl<TEnv extends CliEnv> implements CliContext<TEnv> {
   readonly #variables = new Map<string, any>();
 
