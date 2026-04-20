@@ -22,7 +22,7 @@ Don't enumerate classes or components — list **behaviours**. The remaining beh
 
 2. **GREEN** — Ask: "what's stopping this test from passing right now?" Name that one thing. Fix it. Reassess. If the answer is a collaborator that doesn't exist, drop down and build it with its own RED → GREEN → REFACTOR loop — the collaborator's behaviour should help the consumer fulfil its responsibility. If the answer is one line of code, write that line. Do the simplest thing that works.
 
-3. **REFACTOR** — Improve the design without changing behaviour. This is where strategic thinking happens — separation of concerns, modularity, cohesion. This step is not optional cleanup. If nothing needs refactoring, say so.
+3. **REFACTOR** — Improve the design without changing behaviour. This is where strategic thinking happens — separation of concerns, modularity, cohesion. This step is not optional cleanup. Re-read the change as a reviewer would: error handling gaps, leaked internals, inconsistencies with the rest of the codebase, missed failure modes. Passing tests don't catch any of that. If nothing needs refactoring, say so.
 
 4. **Review** — Are any proposed tests now redundant? Have new behaviours emerged? Then write the next test.
 
@@ -31,7 +31,12 @@ Don't enumerate classes or components — list **behaviours**. The remaining beh
 - Tests describe **what the system should do**, not how it does it.
 - A test should respond to behaviour changes and be insensitive to structure changes.
 - If refactoring forces test changes, the tests are coupled to implementation.
-- Test names should read as specifications: "event handlers are called after saving", not "calls publishEvents on context".
+- Test names read as specifications of observable behaviour. Never name a factory, class, option key, or framework API in the title.
+  - Bad: `"createRouteHandler propagates Env so c.get is strictly typed"`
+  - Bad: `"input hook combines validated data with context to produce handler input"`
+  - Good: `"middleware variables are type-safe inside the input projection"`
+  - Good: `"middleware-attached values can be projected into the handler input"`
+- Before writing a new test, check whether an existing test already asserts this behaviour in any configuration. If a broader-scenario test subsumes it, don't write the narrower one — duplicates only surface when you audit later, and then they're work to remove. Write the most comprehensive test first.
 
 ## Acceptance Tests (Outer-Inner Loop)
 
