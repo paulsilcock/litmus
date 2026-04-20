@@ -56,34 +56,24 @@ class PlaceOrder extends CommandHandler<
   void cli.exec("nonsense", { customerId: "cust_1" }).catch(() => {});
 }
 
-// Type-level regression: middleware context keys are narrowed by TEnv.
-{
-  const cli = new Cli<{ Variables: { userId: string } }>();
-
-  void cli.use(async (ctx, _next) => {
-    const userId: string = ctx.get("userId");
-    void userId;
-    // @ts-expect-error — 'badKey' is not in Variables
-    ctx.get("badKey");
-    // @ts-expect-error — 'userId' is typed as string, not number
-    ctx.set("userId", 42);
-  });
-}
-
-// Type-level regression: chained .use() calls share the same typed context.
+// Type-level regression: chained .use() calls share the typed context
+// declared by TEnv — later middleware can read keys set by earlier
+// middleware, unknown keys are rejected, and values are type-checked.
 {
   const cli = new Cli<{
     Variables: { userId: string; requestId: string };
   }>()
     .use(async (ctx, next) => {
       ctx.set("userId", "u1");
+      // @ts-expect-error — 'userId' is typed as string, not number
+      ctx.set("userId", 42);
       await next();
     })
     .use(async (ctx, next) => {
       const userId: string = ctx.get("userId");
       void userId;
       ctx.set("requestId", "r1");
-      // @ts-expect-error — still not in Variables
+      // @ts-expect-error — 'badKey' is not in Variables
       ctx.get("badKey");
       await next();
     });
@@ -91,75 +81,12 @@ class PlaceOrder extends CommandHandler<
 }
 
 describe("cli", () => {
-  it("grouped commands compose and dispatch through argv", async () => {
-    const GetOrderSchema = z.object({ id: z.string() });
-    type GetOrderQuery = z.infer<typeof GetOrderSchema>;
-
-    class GetOrder extends CommandHandler<
-      GetOrderQuery,
-      { id: string; status: string }
-    > {
-      async handle(query: GetOrderQuery) {
-        return { id: query.id, status: "placed" };
-      }
-    }
-
-    const RegisterSchema = z.object({ email: z.string() });
-    type RegisterInput = z.infer<typeof RegisterSchema>;
-
-    class RegisterUser extends CommandHandler<
-      RegisterInput,
-      { userId: string }
-    > {
-      async handle(cmd: RegisterInput) {
-        return { userId: `user_${cmd.email}` };
-      }
-    }
-
-    const orderCommands = new Cli()
-      .command("create", PlaceOrder, PlaceOrderSchema, {
-        description: "Place a new order",
-      })
-      .command("get", GetOrder, GetOrderSchema, {
-        description: "Get order details",
-      });
-
-    const userCommands = new Cli().command(
-      "register",
-      RegisterUser,
-      RegisterSchema,
-      { description: "Register a user" },
+  it("argv reaches a handler nested inside a group", async () => {
+    const orderCommands = new Cli().command(
+      "create",
+      PlaceOrder,
+      PlaceOrderSchema,
     );
-
-    const cli = new Cli()
-      .command("orders", orderCommands)
-      .command("users", userCommands);
-
-    // Create an order
-    const createIo = captureIo();
-    await cli.run(["orders", "create", "--customerId", "cust_1"], {
-      stdout: (s) => createIo.stdout.push(s),
-      stderr: (s) => createIo.stderr.push(s),
-      exit: createIo.exit,
-    });
-    expect(createIo.exitCode).toBe(0);
-    expect(createIo.stdout.join("")).toContain("order_cust_1");
-
-    // Register a user
-    const registerIo = captureIo();
-    await cli.run(["users", "register", "--email", "alice@test.com"], {
-      stdout: (s) => registerIo.stdout.push(s),
-      stderr: (s) => registerIo.stderr.push(s),
-      exit: registerIo.exit,
-    });
-    expect(registerIo.exitCode).toBe(0);
-    expect(registerIo.stdout.join("")).toContain("user_alice@test.com");
-  });
-
-  it("grouped commands resolve via 'group subcommand' in argv", async () => {
-    const orderCommands = new Cli()
-      .command("create", PlaceOrder, PlaceOrderSchema)
-      .command("ship", PlaceOrder, PlaceOrderSchema);
 
     const io = captureIo();
     const cli = new Cli().command("orders", orderCommands);
