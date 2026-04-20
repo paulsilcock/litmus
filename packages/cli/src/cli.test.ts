@@ -70,6 +70,26 @@ class PlaceOrder extends CommandHandler<
   });
 }
 
+// Type-level regression: chained .use() calls share the same typed context.
+{
+  const cli = new Cli<{
+    Variables: { userId: string; requestId: string };
+  }>()
+    .use(async (ctx, next) => {
+      ctx.set("userId", "u1");
+      await next();
+    })
+    .use(async (ctx, next) => {
+      const userId: string = ctx.get("userId");
+      void userId;
+      ctx.set("requestId", "r1");
+      // @ts-expect-error — still not in Variables
+      ctx.get("badKey");
+      await next();
+    });
+  void cli;
+}
+
 describe("cli", () => {
   it("grouped commands compose and dispatch through argv", async () => {
     const GetOrderSchema = z.object({ id: z.string() });
@@ -286,6 +306,57 @@ describe("cli", () => {
     const stderr = io.stderr.join("");
     expect(stderr).toContain("ORDER_NOT_FOUND");
     expect(stderr).toContain("Order order_missing not found");
+  });
+
+  it("chained middleware runs onion-style and shares a single context", async () => {
+    const EchoSchema = z.object({});
+    type EchoInput = { userId: string; requestId: string; order: string[] };
+
+    class Echo extends CommandHandler<EchoInput, EchoInput> {
+      async handle(cmd: EchoInput) {
+        cmd.order.push("handler");
+        return { ...cmd, order: [...cmd.order] };
+      }
+    }
+
+    const order: string[] = [];
+    const cli = new Cli<{
+      Variables: { userId: string; requestId: string };
+    }>()
+      .use(async (ctx, next) => {
+        order.push("outer:pre");
+        ctx.set("userId", "u1");
+        await next();
+        order.push("outer:post");
+      })
+      .use(async (ctx, next) => {
+        order.push("inner:pre");
+        expect(ctx.get("userId")).toBe("u1");
+        ctx.set("requestId", "r1");
+        await next();
+        order.push("inner:post");
+      })
+      .command("echo", Echo, EchoSchema, {
+        input: (_, ctx) => ({
+          userId: ctx.get("userId"),
+          requestId: ctx.get("requestId"),
+          order,
+        }),
+      });
+
+    const result = await cli.exec("echo", {});
+    expect(result).toEqual({
+      userId: "u1",
+      requestId: "r1",
+      order: ["outer:pre", "inner:pre", "handler"],
+    });
+    expect(order).toEqual([
+      "outer:pre",
+      "inner:pre",
+      "handler",
+      "inner:post",
+      "outer:post",
+    ]);
   });
 
   it("middleware can inject values the handler receives alongside argv flags", async () => {
