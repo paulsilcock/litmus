@@ -56,6 +56,20 @@ class PlaceOrder extends CommandHandler<
   void cli.exec("nonsense", { customerId: "cust_1" }).catch(() => {});
 }
 
+// Type-level regression: middleware context keys are narrowed by TEnv.
+{
+  const cli = new Cli<{ Variables: { userId: string } }>();
+
+  void cli.use(async (ctx, _next) => {
+    const userId: string = ctx.get("userId");
+    void userId;
+    // @ts-expect-error — 'badKey' is not in Variables
+    ctx.get("badKey");
+    // @ts-expect-error — 'userId' is typed as string, not number
+    ctx.set("userId", 42);
+  });
+}
+
 describe("cli", () => {
   it("grouped commands compose and dispatch through argv", async () => {
     const GetOrderSchema = z.object({ id: z.string() });
@@ -272,6 +286,88 @@ describe("cli", () => {
     const stderr = io.stderr.join("");
     expect(stderr).toContain("ORDER_NOT_FOUND");
     expect(stderr).toContain("Order order_missing not found");
+  });
+
+  it("middleware-attached values can be projected into the command input", async () => {
+    const AuthedSchema = z.object({
+      customerId: z.string(),
+      userId: z.string(),
+    });
+    type AuthedCommand = z.infer<typeof AuthedSchema>;
+
+    class PlaceOrderAuthed extends CommandHandler<
+      AuthedCommand,
+      { userId: string }
+    > {
+      async handle(cmd: AuthedCommand) {
+        return { userId: cmd.userId };
+      }
+    }
+
+    const cli = new Cli<{ Variables: { userId: string } }>()
+      .use(async (ctx, next) => {
+        ctx.set("userId", "user_1");
+        await next();
+      })
+      .command(
+        "orders:create",
+        PlaceOrderAuthed,
+        AuthedSchema.omit({ userId: true }),
+        {
+          input: (validated, ctx) => {
+            const userId: string = ctx.get("userId");
+            return { ...validated, userId };
+          },
+        },
+      );
+
+    const result = await cli.exec("orders:create", { customerId: "cust_1" });
+    expect(result).toEqual({ userId: "user_1" });
+  });
+
+  it("middleware and input projection apply to argv-invoked commands", async () => {
+    const AuthedSchema = z.object({
+      customerId: z.string(),
+      userId: z.string(),
+    });
+    type AuthedCommand = z.infer<typeof AuthedSchema>;
+
+    class PlaceOrderAuthed extends CommandHandler<
+      AuthedCommand,
+      { userId: string; customerId: string }
+    > {
+      async handle(cmd: AuthedCommand) {
+        return { userId: cmd.userId, customerId: cmd.customerId };
+      }
+    }
+
+    const io = captureIo();
+    const cli = new Cli<{ Variables: { userId: string } }>()
+      .use(async (ctx, next) => {
+        ctx.set("userId", "user_argv");
+        await next();
+      })
+      .command(
+        "orders:create",
+        PlaceOrderAuthed,
+        AuthedSchema.omit({ userId: true }),
+        {
+          input: (validated, ctx) => ({
+            ...validated,
+            userId: ctx.get("userId"),
+          }),
+        },
+      );
+
+    await cli.run(["orders:create", "--customerId", "cust_argv"], {
+      stdout: (s) => io.stdout.push(s),
+      stderr: (s) => io.stderr.push(s),
+      exit: io.exit,
+    });
+
+    expect(io.exitCode).toBe(0);
+    const out = JSON.parse(io.stdout.join("").trim());
+    expect(out).toEqual({ userId: "user_argv", customerId: "cust_argv" });
   });
 
   it("invalid args print validation errors to stderr and exit non-zero", async () => {

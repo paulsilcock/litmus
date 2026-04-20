@@ -20,17 +20,17 @@ interface CliServer {
 }
 
 export async function serveCli(
-  cli: Cli<any>,
+  cli: Cli<any, any>,
   argsOrMode: { socket: string },
   options?: ServeCliOptions,
 ): Promise<CliServer>;
 export async function serveCli(
-  cli: Cli<any>,
+  cli: Cli<any, any>,
   argsOrMode: string[] | { interactive: true },
   options?: ServeCliOptions,
 ): Promise<void>;
 export async function serveCli(
-  cli: Cli<any>,
+  cli: Cli<any, any>,
   argsOrMode: ArgsOrMode,
   options: ServeCliOptions = {},
 ): Promise<CliServer | void> {
@@ -70,7 +70,7 @@ export async function serveCli(
 }
 
 async function runInteractive(
-  cli: Cli<any>,
+  cli: Cli<any, any>,
   options: ServeCliOptions,
 ): Promise<void> {
   const stdout = options.stdout ?? ((s: string) => process.stdout.write(s));
@@ -106,7 +106,7 @@ async function runInteractive(
 }
 
 async function runSocket(
-  cli: Cli<any>,
+  cli: Cli<any, any>,
   socketPath: string,
   options: ServeCliOptions,
 ): Promise<CliServer> {
@@ -157,7 +157,7 @@ async function runSocket(
 }
 
 async function handleSocketRequest(
-  cli: Cli<any>,
+  cli: Cli<any, any>,
   connection: Socket,
   raw: string,
 ): Promise<void> {

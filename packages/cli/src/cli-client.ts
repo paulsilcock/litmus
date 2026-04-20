@@ -8,7 +8,7 @@ class RemoteDomainError extends DomainError {}
 
 type CommandSchema<TInput, TResult> = { input: TInput; result: TResult };
 
-type InferCommands<T> = T extends Cli<infer C> ? C : never;
+type InferCommands<T> = T extends Cli<any, infer C> ? C : never;
 
 export interface CliClient<
   TCommands extends Record<string, CommandSchema<any, any>>,
@@ -19,7 +19,7 @@ export interface CliClient<
   ): Promise<TCommands[TName]["result"]>;
 }
 
-export function cliClient<T extends Cli<any>>(
+export function cliClient<T extends Cli<any, any>>(
   socketPath: string,
 ): CliClient<InferCommands<T>> {
   return {
