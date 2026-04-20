@@ -7,7 +7,7 @@ interface LitmusCliDriverOptions {
   socket: string;
 }
 
-type InferCommands<T> = T extends Cli<infer C> ? C : never;
+type InferCommands<T> = T extends Cli<any, infer C> ? C : never;
 
 /**
  * Base driver for acceptance tests that interact with a Litmus CLI
@@ -35,7 +35,7 @@ type InferCommands<T> = T extends Cli<infer C> ? C : never;
  * ```
  */
 export abstract class BaseLitmusCliDriver<
-  T extends Cli<any>,
+  T extends Cli<any, any>,
 > extends BaseDriver {
   protected readonly client: CliClient<InferCommands<T>>;
 

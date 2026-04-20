@@ -3,18 +3,41 @@ import { container } from "tsyringe";
 import yargsParser from "yargs-parser";
 import { ZodError, type ZodSchema } from "zod";
 
-interface CommandOptions {
+export interface CliEnv {
+  Variables?: Record<string, unknown>;
+}
+
+type VariablesOf<TEnv extends CliEnv> = TEnv extends { Variables: infer V }
+  ? V
+  : Record<string, never>;
+
+export interface CliContext<TEnv extends CliEnv = CliEnv> {
+  get<K extends keyof VariablesOf<TEnv> & string>(key: K): VariablesOf<TEnv>[K];
+  set<K extends keyof VariablesOf<TEnv> & string>(
+    key: K,
+    value: VariablesOf<TEnv>[K],
+  ): void;
+}
+
+export type CliMiddleware<TEnv extends CliEnv = CliEnv> = (
+  ctx: CliContext<TEnv>,
+  next: () => Promise<void>,
+) => Promise<void>;
+
+interface CommandOptions<TEnv extends CliEnv, TSchema, TInput> {
   description?: string;
+  input?: (validated: TSchema, ctx: CliContext<TEnv>) => TInput;
 }
 
 interface CommandEntry {
   Handler: HandlerClass<any, any>;
   schema: ZodSchema<any>;
   description?: string;
+  input?: (validated: any, ctx: CliContext<any>) => any;
 }
 
 interface GroupEntry {
-  subCli: Cli<any>;
+  subCli: Cli<any, any>;
   description?: string;
 }
 
@@ -67,12 +90,41 @@ type PrefixKeys<
  * ```
  */
 export class Cli<
+  TEnv extends CliEnv = {},
   TCommands extends Record<string, CommandSchema<any, any>> = {},
 > {
   readonly #entries: Map<string, Entry>;
+  readonly #middlewares: CliMiddleware<TEnv>[];
 
-  constructor(entries?: Map<string, Entry>) {
+  constructor(
+    entries?: Map<string, Entry>,
+    middlewares?: CliMiddleware<TEnv>[],
+  ) {
     this.#entries = entries ?? new Map();
+    this.#middlewares = middlewares ?? [];
+  }
+
+  /**
+   * Register middleware that runs before the command handler. Middleware
+   * receives a typed `CliContext` whose `Variables` type is supplied via
+   * the `Cli<TEnv>` generic, mirroring Hono's `use`. Compose middleware
+   * with `next()` — code before `next()` runs inbound, code after runs
+   * outbound.
+   *
+   * @example
+   * ```typescript
+   * const cli = new Cli<{ Variables: { userId: string } }>()
+   *   .use(async (ctx, next) => {
+   *     ctx.set("userId", await resolveUser());
+   *     await next();
+   *   })
+   *   .command("orders:create", PlaceOrder, PlaceOrderWireSchema, {
+   *     input: (validated, ctx) => ({ ...validated, userId: ctx.get("userId") }),
+   *   });
+   * ```
+   */
+  use(middleware: CliMiddleware<TEnv>): Cli<TEnv, TCommands> {
+    return new Cli(this.#entries, [...this.#middlewares, middleware]);
   }
 
   /**
@@ -83,6 +135,9 @@ export class Cli<
    * @param Handler - Use case class. Resolved via tsyringe.
    * @param schema - Zod schema for input validation from argv flags.
    * @param options.description - Shown in `--help` output.
+   * @param options.input - Project the validated args and middleware context
+   *   into the handler input. Use this to inject middleware-attached values
+   *   (e.g. a principal) without including them in the wire schema.
    */
   command<
     TName extends string,
@@ -92,14 +147,30 @@ export class Cli<
     name: TName,
     Handler: HandlerClass<TInput, TResult>,
     schema: ZodSchema<TInput>,
-    options?: CommandOptions,
-  ): Cli<TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
+    options?: CommandOptions<TEnv, TInput, TInput>,
+  ): Cli<TEnv, TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
+  command<
+    TName extends string,
+    TInput extends Record<string, unknown>,
+    TResult,
+    TSchema extends Record<string, unknown>,
+  >(
+    name: TName,
+    Handler: HandlerClass<TInput, TResult>,
+    schema: ZodSchema<TSchema>,
+    options: CommandOptions<TEnv, TSchema, TInput> & {
+      input: (validated: TSchema, ctx: CliContext<TEnv>) => TInput;
+    },
+  ): Cli<TEnv, TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
 
   /** Mount a sub-CLI as a command group. */
   command<
     TName extends string,
     TSub extends Record<string, CommandSchema<any, any>>,
-  >(name: TName, subCli: Cli<TSub>): Cli<TCommands & PrefixKeys<TName, TSub>>;
+  >(
+    name: TName,
+    subCli: Cli<TEnv, TSub>,
+  ): Cli<TEnv, TCommands & PrefixKeys<TName, TSub>>;
 
   // oxlint-disable no-unsafe-type-assertion -- overloaded method requires runtime casts
   command(...args: unknown[]) {
@@ -109,19 +180,22 @@ export class Cli<
     if (args.length >= 3) {
       const Handler = args[1] as HandlerClass<any, any>;
       const schema = args[2] as ZodSchema<any>;
-      const options = args[3] as CommandOptions | undefined;
+      const options = args[3] as
+        | CommandOptions<TEnv, unknown, unknown>
+        | undefined;
       newEntries.set(name, {
         Handler,
         schema,
         description: options?.description,
+        input: options?.input,
       });
     } else {
-      const subCli = args[1] as Cli<any>;
+      const subCli = args[1] as Cli<TEnv, any>;
       newEntries.set(name, { subCli });
     }
     // oxlint-enable no-unsafe-type-assertion
 
-    return new Cli(newEntries);
+    return new Cli<TEnv, any>(newEntries, this.#middlewares);
   }
 
   async exec<TName extends keyof TCommands & string>(
@@ -132,8 +206,7 @@ export class Cli<
     const flat = this.#entries.get(name);
     if (flat && !isGroup(flat)) {
       const validated = flat.schema.parse(input);
-      const handler = container.resolve(flat.Handler);
-      return handler.handle(validated);
+      return this.#runWithMiddleware(flat, validated);
     }
 
     // Try group resolution
@@ -146,6 +219,24 @@ export class Cli<
     }
 
     throw new Error(`Unknown command: ${name}`);
+  }
+
+  async #runWithMiddleware(entry: CommandEntry, validated: unknown) {
+    const ctx = new CliContextImpl<TEnv>();
+    let result: unknown;
+    const invokeHandler = async () => {
+      const handlerInput = entry.input
+        ? entry.input(validated, ctx)
+        : validated;
+      const handler = container.resolve(entry.Handler);
+      result = await handler.handle(handlerInput);
+    };
+    const chain = this.#middlewares.reduceRight<() => Promise<void>>(
+      (next, middleware) => () => middleware(ctx, next),
+      invokeHandler,
+    );
+    await chain();
+    return result;
   }
 
   async run(args: string[], options: RunOptions = {}): Promise<void> {
@@ -196,9 +287,8 @@ export class Cli<
       throw e;
     }
 
-    const handler = container.resolve(entry.Handler);
     try {
-      const result = await handler.handle(input);
+      const result = await this.#runWithMiddleware(entry, input);
       if (isAsyncIterable<unknown>(result)) {
         for await (const chunk of result) {
           stdout(`${JSON.stringify(chunk)}\n`);
@@ -215,6 +305,23 @@ export class Cli<
       throw e;
     }
     exit(0);
+  }
+}
+
+class CliContextImpl<TEnv extends CliEnv> implements CliContext<TEnv> {
+  readonly #variables = new Map<string, any>();
+
+  get<K extends keyof VariablesOf<TEnv> & string>(
+    key: K,
+  ): VariablesOf<TEnv>[K] {
+    return this.#variables.get(key);
+  }
+
+  set<K extends keyof VariablesOf<TEnv> & string>(
+    key: K,
+    value: VariablesOf<TEnv>[K],
+  ): void {
+    this.#variables.set(key, value);
   }
 }
 

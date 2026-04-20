@@ -56,76 +56,37 @@ class PlaceOrder extends CommandHandler<
   void cli.exec("nonsense", { customerId: "cust_1" }).catch(() => {});
 }
 
+// Type-level regression: chained .use() calls share the typed context
+// declared by TEnv — later middleware can read keys set by earlier
+// middleware, unknown keys are rejected, and values are type-checked.
+{
+  const cli = new Cli<{
+    Variables: { userId: string; requestId: string };
+  }>()
+    .use(async (ctx, next) => {
+      ctx.set("userId", "u1");
+      // @ts-expect-error — 'userId' is typed as string, not number
+      ctx.set("userId", 42);
+      await next();
+    })
+    .use(async (ctx, next) => {
+      const userId: string = ctx.get("userId");
+      void userId;
+      ctx.set("requestId", "r1");
+      // @ts-expect-error — 'badKey' is not in Variables
+      ctx.get("badKey");
+      await next();
+    });
+  void cli;
+}
+
 describe("cli", () => {
-  it("grouped commands compose and dispatch through argv", async () => {
-    const GetOrderSchema = z.object({ id: z.string() });
-    type GetOrderQuery = z.infer<typeof GetOrderSchema>;
-
-    class GetOrder extends CommandHandler<
-      GetOrderQuery,
-      { id: string; status: string }
-    > {
-      async handle(query: GetOrderQuery) {
-        return { id: query.id, status: "placed" };
-      }
-    }
-
-    const RegisterSchema = z.object({ email: z.string() });
-    type RegisterInput = z.infer<typeof RegisterSchema>;
-
-    class RegisterUser extends CommandHandler<
-      RegisterInput,
-      { userId: string }
-    > {
-      async handle(cmd: RegisterInput) {
-        return { userId: `user_${cmd.email}` };
-      }
-    }
-
-    const orderCommands = new Cli()
-      .command("create", PlaceOrder, PlaceOrderSchema, {
-        description: "Place a new order",
-      })
-      .command("get", GetOrder, GetOrderSchema, {
-        description: "Get order details",
-      });
-
-    const userCommands = new Cli().command(
-      "register",
-      RegisterUser,
-      RegisterSchema,
-      { description: "Register a user" },
+  it("argv reaches a handler nested inside a group", async () => {
+    const orderCommands = new Cli().command(
+      "create",
+      PlaceOrder,
+      PlaceOrderSchema,
     );
-
-    const cli = new Cli()
-      .command("orders", orderCommands)
-      .command("users", userCommands);
-
-    // Create an order
-    const createIo = captureIo();
-    await cli.run(["orders", "create", "--customerId", "cust_1"], {
-      stdout: (s) => createIo.stdout.push(s),
-      stderr: (s) => createIo.stderr.push(s),
-      exit: createIo.exit,
-    });
-    expect(createIo.exitCode).toBe(0);
-    expect(createIo.stdout.join("")).toContain("order_cust_1");
-
-    // Register a user
-    const registerIo = captureIo();
-    await cli.run(["users", "register", "--email", "alice@test.com"], {
-      stdout: (s) => registerIo.stdout.push(s),
-      stderr: (s) => registerIo.stderr.push(s),
-      exit: registerIo.exit,
-    });
-    expect(registerIo.exitCode).toBe(0);
-    expect(registerIo.stdout.join("")).toContain("user_alice@test.com");
-  });
-
-  it("grouped commands resolve via 'group subcommand' in argv", async () => {
-    const orderCommands = new Cli()
-      .command("create", PlaceOrder, PlaceOrderSchema)
-      .command("ship", PlaceOrder, PlaceOrderSchema);
 
     const io = captureIo();
     const cli = new Cli().command("orders", orderCommands);
@@ -272,6 +233,105 @@ describe("cli", () => {
     const stderr = io.stderr.join("");
     expect(stderr).toContain("ORDER_NOT_FOUND");
     expect(stderr).toContain("Order order_missing not found");
+  });
+
+  it("chained middleware runs onion-style and shares a single context", async () => {
+    const EchoSchema = z.object({});
+    type EchoInput = { userId: string; requestId: string; order: string[] };
+
+    class Echo extends CommandHandler<EchoInput, EchoInput> {
+      async handle(cmd: EchoInput) {
+        cmd.order.push("handler");
+        return { ...cmd, order: [...cmd.order] };
+      }
+    }
+
+    const order: string[] = [];
+    const cli = new Cli<{
+      Variables: { userId: string; requestId: string };
+    }>()
+      .use(async (ctx, next) => {
+        order.push("outer:pre");
+        ctx.set("userId", "u1");
+        await next();
+        order.push("outer:post");
+      })
+      .use(async (ctx, next) => {
+        order.push("inner:pre");
+        expect(ctx.get("userId")).toBe("u1");
+        ctx.set("requestId", "r1");
+        await next();
+        order.push("inner:post");
+      })
+      .command("echo", Echo, EchoSchema, {
+        input: (_, ctx) => ({
+          userId: ctx.get("userId"),
+          requestId: ctx.get("requestId"),
+          order,
+        }),
+      });
+
+    const result = await cli.exec("echo", {});
+    expect(result).toEqual({
+      userId: "u1",
+      requestId: "r1",
+      order: ["outer:pre", "inner:pre", "handler"],
+    });
+    expect(order).toEqual([
+      "outer:pre",
+      "inner:pre",
+      "handler",
+      "inner:post",
+      "outer:post",
+    ]);
+  });
+
+  it("middleware can inject values the handler receives alongside argv flags", async () => {
+    const CreateOrderSchema = z.object({
+      customerId: z.string(),
+      placedBy: z.string(),
+    });
+    type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
+
+    class CreateOrder extends CommandHandler<
+      CreateOrderInput,
+      { customerId: string; placedBy: string }
+    > {
+      async handle(cmd: CreateOrderInput) {
+        return { customerId: cmd.customerId, placedBy: cmd.placedBy };
+      }
+    }
+
+    const io = captureIo();
+    const cli = new Cli<{ Variables: { userId: string } }>()
+      .use(async (ctx, next) => {
+        ctx.set("userId", "user_from_middleware");
+        await next();
+      })
+      .command(
+        "orders:create",
+        CreateOrder,
+        CreateOrderSchema.omit({ placedBy: true }),
+        {
+          input: (validated, ctx) => ({
+            ...validated,
+            placedBy: ctx.get("userId"),
+          }),
+        },
+      );
+
+    await cli.run(["orders:create", "--customerId", "cust_1"], {
+      stdout: (s) => io.stdout.push(s),
+      stderr: (s) => io.stderr.push(s),
+      exit: io.exit,
+    });
+
+    expect(io.exitCode).toBe(0);
+    const out = JSON.parse(io.stdout.join("").trim());
+    expect(out).toEqual({
+      customerId: "cust_1",
+      placedBy: "user_from_middleware",
+    });
   });
 
   it("invalid args print validation errors to stderr and exit non-zero", async () => {

@@ -10,7 +10,10 @@ import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
 import { domainErrorHandler } from "#litmus-http/error-handler.ts";
-import { routeHandler } from "#litmus-http/route-handler.ts";
+import {
+  createRouteHandler,
+  routeHandler,
+} from "#litmus-http/route-handler.ts";
 
 const PlaceOrderSchema = z.object({
   customerId: z.string(),
@@ -408,6 +411,100 @@ describe("routeHandler", () => {
 
     const body = await res.json();
     expect(body).toEqual({ id: "order_1", status: "shipped" });
+  });
+
+  it("middleware variables are type-safe inside the input projection", async () => {
+    const CreateOrderSchema = z.object({
+      items: z.array(z.object({ productId: z.string() })),
+      userId: z.string(),
+    });
+    type CreateOrderCommand = z.infer<typeof CreateOrderSchema>;
+
+    class CreateOrder extends CommandHandler<
+      CreateOrderCommand,
+      { userId: string }
+    > {
+      async handle(cmd: CreateOrderCommand) {
+        return { userId: cmd.userId };
+      }
+    }
+
+    const typedRouteHandler = createRouteHandler<{
+      Variables: { userId: string };
+    }>();
+
+    const app = new Hono<{ Variables: { userId: string } }>()
+      .use(async (c, next) => {
+        c.set("userId", "user_1");
+        await next();
+      })
+      .post(
+        "/orders",
+        ...typedRouteHandler(
+          CreateOrder,
+          CreateOrderSchema.omit({ userId: true }),
+          {
+            input: (validated, c) => {
+              const userId: string = c.get("userId");
+              // @ts-expect-error -- 'badKey' is not in Variables
+              c.get("badKey");
+              return { ...validated, userId };
+            },
+          },
+        ),
+      );
+
+    const res = await app.request("/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ productId: "p1" }] }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body).toEqual({ userId: "user_1" });
+  });
+
+  it("middleware-attached values can be projected into the handler input", async () => {
+    const CreateOrderSchema = z.object({
+      items: z.array(z.object({ productId: z.string() })),
+      userId: z.string(),
+    });
+    type CreateOrderCommand = z.infer<typeof CreateOrderSchema>;
+
+    class CreateOrder extends CommandHandler<
+      CreateOrderCommand,
+      { orderId: string; userId: string }
+    > {
+      async handle(cmd: CreateOrderCommand) {
+        return { orderId: "order_1", userId: cmd.userId };
+      }
+    }
+
+    const app = new Hono<{ Variables: { userId: string } }>()
+      .use(async (c, next) => {
+        c.set("userId", "user_abc");
+        await next();
+      })
+      .post(
+        "/orders",
+        ...routeHandler(CreateOrder, CreateOrderSchema.omit({ userId: true }), {
+          input: (validated, c) => ({
+            ...validated,
+            userId: c.get("userId"),
+          }),
+        }),
+      );
+
+    const res = await app.request("/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ productId: "prod_1" }] }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body).toEqual({ orderId: "order_1", userId: "user_abc" });
   });
 
   it("invalid path params return 422 with validation errors", async () => {
