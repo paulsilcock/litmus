@@ -1,5 +1,5 @@
 import { toVercelTools } from "@litmus/ai/vercel";
-import type { Agent } from "@litmus/core/ai";
+import { Agent } from "@litmus/core/ai";
 import { Toolbox } from "@litmus/core/ai";
 import { generateText, stepCountIs } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
@@ -41,11 +41,13 @@ const systemTools = new Toolbox()
 
 // --- Agent (fixture) ---
 
-class DisputeAgent implements Agent<
+class DisputeAgent extends Agent<
   { customerId: string; message: string },
   string
 > {
-  constructor(private model: Parameters<typeof generateText>[0]["model"]) {}
+  constructor(private model: Parameters<typeof generateText>[0]["model"]) {
+    super();
+  }
 
   async run(input: { customerId: string; message: string }): Promise<string> {
     const tools = toVercelTools(

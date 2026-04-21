@@ -1,6 +1,7 @@
 import { container } from "tsyringe";
 import type { ZodSchema } from "zod";
 
+import { Traceable } from "#litmus/tracing.ts";
 import type { HandlerClass } from "#litmus/use-case/handlers.ts";
 
 /**
@@ -18,7 +19,7 @@ import type { HandlerClass } from "#litmus/use-case/handlers.ts";
  * import { generateText, embed } from "ai";
  *
  * // Text generation
- * class TriageRequest implements AiTask<string, TriageResult> {
+ * class TriageRequest extends AiTask<string, TriageResult> {
  *   async run(message: string): Promise<TriageResult> {
  *     const { output } = await generateText({ ... });
  *     return output;
@@ -26,7 +27,7 @@ import type { HandlerClass } from "#litmus/use-case/handlers.ts";
  * }
  *
  * // Embeddings
- * class EmbedDocument implements AiTask<string, number[]> {
+ * class EmbedDocument extends AiTask<string, number[]> {
  *   async run(text: string): Promise<number[]> {
  *     const { embedding } = await embed({ ... });
  *     return embedding;
@@ -34,8 +35,12 @@ import type { HandlerClass } from "#litmus/use-case/handlers.ts";
  * }
  * ```
  */
-export interface AiTask<TInput, TOutput = void> {
-  run(input: TInput): Promise<TOutput> | AsyncIterable<TOutput>;
+export abstract class AiTask<TInput, TOutput = void> extends Traceable {
+  constructor() {
+    super("run");
+  }
+
+  abstract run(input: TInput): Promise<TOutput> | AsyncIterable<TOutput>;
 }
 
 /**
@@ -50,12 +55,12 @@ export interface AiTask<TInput, TOutput = void> {
  * ```typescript
  * import type { Agent } from "@litmus/core/ai";
  *
- * class DisputeAgent implements Agent<{ customerId: string }, string> {
+ * class DisputeAgent extends Agent<{ customerId: string }, string> {
  *   constructor(
  *     private triage: TriageRequest,       // AiTask
  *     private analyse: AnalyseDispute,     // AiTask
  *     private summarise: SummariseResult,  // AiTask
- *   ) {}
+ *   ) { super(); }
  *
  *   async run(input: { customerId: string }): Promise<string> {
  *     const intent = await this.triage.run(input.message);
@@ -65,8 +70,12 @@ export interface AiTask<TInput, TOutput = void> {
  * }
  * ```
  */
-export interface Agent<TInput, TOutput = void> {
-  run(input: TInput): Promise<TOutput> | AsyncIterable<TOutput>;
+export abstract class Agent<TInput, TOutput = void> extends Traceable {
+  constructor() {
+    super("run");
+  }
+
+  abstract run(input: TInput): Promise<TOutput> | AsyncIterable<TOutput>;
 }
 
 /**

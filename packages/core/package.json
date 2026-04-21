@@ -40,12 +40,15 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "reflect-metadata": "catalog:",
     "tsyringe": "catalog:",
     "ulidx": "^2.4.1",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@opentelemetry/context-async-hooks": "^2.7.0",
+    "@opentelemetry/sdk-trace-base": "^2.7.0",
     "@types/node": "catalog:",
     "vite-plus": "catalog:"
   }

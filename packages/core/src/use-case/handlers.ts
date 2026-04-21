@@ -1,3 +1,5 @@
+import { Traceable } from "#litmus/tracing.ts";
+
 /**
  * A use case handler class that can be resolved by the DI container.
  * Used by entrypoint adapters (HTTP, CLI, Toolbox) to accept handler
@@ -38,7 +40,11 @@ export type HandlerClass<TInput, TResult> = new (...args: any[]) => {
 export abstract class CommandHandler<
   TCommand extends Record<string, unknown>,
   TResult = void,
-> {
+> extends Traceable {
+  constructor() {
+    super("handle");
+  }
+
   abstract handle(command: TCommand): Promise<TResult> | AsyncIterable<TResult>;
 }
 
@@ -67,6 +73,10 @@ export abstract class CommandHandler<
 export abstract class QueryHandler<
   TQuery extends Record<string, unknown>,
   TResult,
-> {
+> extends Traceable {
+  constructor() {
+    super("handle");
+  }
+
   abstract handle(query: TQuery): Promise<TResult> | AsyncIterable<TResult>;
 }
