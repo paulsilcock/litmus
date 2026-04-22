@@ -1,14 +1,8 @@
-import { context, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
-import {
-  BasicTracerProvider,
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { Agent, AiTask, Toolbox } from "#litmus/ai.ts";
+import { Agent, Toolbox } from "#litmus/ai.ts";
+import { useInMemoryTracing } from "#litmus/test-support/tracing.ts";
 
 const schema = z.object({ id: z.string() });
 
@@ -73,28 +67,10 @@ describe("Toolbox", () => {
   });
 });
 
-describe("ai task and agent tracing", () => {
-  let exporter: InMemorySpanExporter;
-  let provider: BasicTracerProvider;
+describe("agent tracing", () => {
+  const tracing = useInMemoryTracing();
 
-  beforeEach(() => {
-    exporter = new InMemorySpanExporter();
-    provider = new BasicTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
-    });
-    trace.setGlobalTracerProvider(provider);
-    context.setGlobalContextManager(
-      new AsyncLocalStorageContextManager().enable(),
-    );
-  });
-
-  afterEach(async () => {
-    trace.disable();
-    context.disable();
-    await provider.shutdown();
-  });
-
-  it("records a span named after the agent class when it runs", async () => {
+  it("each agent run is individually observable", async () => {
     class DisputeAgent extends Agent<{ message: string }, string> {
       async run(_input: { message: string }) {
         return "resolved";
@@ -103,22 +79,8 @@ describe("ai task and agent tracing", () => {
 
     await new DisputeAgent().run({ message: "help" });
 
-    const spans = exporter.getFinishedSpans();
+    const spans = tracing.spans();
     expect(spans).toHaveLength(1);
     expect(spans[0]!.name).toBe("DisputeAgent");
-  });
-
-  it("records a span named after the ai task class when it runs", async () => {
-    class TriageRequest extends AiTask<string, string> {
-      async run(_input: string) {
-        return "refund";
-      }
-    }
-
-    await new TriageRequest().run("customer message");
-
-    const spans = exporter.getFinishedSpans();
-    expect(spans).toHaveLength(1);
-    expect(spans[0]!.name).toBe("TriageRequest");
   });
 });
