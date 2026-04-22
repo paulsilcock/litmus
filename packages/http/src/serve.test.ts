@@ -1,5 +1,5 @@
 import { CommandHandler, DomainError } from "@litmus/core";
-import { context, trace } from "@opentelemetry/api";
+import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
   BasicTracerProvider,
@@ -89,6 +89,21 @@ describe("serve", () => {
         },
       }),
     ).rejects.toThrow("init failed");
+  });
+
+  it("serves requests normally when no tracing is configured", async () => {
+    trace.disable();
+
+    const app = new Hono().get("/", (c) => c.text("ok"));
+    const server = await serve(app, { port: 0 });
+
+    try {
+      const res = await fetch(`http://localhost:${server.port}/`);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("ok");
+    } finally {
+      await server.stop();
+    }
   });
 
   it("does not accept connections until onBeforeStart completes", async () => {
@@ -208,5 +223,122 @@ describe("serve tracing", () => {
     expect(attributes["http.response.header.x-correlation-id"]).toBe(
       "corr-789",
     );
+  });
+
+  it("work performed to fulfil a request is observable as part of the same trace", async () => {
+    class PlaceOrder extends CommandHandler<Record<string, never>, void> {
+      async handle() {}
+    }
+
+    const app = new Hono().post(
+      "/orders",
+      ...routeHandler(PlaceOrder, z.object({})),
+    );
+
+    const server = await serve(app, { port: 0 });
+
+    try {
+      const res = await fetch(`http://localhost:${server.port}/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      expect(res.status).toBe(204);
+    } finally {
+      await server.stop();
+    }
+
+    const spans = exporter.getFinishedSpans();
+    const request = spans.find((s) => s.name === "POST /orders");
+    const handler = spans.find((s) => s.name === "PlaceOrder");
+    expect(request).toBeDefined();
+    expect(handler).toBeDefined();
+    expect(handler!.parentSpanContext?.spanId).toBe(
+      request!.spanContext().spanId,
+    );
+    expect(handler!.spanContext().traceId).toBe(request!.spanContext().traceId);
+  });
+
+  it("incoming requests carrying an upstream trace context join that trace", async () => {
+    const app = new Hono().get("/", (c) => c.text("ok"));
+
+    const server = await serve(app, { port: 0 });
+
+    const upstreamTraceId = "0af7651916cd43dd8448eb211c80319c";
+    const upstreamSpanId = "b7ad6b7169203331";
+
+    try {
+      const res = await fetch(`http://localhost:${server.port}/`, {
+        headers: {
+          traceparent: `00-${upstreamTraceId}-${upstreamSpanId}-01`,
+        },
+      });
+      expect(res.status).toBe(200);
+    } finally {
+      await server.stop();
+    }
+
+    const span = exporter.getFinishedSpans()[0]!;
+    expect(span.spanContext().traceId).toBe(upstreamTraceId);
+    expect(span.parentSpanContext?.spanId).toBe(upstreamSpanId);
+  });
+
+  it("uncaught failures handling a request surface in traces with the error", async () => {
+    const app = new Hono().get("/", () => {
+      throw new Error("kaboom");
+    });
+
+    const server = await serve(app, { port: 0 });
+
+    try {
+      const res = await fetch(`http://localhost:${server.port}/`);
+      expect(res.status).toBe(500);
+    } finally {
+      await server.stop();
+    }
+
+    const span = exporter.getFinishedSpans()[0]!;
+    expect(span.status.code).toBe(SpanStatusCode.ERROR);
+    expect(span.events[0]?.attributes?.["exception.message"]).toBe("kaboom");
+  });
+
+  it("domain failures mapped to 4xx are not flagged as server errors in traces", async () => {
+    class OrderNotFound extends DomainError {
+      constructor() {
+        super("ORDER_NOT_FOUND", "Order not found");
+      }
+    }
+
+    class FindOrder extends CommandHandler<Record<string, never>, void> {
+      async handle() {
+        throw new OrderNotFound();
+      }
+    }
+
+    const app = new Hono().post(
+      "/orders/find",
+      ...routeHandler(FindOrder, z.object({})),
+    );
+
+    const server = await serve(app, {
+      port: 0,
+      errors: { OrderNotFound: 404 },
+    });
+
+    try {
+      const res = await fetch(`http://localhost:${server.port}/orders/find`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      expect(res.status).toBe(404);
+    } finally {
+      await server.stop();
+    }
+
+    const requestSpan = exporter
+      .getFinishedSpans()
+      .find((s) => s.name === "POST /orders/find")!;
+    expect(requestSpan.status.code).not.toBe(SpanStatusCode.ERROR);
   });
 });

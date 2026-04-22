@@ -1,9 +1,13 @@
 import { serve as honoServe } from "@hono/node-server";
 import { httpInstrumentationMiddleware } from "@hono/otel";
+import { propagation } from "@opentelemetry/api";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { type Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { domainErrorHandler } from "#litmus-http/error-handler.ts";
+
+propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
 interface TracingOptions {
   spanName?: (c: Context) => string;

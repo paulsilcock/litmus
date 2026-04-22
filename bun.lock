@@ -89,11 +89,12 @@
       "dependencies": {
         "@hono/otel": "^1.1.1",
         "@litmus/core": "workspace:*",
+        "@opentelemetry/api": "^1.9.1",
+        "@opentelemetry/core": "^2.7.0",
       },
       "devDependencies": {
         "@hono/node-server": "catalog:",
         "@hono/zod-validator": "^0.7.6",
-        "@opentelemetry/api": "^1.9.1",
         "@opentelemetry/context-async-hooks": "^2.7.0",
         "@opentelemetry/sdk-trace-base": "^2.7.0",
         "@types/node": "catalog:",
