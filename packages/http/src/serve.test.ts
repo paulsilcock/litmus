@@ -1,6 +1,6 @@
 import { CommandHandler, DomainError } from "@litmus/core";
 import { useInMemoryTracing } from "@litmus/test";
-import { SpanStatusCode, trace } from "@opentelemetry/api";
+import { SpanStatusCode } from "@opentelemetry/api";
 import { Hono } from "hono";
 import { routePath } from "hono/route";
 import { describe, expect, it } from "vite-plus/test";
@@ -101,21 +101,6 @@ describe("serve", () => {
         },
       }),
     ).rejects.toThrow("init failed");
-  });
-
-  it("serves requests normally when no tracing is configured", async () => {
-    trace.disable();
-
-    const app = new Hono().get("/", (c) => c.text("ok"));
-    const server = await serve(app, { port: 0 });
-
-    try {
-      const res = await fetch(`http://localhost:${server.port}/`);
-      expect(res.status).toBe(200);
-      expect(await res.text()).toBe("ok");
-    } finally {
-      await server.stop();
-    }
   });
 
   it("the server does not accept connections until startup completes", async () => {

@@ -4,7 +4,24 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { CommandHandler } from "#litmus/use-case/handlers.ts";
 
-describe("use case handler tracing", () => {
+describe("use case handlers without tracing configured", () => {
+  it("invocations behave normally and return the handler's result", async () => {
+    class PlaceOrder extends CommandHandler<
+      { customerId: string },
+      { orderId: string }
+    > {
+      async handle(cmd: { customerId: string }) {
+        return { orderId: `order_${cmd.customerId}` };
+      }
+    }
+
+    const result = await new PlaceOrder().handle({ customerId: "cust_1" });
+
+    expect(result).toEqual({ orderId: "order_cust_1" });
+  });
+});
+
+describe("use case handlers with tracing configured", () => {
   const tracing = useInMemoryTracing();
 
   it("each handler invocation is individually observable", async () => {
@@ -42,23 +59,6 @@ describe("use case handler tracing", () => {
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
     expect(span.status.message).toBe("boom");
     expect(span.events[0]?.attributes?.["exception.message"]).toBe("boom");
-  });
-
-  it("handlers behave normally when tracing is not configured", async () => {
-    trace.disable();
-
-    class PlaceOrder extends CommandHandler<
-      { customerId: string },
-      { orderId: string }
-    > {
-      async handle(cmd: { customerId: string }) {
-        return { orderId: `order_${cmd.customerId}` };
-      }
-    }
-
-    const result = await new PlaceOrder().handle({ customerId: "cust_1" });
-
-    expect(result).toEqual({ orderId: "order_cust_1" });
   });
 
   it("handlers can attach domain context to their trace", async () => {
