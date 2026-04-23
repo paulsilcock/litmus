@@ -1,3 +1,4 @@
+// trigger CI run on speed-up-ci-tests to verify Playwright caching path
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
