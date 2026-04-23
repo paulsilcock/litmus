@@ -35,6 +35,7 @@
         "yargs-parser": "^21.1.1",
       },
       "devDependencies": {
+        "@litmus/test": "workspace:*",
         "@types/node": "catalog:",
         "@types/yargs-parser": "^21.0.3",
         "reflect-metadata": "catalog:",
@@ -138,17 +139,13 @@
         "zod": "catalog:",
       },
       "devDependencies": {
-        "@hono/node-server": "catalog:",
-        "@litmus/cli": "workspace:*",
         "@types/node": "catalog:",
         "ai": "catalog:",
-        "hono": "catalog:",
         "playwright": "catalog:",
         "reflect-metadata": "catalog:",
         "vite-plus": "catalog:",
       },
       "peerDependencies": {
-        "@litmus/cli": "workspace:*",
         "ai": "catalog:",
         "playwright": "catalog:",
       },

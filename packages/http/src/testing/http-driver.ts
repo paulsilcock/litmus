@@ -1,4 +1,4 @@
-import { BaseDriver } from "#litmus-test/drivers/base.ts";
+import { BaseDriver } from "@litmus/test";
 
 type CommonHeader =
   | "Accept"

@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { BaseHonoDriver } from "#litmus-test/drivers/hono.ts";
+import { BaseHonoDriver } from "#litmus-http/testing/hono-driver.ts";
 
 const app = new Hono().get("/orders", (c) => c.json([{ id: "order_1" }]));
 

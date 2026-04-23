@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { BaseHttpDriver } from "#litmus-test/drivers/http.ts";
+import { BaseHttpDriver } from "#litmus-http/testing/http-driver.ts";
 
 class TestDriver extends BaseHttpDriver {
   async cleanup() {}

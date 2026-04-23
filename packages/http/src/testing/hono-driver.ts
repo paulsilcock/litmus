@@ -1,7 +1,6 @@
+import { BaseDriver } from "@litmus/test";
 import type { Hono } from "hono";
 import { hc } from "hono/client";
-
-import { BaseDriver } from "#litmus-test/drivers/base.ts";
 
 interface HonoDriverOptions {
   baseUrl: string;
