@@ -1,10 +1,8 @@
-import "reflect-metadata";
-import { PGlite } from "@electric-sql/pglite";
 import { DomainEventDispatcher } from "@litmus/core/events";
-import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
-import { pushSchema } from "drizzle-kit/api";
-import { drizzle } from "drizzle-orm/pglite";
+import { setupTestDb } from "@litmus/db/drizzle/postgres/test";
+import "reflect-metadata";
 import { container } from "tsyringe";
+import { beforeEach } from "vite-plus/test";
 
 import { schema } from "../infra/db/schema.ts";
 import {
@@ -31,21 +29,20 @@ export class FakeEmailService implements EmailService {
 }
 
 /**
- * Minimal DI wiring for use case tests: in-memory Postgres,
- * stub payment gateway, in-memory email. Tests can override any
- * binding by calling `container.registerInstance(...)` before
- * resolving the use case.
+ * Describe-level setup for bookshop use case tests: shares one PGlite
+ * instance across the file via `setupTestDb`, then re-registers the
+ * bookshop-specific DI bindings before every test so each case starts
+ * with fresh singletons.
+ *
+ * Call once at the top of a `describe` block. Tests then resolve
+ * dependencies with `container.resolve(...)`.
  */
-export async function initBookshopTestContainer(): Promise<void> {
-  const pg = new PGlite();
-  const rawDb = drizzle(pg);
-  const { apply } = await pushSchema(schema, rawDb);
-  await apply();
+export function setupBookshopTest(): void {
+  setupTestDb({ schema });
 
-  const db = drizzle(pg, { schema });
-
-  DrizzleDbContext.register(db);
-  container.registerSingleton(DomainEventDispatcher);
-  container.registerSingleton(PAYMENT_GATEWAY, StubPaymentGateway);
-  container.registerInstance(EMAIL_SERVICE, new FakeEmailService());
+  beforeEach(() => {
+    container.registerSingleton(DomainEventDispatcher);
+    container.registerSingleton(PAYMENT_GATEWAY, StubPaymentGateway);
+    container.registerInstance(EMAIL_SERVICE, new FakeEmailService());
+  });
 }

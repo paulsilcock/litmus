@@ -1,24 +1,18 @@
 import { prefixedUlid } from "@litmus/core/id";
 import { container } from "tsyringe";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { Customer } from "../domain/customer.ts";
 import { EMAIL_SERVICE } from "../infra/email/email-service.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
 import {
   FakeEmailService,
-  initBookshopTestContainer,
+  setupBookshopTest,
 } from "../test-support/init-test-container.ts";
 import { SendOrderConfirmation } from "./send-order-confirmation.ts";
 
 describe("SendOrderConfirmation", () => {
-  beforeEach(async () => {
-    await initBookshopTestContainer();
-  });
-
-  afterEach(() => {
-    container.reset();
-  });
+  setupBookshopTest();
 
   it("emails the customer with the order total", async () => {
     const customers = container.resolve(CustomerRepository);

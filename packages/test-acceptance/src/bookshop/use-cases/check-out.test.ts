@@ -1,6 +1,6 @@
 import { prefixedUlid } from "@litmus/core/id";
 import { container } from "tsyringe";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { Cart } from "../domain/cart.ts";
 import { Customer } from "../domain/customer.ts";
@@ -8,18 +8,12 @@ import { PAYMENT_GATEWAY } from "../infra/payments/payment-gateway.ts";
 import { StubPaymentGateway } from "../infra/payments/stub-payment-gateway.ts";
 import { CartRepository } from "../infra/repositories/cart-repository.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
-import { initBookshopTestContainer } from "../test-support/init-test-container.ts";
+import { setupBookshopTest } from "../test-support/init-test-container.ts";
 import { CheckOut } from "./check-out.ts";
 import { GetCustomerOrders } from "./get-customer-orders.ts";
 
 describe("CheckOut", () => {
-  beforeEach(async () => {
-    await initBookshopTestContainer();
-  });
-
-  afterEach(() => {
-    container.reset();
-  });
+  setupBookshopTest();
 
   it("charges the cart total and records an order for the customer", async () => {
     const customers = container.resolve(CustomerRepository);
