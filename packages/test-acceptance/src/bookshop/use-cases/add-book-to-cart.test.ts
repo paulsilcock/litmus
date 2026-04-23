@@ -1,22 +1,16 @@
 import { container } from "tsyringe";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { Book } from "../domain/book.ts";
 import { Customer } from "../domain/customer.ts";
 import { BookRepository } from "../infra/repositories/book-repository.ts";
 import { CartRepository } from "../infra/repositories/cart-repository.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
-import { initBookshopTestContainer } from "../test-support/init-test-container.ts";
+import { setupBookshopTest } from "../test-support/init-test-container.ts";
 import { AddBookToCart } from "./add-book-to-cart.ts";
 
 describe("AddBookToCart", () => {
-  beforeEach(async () => {
-    await initBookshopTestContainer();
-  });
-
-  afterEach(() => {
-    container.reset();
-  });
+  setupBookshopTest();
 
   it("adds to the customer's existing open cart rather than creating another", async () => {
     const customers = container.resolve(CustomerRepository);

@@ -1,20 +1,14 @@
 import { container } from "tsyringe";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { Cart } from "../../domain/cart.ts";
 import { Customer } from "../../domain/customer.ts";
-import { initBookshopTestContainer } from "../../test-support/init-test-container.ts";
+import { setupBookshopTest } from "../../test-support/init-test-container.ts";
 import { CartRepository } from "./cart-repository.ts";
 import { CustomerRepository } from "./customer-repository.ts";
 
 describe("CartRepository", () => {
-  beforeEach(async () => {
-    await initBookshopTestContainer();
-  });
-
-  afterEach(() => {
-    container.reset();
-  });
+  setupBookshopTest();
 
   it("findOpenForCustomer returns null when the customer has no open cart", async () => {
     const customers = container.resolve(CustomerRepository);

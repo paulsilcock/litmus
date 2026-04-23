@@ -1,22 +1,16 @@
 import { prefixedUlid } from "@litmus/core/id";
 import { container } from "tsyringe";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { Cart } from "../domain/cart.ts";
 import { Customer } from "../domain/customer.ts";
 import { CartRepository } from "../infra/repositories/cart-repository.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
-import { initBookshopTestContainer } from "../test-support/init-test-container.ts";
+import { setupBookshopTest } from "../test-support/init-test-container.ts";
 import { CloseCart } from "./close-cart.ts";
 
 describe("CloseCart", () => {
-  beforeEach(async () => {
-    await initBookshopTestContainer();
-  });
-
-  afterEach(() => {
-    container.reset();
-  });
+  setupBookshopTest();
 
   it("closes the cart identified by the command", async () => {
     const customers = container.resolve(CustomerRepository);

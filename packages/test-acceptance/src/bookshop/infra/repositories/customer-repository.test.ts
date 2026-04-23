@@ -1,18 +1,12 @@
 import { container } from "tsyringe";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import { Customer, CustomerNotFound } from "../../domain/customer.ts";
-import { initBookshopTestContainer } from "../../test-support/init-test-container.ts";
+import { setupBookshopTest } from "../../test-support/init-test-container.ts";
 import { CustomerRepository } from "./customer-repository.ts";
 
 describe("CustomerRepository", () => {
-  beforeEach(async () => {
-    await initBookshopTestContainer();
-  });
-
-  afterEach(() => {
-    container.reset();
-  });
+  setupBookshopTest();
 
   it("finds a customer by email", async () => {
     const customers = container.resolve(CustomerRepository);
