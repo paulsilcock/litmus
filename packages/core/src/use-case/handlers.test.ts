@@ -2,6 +2,7 @@ import { useInMemoryTracing } from "@litmus/test";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { describe, expect, it } from "vite-plus/test";
 
+import { DomainError } from "#litmus/domain/domain-error.ts";
 import { CommandHandler } from "#litmus/use-case/handlers.ts";
 
 describe("use case handlers without tracing configured", () => {
@@ -59,6 +60,29 @@ describe("use case handlers with tracing configured", () => {
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
     expect(span.status.message).toBe("boom");
     expect(span.events[0]?.attributes?.["exception.message"]).toBe("boom");
+  });
+
+  it("domain failures are not flagged as errors on the handler span", async () => {
+    class CustomerNotFound extends DomainError {
+      constructor() {
+        super("CUSTOMER_NOT_FOUND", "no such customer");
+      }
+    }
+    class CheckOut extends CommandHandler<{ customerEmail: string }, void> {
+      async handle(_cmd: { customerEmail: string }): Promise<void> {
+        throw new CustomerNotFound();
+      }
+    }
+
+    await expect(
+      new CheckOut().handle({ customerEmail: "ghost@example.com" }),
+    ).rejects.toThrow("no such customer");
+
+    const span = tracing.spans()[0]!;
+    expect(span.status.code).not.toBe(SpanStatusCode.ERROR);
+    expect(span.events[0]?.attributes?.["exception.type"]).toBe(
+      "CUSTOMER_NOT_FOUND",
+    );
   });
 
   it("handlers can attach domain context to their trace", async () => {

@@ -1,5 +1,7 @@
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 
+import { DomainError } from "#litmus/domain/domain-error.ts";
+
 const TRACER_NAME = "@litmus/core";
 
 function toException(err: unknown): Error | string {
@@ -40,11 +42,13 @@ function traceMethod(instance: object, methodName: string): void {
         } catch (err) {
           const exception = toException(err);
           span.recordException(exception);
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message:
-              typeof exception === "string" ? exception : exception.message,
-          });
+          if (!(err instanceof DomainError)) {
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message:
+                typeof exception === "string" ? exception : exception.message,
+            });
+          }
           throw err;
         } finally {
           span.end();
