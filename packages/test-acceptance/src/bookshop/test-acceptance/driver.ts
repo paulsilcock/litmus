@@ -1,4 +1,4 @@
-import { BaseHonoDriver } from "@litmus/test";
+import { BaseHonoDriver } from "@litmus/http/testing";
 
 import type { BookshopApp } from "../entrypoints/http/app.ts";
 import { EmailStubClient } from "./email-stub-client.ts";

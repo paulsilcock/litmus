@@ -22,6 +22,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -39,6 +40,7 @@
     "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
+    "@litmus/test": "workspace:*",
     "@types/node": "catalog:",
     "@types/yargs-parser": "^21.0.3",
     "reflect-metadata": "catalog:",

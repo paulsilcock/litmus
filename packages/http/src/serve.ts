@@ -1,14 +1,43 @@
 import { serve as honoServe } from "@hono/node-server";
-import type { Hono } from "hono";
+import { httpInstrumentationMiddleware } from "@hono/otel";
+import { context, propagation, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import {
+  BasicTracerProvider,
+  ConsoleSpanExporter,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
+import { type Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { domainErrorHandler } from "#litmus-http/error-handler.ts";
+
+propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+
+if (process.env.OTEL_TRACES_EXPORTER === "console") {
+  trace.setGlobalTracerProvider(
+    new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())],
+    }),
+  );
+  context.setGlobalContextManager(
+    new AsyncLocalStorageContextManager().enable(),
+  );
+}
+
+interface TracingOptions {
+  spanName?: (c: Context) => string;
+  captureRequestHeaders?: string[];
+  captureResponseHeaders?: string[];
+}
 
 interface ServeOptions {
   port?: number;
   errors?: Record<string, ContentfulStatusCode>;
   onBeforeStart?: () => Promise<void> | void;
   onBeforeStop?: () => Promise<void> | void;
+  tracing?: TracingOptions;
 }
 
 export interface LitmusServer {
@@ -20,12 +49,24 @@ export async function serve(
   app: Hono,
   options: ServeOptions = {},
 ): Promise<LitmusServer> {
-  app.onError(domainErrorHandler(options.errors ?? {}));
+  const tracedApp = new Hono()
+    .use(
+      httpInstrumentationMiddleware({
+        spanNameFactory: options.tracing?.spanName,
+        captureRequestHeaders: options.tracing?.captureRequestHeaders,
+        captureResponseHeaders: options.tracing?.captureResponseHeaders,
+      }),
+    )
+    .route("/", app);
+  tracedApp.onError(domainErrorHandler(options.errors ?? {}));
+  tracedApp.notFound((c) =>
+    c.json({ code: "ROUTE_NOT_FOUND", message: "Route not found" }, 404),
+  );
 
   if (options.onBeforeStart) {
     await options.onBeforeStart();
   }
-  const httpServer = honoServe({ fetch: app.fetch, port: options.port });
+  const httpServer = honoServe({ fetch: tracedApp.fetch, port: options.port });
 
   const address = httpServer.address();
   const port =

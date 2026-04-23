@@ -2,7 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
-    setupFiles: ["./test-setup.ts"],
+    setupFiles: ["./test-setup.ts", "@litmus/test/vitest-setup"],
   },
   staged: {
     "*": "vp check --fix",

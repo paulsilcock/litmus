@@ -1,7 +1,8 @@
+import { useInMemoryTracing } from "@litmus/test";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { Toolbox } from "#litmus/ai.ts";
+import { Agent, Toolbox } from "#litmus/ai.ts";
 
 const schema = z.object({ id: z.string() });
 
@@ -63,5 +64,23 @@ describe("Toolbox", () => {
 
     const result = await entry?.handler.handle({ id: "acc_123" });
     expect(result).toEqual({ balance: 100 });
+  });
+});
+
+describe("agent tracing", () => {
+  const tracing = useInMemoryTracing();
+
+  it("each agent run is individually observable", async () => {
+    class DisputeAgent extends Agent<{ message: string }, string> {
+      async run(_input: { message: string }) {
+        return "resolved";
+      }
+    }
+
+    await new DisputeAgent().run({ message: "help" });
+
+    const spans = tracing.spans();
+    expect(spans).toHaveLength(1);
+    expect(spans[0]!.name).toBe("DisputeAgent");
   });
 });

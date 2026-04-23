@@ -10,8 +10,8 @@
     "ready": "vp fmt && vp lint && vp run -r test && vp run -r build",
     "prepare": "vp config"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@litmus/test": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
     "reflect-metadata": "catalog:",
     "vite-plus": "catalog:"

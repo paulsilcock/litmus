@@ -1,7 +1,7 @@
-import type { Cli, CliClient } from "@litmus/cli";
-import { cliClient } from "@litmus/cli";
+import { BaseDriver } from "@litmus/test";
 
-import { BaseDriver } from "#litmus-test/drivers/base.ts";
+import type { Cli, CliClient } from "#litmus-cli/index.ts";
+import { cliClient } from "#litmus-cli/index.ts";
 
 interface LitmusCliDriverOptions {
   socket: string;

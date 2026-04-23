@@ -1,11 +1,11 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Cli, serveCli } from "@litmus/cli";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { BaseLitmusCliDriver } from "#litmus-test/drivers/litmus-cli.ts";
+import { Cli, serveCli } from "#litmus-cli/index.ts";
+import { BaseLitmusCliDriver } from "#litmus-cli/testing/cli-driver.ts";
 
 class Echo {
   async handle(input: { message: string }) {
