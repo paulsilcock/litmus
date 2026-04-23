@@ -53,6 +53,23 @@ describe("serve", () => {
     }
   });
 
+  it("returns a structured body when no route matches the request", async () => {
+    const app = new Hono().get("/", (c) => c.text("ok"));
+    const server = await serve(app, { port: 0 });
+
+    try {
+      const res = await fetch(`http://localhost:${server.port}/missing`);
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: "ROUTE_NOT_FOUND",
+        message: "Route not found",
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
   it("runs onBeforeStop when stopping and closes the server", async () => {
     const app = new Hono().get("/", (c) => c.text("ok"));
 
@@ -317,5 +334,20 @@ describe("serve tracing", () => {
       .spans()
       .find((s) => s.name === "POST /orders/find")!;
     expect(requestSpan.status.code).not.toBe(SpanStatusCode.ERROR);
+  });
+
+  it("requests that match no route are not flagged as server errors in traces", async () => {
+    const app = new Hono().get("/", (c) => c.text("ok"));
+    const server = await serve(app, { port: 0 });
+
+    try {
+      const res = await fetch(`http://localhost:${server.port}/missing`);
+      expect(res.status).toBe(404);
+    } finally {
+      await server.stop();
+    }
+
+    const span = tracing.spans()[0]!;
+    expect(span.status.code).not.toBe(SpanStatusCode.ERROR);
   });
 });

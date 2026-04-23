@@ -59,6 +59,9 @@ export async function serve(
     )
     .route("/", app);
   tracedApp.onError(domainErrorHandler(options.errors ?? {}));
+  tracedApp.notFound((c) =>
+    c.json({ code: "ROUTE_NOT_FOUND", message: "Route not found" }, 404),
+  );
 
   if (options.onBeforeStart) {
     await options.onBeforeStart();
