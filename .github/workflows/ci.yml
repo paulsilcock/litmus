@@ -32,9 +32,6 @@ jobs:
       - name: Install Playwright (browsers)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: vp dlx playwright install --with-deps chromium
-      - name: Install Playwright (system deps only)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: vp dlx playwright install-deps chromium
       - run: vp check
       - name: Run changed tests (PR)
         if: github.event_name == 'pull_request'
