@@ -139,8 +139,10 @@
         "zod": "catalog:",
       },
       "devDependencies": {
+        "@hono/node-server": "catalog:",
         "@types/node": "catalog:",
         "ai": "catalog:",
+        "hono": "catalog:",
         "playwright": "catalog:",
         "reflect-metadata": "catalog:",
         "vite-plus": "catalog:",
