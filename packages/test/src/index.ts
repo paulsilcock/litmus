@@ -9,4 +9,5 @@ export {
   type LlmJudgeConfig,
 } from "#litmus-test/grader.ts";
 export { UserSimulator } from "#litmus-test/simulator.ts";
+export { useInMemoryTracing } from "#litmus-test/tracing.ts";
 export { trial } from "#litmus-test/trial.ts";

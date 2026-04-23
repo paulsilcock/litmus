@@ -2,24 +2,30 @@ import { context, trace } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
   BasicTracerProvider,
+  ConsoleSpanExporter,
   InMemorySpanExporter,
   type ReadableSpan,
   SimpleSpanProcessor,
+  type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { afterEach, beforeEach } from "vite-plus/test";
 
 /**
- * Registers an in-memory OTel tracer + AsyncLocalStorage context manager
- * for the duration of each test in the enclosing `describe`. Returns an
- * accessor for the spans recorded by the active test.
+ * Records spans emitted during each test in the enclosing `describe`
+ * so they can be asserted against.
+ *
+ * When `OTEL_TRACES_EXPORTER=console` is set, spans are also printed
+ * to stdout — handy when debugging a flaky test or learning what the
+ * framework emits. The behaviour is controlled entirely by the env
+ * var, so test code stays free of debug toggles.
  *
  * @example
  * ```ts
- * describe("...", () => {
+ * describe("PlaceOrder", () => {
  *   const tracing = useInMemoryTracing();
  *
- *   it("...", () => {
- *     // exercise code that emits spans
+ *   it("emits one span per invocation", async () => {
+ *     await new PlaceOrder().handle({ customerId: "c1" });
  *     expect(tracing.spans()).toHaveLength(1);
  *   });
  * });
@@ -32,10 +38,14 @@ export function useInMemoryTracing(): {
   let provider: BasicTracerProvider;
 
   beforeEach(() => {
+    trace.disable();
+    context.disable();
     exporter = new InMemorySpanExporter();
-    provider = new BasicTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
-    });
+    const processors: SpanProcessor[] = [new SimpleSpanProcessor(exporter)];
+    if (process.env.OTEL_TRACES_EXPORTER === "console") {
+      processors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+    }
+    provider = new BasicTracerProvider({ spanProcessors: processors });
     trace.setGlobalTracerProvider(provider);
     context.setGlobalContextManager(
       new AsyncLocalStorageContextManager().enable(),

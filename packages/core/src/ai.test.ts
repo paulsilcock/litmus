@@ -1,8 +1,8 @@
+import { useInMemoryTracing } from "@litmus/test";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
 import { Agent, Toolbox } from "#litmus/ai.ts";
-import { useInMemoryTracing } from "#litmus/test-support/tracing.ts";
 
 const schema = z.object({ id: z.string() });
 

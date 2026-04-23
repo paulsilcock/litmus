@@ -1,14 +1,9 @@
 import { CommandHandler, DomainError } from "@litmus/core";
-import { context, SpanStatusCode, trace } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
-import {
-  BasicTracerProvider,
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { useInMemoryTracing } from "@litmus/test";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { Hono } from "hono";
 import { routePath } from "hono/route";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
 import { routeHandler } from "#litmus-http/route-handler.ts";
@@ -133,25 +128,7 @@ describe("serve", () => {
 });
 
 describe("serve tracing", () => {
-  let exporter: InMemorySpanExporter;
-  let provider: BasicTracerProvider;
-
-  beforeEach(() => {
-    exporter = new InMemorySpanExporter();
-    provider = new BasicTracerProvider({
-      spanProcessors: [new SimpleSpanProcessor(exporter)],
-    });
-    trace.setGlobalTracerProvider(provider);
-    context.setGlobalContextManager(
-      new AsyncLocalStorageContextManager().enable(),
-    );
-  });
-
-  afterEach(async () => {
-    trace.disable();
-    context.disable();
-    await provider.shutdown();
-  });
+  const tracing = useInMemoryTracing();
 
   it("incoming requests are observable in traces by the route they hit", async () => {
     const app = new Hono().get("/users/:id", (c) =>
@@ -167,7 +144,7 @@ describe("serve tracing", () => {
       await server.stop();
     }
 
-    const spans = exporter.getFinishedSpans();
+    const spans = tracing.spans();
     expect(spans).toHaveLength(1);
     expect(spans[0]!.name).toBe("GET /users/:id");
   });
@@ -191,7 +168,7 @@ describe("serve tracing", () => {
       await server.stop();
     }
 
-    const spans = exporter.getFinishedSpans();
+    const spans = tracing.spans();
     expect(spans[0]!.name).toBe("user.lookup /users/:id");
   });
 
@@ -218,7 +195,7 @@ describe("serve tracing", () => {
       await server.stop();
     }
 
-    const attributes = exporter.getFinishedSpans()[0]!.attributes;
+    const attributes = tracing.spans()[0]!.attributes;
     expect(attributes["http.request.header.x-tenant-id"]).toBe("tenant-42");
     expect(attributes["http.response.header.x-correlation-id"]).toBe(
       "corr-789",
@@ -248,7 +225,7 @@ describe("serve tracing", () => {
       await server.stop();
     }
 
-    const spans = exporter.getFinishedSpans();
+    const spans = tracing.spans();
     const request = spans.find((s) => s.name === "POST /orders");
     const handler = spans.find((s) => s.name === "PlaceOrder");
     expect(request).toBeDefined();
@@ -278,7 +255,7 @@ describe("serve tracing", () => {
       await server.stop();
     }
 
-    const span = exporter.getFinishedSpans()[0]!;
+    const span = tracing.spans()[0]!;
     expect(span.spanContext().traceId).toBe(upstreamTraceId);
     expect(span.parentSpanContext?.spanId).toBe(upstreamSpanId);
   });
@@ -297,7 +274,7 @@ describe("serve tracing", () => {
       await server.stop();
     }
 
-    const span = exporter.getFinishedSpans()[0]!;
+    const span = tracing.spans()[0]!;
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
     expect(span.events[0]?.attributes?.["exception.message"]).toBe("kaboom");
   });
@@ -336,8 +313,8 @@ describe("serve tracing", () => {
       await server.stop();
     }
 
-    const requestSpan = exporter
-      .getFinishedSpans()
+    const requestSpan = tracing
+      .spans()
       .find((s) => s.name === "POST /orders/find")!;
     expect(requestSpan.status.code).not.toBe(SpanStatusCode.ERROR);
   });

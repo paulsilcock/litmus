@@ -1,7 +1,7 @@
+import { useInMemoryTracing } from "@litmus/test";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { describe, expect, it } from "vite-plus/test";
 
-import { useInMemoryTracing } from "#litmus/test-support/tracing.ts";
 import { CommandHandler } from "#litmus/use-case/handlers.ts";
 
 describe("use case handler tracing", () => {

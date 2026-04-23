@@ -5,6 +5,7 @@
     "": {
       "name": "litmus",
       "devDependencies": {
+        "@litmus/test": "workspace:*",
         "@typescript/native-preview": "7.0.0-dev.20260328.1",
         "reflect-metadata": "catalog:",
         "vite-plus": "catalog:",
@@ -58,6 +59,7 @@
         "zod": "catalog:",
       },
       "devDependencies": {
+        "@litmus/test": "workspace:*",
         "@opentelemetry/context-async-hooks": "^2.7.0",
         "@opentelemetry/sdk-trace-base": "^2.7.0",
         "@types/node": "catalog:",
@@ -90,13 +92,14 @@
         "@hono/otel": "^1.1.1",
         "@litmus/core": "workspace:*",
         "@opentelemetry/api": "^1.9.1",
+        "@opentelemetry/context-async-hooks": "^2.7.0",
         "@opentelemetry/core": "^2.7.0",
+        "@opentelemetry/sdk-trace-base": "^2.7.0",
       },
       "devDependencies": {
         "@hono/node-server": "catalog:",
         "@hono/zod-validator": "^0.7.6",
-        "@opentelemetry/context-async-hooks": "^2.7.0",
-        "@opentelemetry/sdk-trace-base": "^2.7.0",
+        "@litmus/test": "workspace:*",
         "@types/node": "catalog:",
         "@typescript/native-preview": "7.0.0-dev.20260328.1",
         "hono": "catalog:",
@@ -128,6 +131,10 @@
       "name": "@litmus/test",
       "version": "0.0.0",
       "dependencies": {
+        "@opentelemetry/api": "^1.9.1",
+        "@opentelemetry/context-async-hooks": "^2.7.0",
+        "@opentelemetry/core": "^2.7.0",
+        "@opentelemetry/sdk-trace-base": "^2.7.0",
         "zod": "catalog:",
       },
       "devDependencies": {

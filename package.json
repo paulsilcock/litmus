@@ -11,6 +11,7 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@litmus/test": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
     "reflect-metadata": "catalog:",
     "vite-plus": "catalog:"

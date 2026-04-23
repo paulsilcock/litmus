@@ -22,6 +22,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./vitest-setup": "./src/vitest-setup.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -35,6 +36,10 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/context-async-hooks": "^2.7.0",
+    "@opentelemetry/core": "^2.7.0",
+    "@opentelemetry/sdk-trace-base": "^2.7.0",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -1,13 +1,30 @@
 import { serve as honoServe } from "@hono/node-server";
 import { httpInstrumentationMiddleware } from "@hono/otel";
-import { propagation } from "@opentelemetry/api";
+import { context, propagation, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import {
+  BasicTracerProvider,
+  ConsoleSpanExporter,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { type Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { domainErrorHandler } from "#litmus-http/error-handler.ts";
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+
+if (process.env.OTEL_TRACES_EXPORTER === "console") {
+  trace.setGlobalTracerProvider(
+    new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())],
+    }),
+  );
+  context.setGlobalContextManager(
+    new AsyncLocalStorageContextManager().enable(),
+  );
+}
 
 interface TracingOptions {
   spanName?: (c: Context) => string;
