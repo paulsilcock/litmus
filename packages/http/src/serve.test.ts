@@ -10,7 +10,7 @@ import { routeHandler } from "#litmus-http/route-handler.ts";
 import { serve } from "#litmus-http/serve.ts";
 
 describe("serve", () => {
-  it("auto-installs domain error mapping from the errors option", async () => {
+  it("a DomainError thrown by a handler maps to the configured HTTP status", async () => {
     class OrderNotFound extends DomainError {
       constructor() {
         super("ORDER_NOT_FOUND", "Order not found");
@@ -70,7 +70,7 @@ describe("serve", () => {
     }
   });
 
-  it("runs onBeforeStop when stopping and closes the server", async () => {
+  it("caller-supplied shutdown logic runs before the server closes", async () => {
     const app = new Hono().get("/", (c) => c.text("ok"));
 
     let stopped = false;
@@ -90,7 +90,7 @@ describe("serve", () => {
     await expect(fetch(`http://localhost:${server.port}/`)).rejects.toThrow();
   });
 
-  it("rejects and does not start the server if onBeforeStart throws", async () => {
+  it("a startup failure prevents the server from accepting connections", async () => {
     const app = new Hono().get("/", (c) => c.text("ok"));
 
     await expect(
@@ -118,7 +118,7 @@ describe("serve", () => {
     }
   });
 
-  it("does not accept connections until onBeforeStart completes", async () => {
+  it("the server does not accept connections until startup completes", async () => {
     const app = new Hono().get("/", (c) => c.text("ok"));
 
     let completeBeforeStartHandler: () => void = () => {};

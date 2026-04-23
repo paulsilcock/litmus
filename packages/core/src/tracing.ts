@@ -2,6 +2,10 @@ import { SpanStatusCode, trace } from "@opentelemetry/api";
 
 const TRACER_NAME = "@litmus/core";
 
+function toException(err: unknown): Error | string {
+  return err instanceof Error ? err : String(err);
+}
+
 /**
  * Base class that wraps a named method on the subclass instance so each
  * invocation is enclosed in an OpenTelemetry span named after the
@@ -28,16 +32,18 @@ function traceMethod(instance: object, methodName: string): void {
   const original = fn.bind(instance);
   const spanName = instance.constructor.name;
   Object.defineProperty(instance, methodName, {
-    value: (input: unknown) => {
+    value: (...args: unknown[]) => {
       const tracer = trace.getTracer(TRACER_NAME);
       return tracer.startActiveSpan(spanName, async (span) => {
         try {
-          return await original(input);
+          return await original(...args);
         } catch (err) {
-          span.recordException(err instanceof Error ? err : String(err));
+          const exception = toException(err);
+          span.recordException(exception);
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: err instanceof Error ? err.message : String(err),
+            message:
+              typeof exception === "string" ? exception : exception.message,
           });
           throw err;
         } finally {

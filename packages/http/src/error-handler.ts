@@ -8,6 +8,8 @@ export function domainErrorHandler(map: DomainErrorMap) {
   return (err: Error, c: Context) => {
     if (err instanceof DomainError) {
       const status = map[err.constructor.name] ?? 400;
+      // Clear so @hono/otel doesn't mark the span as ERROR — a mapped
+      // domain failure is a handled 4xx, not a server error.
       c.error = undefined;
       return c.json({ code: err.code, message: err.message }, status);
     }
