@@ -9,7 +9,7 @@ export default defineConfig({
   },
   test: {
     // fixtures/ holds intentionally-failing files invoked on demand by
-    // subprocess-based tests inside trial.test.ts; skip auto-discovery.
+    // subprocess-based tests inside evaluate.test.ts; skip auto-discovery.
     exclude: ["**/node_modules/**", "**/dist/**", "**/fixtures/**"],
   },
 });

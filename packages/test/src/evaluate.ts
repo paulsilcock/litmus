@@ -5,8 +5,8 @@ interface SamplesOptions {
   passRate?: number;
 }
 
-interface FixturesOptions<T> {
-  fixtures: T[];
+interface ScenariosOptions<T> {
+  scenarios: T[];
   passRate?: number;
 }
 
@@ -22,47 +22,47 @@ interface SamplesRunner {
   };
 }
 
-interface FixturesRunner<T> {
+interface ScenariosRunner<T> {
   each(
-    name: string | ((fixture: T) => string),
-    fn: (fixture: T) => Promise<void>,
+    name: string | ((scenario: T) => string),
+    fn: (scenario: T) => Promise<void>,
     options?: EachOptions,
   ): void;
   concurrent: {
     each(
-      name: string | ((fixture: T) => string),
-      fn: (fixture: T) => Promise<void>,
+      name: string | ((scenario: T) => string),
+      fn: (scenario: T) => Promise<void>,
       options?: EachOptions,
     ): void;
   };
 }
 
-function fixtureLabel(fixture: unknown): string {
-  if (typeof fixture === "object" && fixture !== null) {
-    if ("name" in fixture && typeof fixture.name === "string")
-      return fixture.name;
-    if ("id" in fixture && typeof fixture.id === "string") return fixture.id;
+function scenarioLabel(scenario: unknown): string {
+  if (typeof scenario === "object" && scenario !== null) {
+    if ("name" in scenario && typeof scenario.name === "string")
+      return scenario.name;
+    if ("id" in scenario && typeof scenario.id === "string") return scenario.id;
   }
-  return "fixture";
+  return "scenario";
 }
 
 function resolveLabel<T>(
-  name: string | ((fixture: T) => string),
-  fixture: T,
+  name: string | ((scenario: T) => string),
+  scenario: T,
 ): string {
-  return typeof name === "function" ? name(fixture) : fixtureLabel(fixture);
+  return typeof name === "function" ? name(scenario) : scenarioLabel(scenario);
 }
 
 function warnFailure(label: string, e: unknown) {
   const message = e instanceof Error ? e.message : String(e);
-  console.warn(`Trial warning: ${label} failed — ${message}`);
+  console.warn(`Evaluate warning: ${label} failed — ${message}`);
 }
 
 function assertPassRate(passed: number, total: number, required: number) {
   const actual = passed / total;
   if (actual < required) {
     throw new Error(
-      `Trial failed: ${passed}/${total} passed (${(actual * 100).toFixed(0)}%), required ${(required * 100).toFixed(0)}%`,
+      `Evaluate failed: ${passed}/${total} passed (${(actual * 100).toFixed(0)}%), required ${(required * 100).toFixed(0)}%`,
     );
   }
 }
@@ -134,35 +134,35 @@ async function runConcurrent(
   assertPassRate(passed, tasks.length, passRate);
 }
 
-type SetupFn<TContext> = (
-  use: (ctx: TContext) => Promise<void>,
+type SetupFn<TFixtures> = (
+  use: (fixtures: TFixtures) => Promise<void>,
 ) => Promise<void>;
 
-interface ContextSamplesRunner<TContext> {
+interface FixturesSamplesRunner<TFixtures> {
   each(
     name: string,
-    fn: (ctx: TContext) => Promise<void>,
+    fn: (fixtures: TFixtures) => Promise<void>,
     options?: EachOptions,
   ): void;
   concurrent: {
     each(
       name: string,
-      fn: (ctx: TContext) => Promise<void>,
+      fn: (fixtures: TFixtures) => Promise<void>,
       options?: EachOptions,
     ): void;
   };
 }
 
-interface ContextFixturesRunner<TFixture, TContext> {
+interface FixturesScenariosRunner<TScenario, TFixtures> {
   each(
-    name: string | ((fixture: TFixture) => string),
-    fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+    name: string | ((scenario: TScenario) => string),
+    fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
     options?: EachOptions,
   ): void;
   concurrent: {
     each(
-      name: string | ((fixture: TFixture) => string),
-      fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+      name: string | ((scenario: TScenario) => string),
+      fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
       options?: EachOptions,
     ): void;
   };
@@ -182,57 +182,57 @@ function totalTimeout(
 }
 
 /**
- * Creates a trial runner with per-run setup and teardown.
- * Each run gets a fresh context — essential for concurrent execution
- * where shared state would cause interference.
+ * Creates an evaluate runner with per-run setup and teardown that
+ * provides a freshly built fixtures object to every repeat. Essential
+ * for concurrent execution where shared state would cause interference.
  *
- * @param setup - Async function that creates context, passes it to
+ * @param setup - Async function that builds fixtures, passes them to
  *   `use()`, and runs teardown after `use()` returns.
  *
  * @example
  * ```typescript
- * const withDsl = trial.extend<{ dsl: Dsl }>(async (use) => {
+ * const withDsl = evaluate.extend<{ dsl: Dsl }>(async (use) => {
  *   const dsl = new Dsl();
  *   await dsl.setup();
  *   await use({ dsl });
  *   await dsl.cleanup();
  * });
  *
- * withDsl({ fixtures, passRate: 0.8 })
- *   .concurrent.each("screens $name correctly", async (fixture, { dsl }) => {
- *     await dsl.submitApplication(fixture.cv);
- *     await dsl.assertScreeningResult(fixture.expected);
+ * withDsl({ scenarios, passRate: 0.8 })
+ *   .concurrent.each("screens $name correctly", async (scenario, { dsl }) => {
+ *     await dsl.submitApplication(scenario.cv);
+ *     await dsl.assertScreeningResult(scenario.expected);
  *   });
  * ```
  */
-trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
-  function extended(options: SamplesOptions): ContextSamplesRunner<TContext>;
-  function extended<TFixture>(
-    options: FixturesOptions<TFixture>,
-  ): ContextFixturesRunner<TFixture, TContext>;
-  function extended<TFixture>(
-    options: SamplesOptions | FixturesOptions<TFixture>,
+evaluate.extend = function extend<TFixtures>(setup: SetupFn<TFixtures>) {
+  function extended(options: SamplesOptions): FixturesSamplesRunner<TFixtures>;
+  function extended<TScenario>(
+    options: ScenariosOptions<TScenario>,
+  ): FixturesScenariosRunner<TScenario, TFixtures>;
+  function extended<TScenario>(
+    options: SamplesOptions | ScenariosOptions<TScenario>,
   ):
-    | ContextSamplesRunner<TContext>
-    | ContextFixturesRunner<TFixture, TContext> {
+    | FixturesSamplesRunner<TFixtures>
+    | FixturesScenariosRunner<TScenario, TFixtures> {
     const passRate = options.passRate ?? 1;
 
-    if ("fixtures" in options) {
-      const fixtures = options.fixtures;
+    if ("scenarios" in options) {
+      const scenarios = options.scenarios;
       return {
         each(
-          name: string | ((fixture: TFixture) => string),
-          fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+          name: string | ((scenario: TScenario) => string),
+          fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
           register({
-            label: trialLabel(name, fixtures, "fixtures", passRate),
+            label: scenariosTitle(name, scenarios, passRate),
             tasks: () =>
-              fixtures.map((fixture) => ({
-                label: resolveLabel(name, fixture),
+              scenarios.map((scenario) => ({
+                label: resolveLabel(name, scenario),
                 run: () =>
-                  setup(async (ctx: TContext) => {
-                    await fn(fixture, ctx);
+                  setup(async (fixtures: TFixtures) => {
+                    await fn(scenario, fixtures);
                   }),
               })),
             passRate,
@@ -242,18 +242,18 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
         },
         concurrent: {
           each(
-            name: string | ((fixture: TFixture) => string),
-            fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
+            name: string | ((scenario: TScenario) => string),
+            fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
             eachOptions?: EachOptions,
           ) {
             register({
-              label: trialLabel(name, fixtures, "fixtures", passRate),
+              label: scenariosTitle(name, scenarios, passRate),
               tasks: () =>
-                fixtures.map((fixture) => ({
-                  label: resolveLabel(name, fixture),
+                scenarios.map((scenario) => ({
+                  label: resolveLabel(name, scenario),
                   run: () =>
-                    setup(async (ctx: TContext) => {
-                      await fn(fixture, ctx);
+                    setup(async (fixtures: TFixtures) => {
+                      await fn(scenario, fixtures);
                     }),
                 })),
               passRate,
@@ -269,17 +269,17 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
     return {
       each(
         name: string,
-        fn: (ctx: TContext) => Promise<void>,
+        fn: (fixtures: TFixtures) => Promise<void>,
         eachOptions?: EachOptions,
       ) {
         register({
-          label: samplesLabel(name, samples, passRate),
+          label: samplesTitle(name, samples, passRate),
           tasks: () =>
             Array.from({ length: samples }, (_, i) => ({
               label: `sample ${i + 1}`,
               run: () =>
-                setup(async (ctx: TContext) => {
-                  await fn(ctx);
+                setup(async (fixtures: TFixtures) => {
+                  await fn(fixtures);
                 }),
             })),
           passRate,
@@ -290,17 +290,17 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
       concurrent: {
         each(
           name: string,
-          fn: (ctx: TContext) => Promise<void>,
+          fn: (fixtures: TFixtures) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
           register({
-            label: samplesLabel(name, samples, passRate),
+            label: samplesTitle(name, samples, passRate),
             tasks: () =>
               Array.from({ length: samples }, (_, i) => ({
                 label: `sample ${i + 1}`,
                 run: () =>
-                  setup(async (ctx: TContext) => {
-                    await fn(ctx);
+                  setup(async (fixtures: TFixtures) => {
+                    await fn(fixtures);
                   }),
               })),
             passRate,
@@ -351,76 +351,75 @@ function taskCount(tasks: () => RunTask[]): number {
   return tasks().length;
 }
 
-function trialLabel<T>(
-  name: string | ((fixture: T) => string),
-  fixtures: T[],
-  unit: "fixtures" | "samples",
+function scenariosTitle<T>(
+  name: string | ((scenario: T) => string),
+  scenarios: T[],
   passRate: number,
 ): string {
-  const base = typeof name === "string" ? name : "trial";
-  return `${base} [${fixtures.length} ${unit}, ${(passRate * 100).toFixed(0)}% pass]`;
+  const base = typeof name === "string" ? name : "evaluate";
+  return `${base} [${scenarios.length} scenarios, ${(passRate * 100).toFixed(0)}% pass]`;
 }
 
-function samplesLabel(name: string, samples: number, passRate: number): string {
+function samplesTitle(name: string, samples: number, passRate: number): string {
   return `${name} [${samples} samples, ${(passRate * 100).toFixed(0)}% pass]`;
 }
 
 /**
- * Probabilistic test runner for non-deterministic behaviour.
+ * Probabilistic evaluation runner for non-deterministic behaviour.
  * Top-level equivalent to vitest's `test`/`it` — registers a vitest
- * test that runs N samples or fixtures internally and asserts the
+ * test that runs N samples or scenarios internally and asserts the
  * overall pass rate.
  *
  * Two modes:
  * - **Samples**: run N times with random/repeated input
- * - **Fixtures**: run once per fixture from an array
+ * - **Scenarios**: run once per scenario from an array
  *
  * Supports sequential (default) and concurrent execution via
  * `.concurrent.each()`, with configurable concurrency limits
  * and per-run timeouts.
  *
- * @param options.samples - Number of times to run the test.
- * @param options.fixtures - Array of test cases to iterate.
+ * @param options.samples - Number of times to run the body.
+ * @param options.scenarios - Array of test cases to iterate.
  * @param options.passRate - Minimum pass ratio (0–1, default 1).
  *
  * @example
  * ```typescript
  * // Top-level — registers a vitest test, no it() wrapper needed
- * trial({ samples: 10, passRate: 0.8 })
+ * evaluate({ samples: 10, passRate: 0.8 })
  *   .each("classifies intent", async () => {
  *     const result = await classifier.run("I want a refund");
  *     expect(result.intent).toBe("refund");
  *   });
  *
- * trial({ fixtures: candidates, passRate: 0.8 })
+ * evaluate({ scenarios: candidates, passRate: 0.8 })
  *   .concurrent.each(
  *     ({ name }) => `screens ${name}`,
- *     async (fixture) => { ... },
+ *     async (scenario) => { ... },
  *     { concurrency: 5, timeout: 30_000 },
  *   );
  * ```
  */
-export function trial(options: SamplesOptions): SamplesRunner;
-export function trial<T>(options: FixturesOptions<T>): FixturesRunner<T>;
-export function trial<T>(
-  options: SamplesOptions | FixturesOptions<T>,
-): SamplesRunner | FixturesRunner<T> {
+export function evaluate(options: SamplesOptions): SamplesRunner;
+export function evaluate<T>(options: ScenariosOptions<T>): ScenariosRunner<T>;
+export function evaluate<T>(
+  options: SamplesOptions | ScenariosOptions<T>,
+): SamplesRunner | ScenariosRunner<T> {
   const passRate = options.passRate ?? 1;
 
-  if ("fixtures" in options) {
-    const fixtures = options.fixtures;
+  if ("scenarios" in options) {
+    const scenarios = options.scenarios;
     return {
       each(
-        name: string | ((fixture: T) => string),
-        fn: (fixture: T) => Promise<void>,
+        name: string | ((scenario: T) => string),
+        fn: (scenario: T) => Promise<void>,
         eachOptions?: EachOptions,
       ) {
         register({
-          label: trialLabel(name, fixtures, "fixtures", passRate),
+          label: scenariosTitle(name, scenarios, passRate),
           tasks: () =>
-            fixtures.map((fixture) => ({
-              label: resolveLabel(name, fixture),
-              run: () => fn(fixture),
+            scenarios.map((scenario) => ({
+              label: resolveLabel(name, scenario),
+              run: () => fn(scenario),
             })),
           passRate,
           eachOptions,
@@ -429,16 +428,16 @@ export function trial<T>(
       },
       concurrent: {
         each(
-          name: string | ((fixture: T) => string),
-          fn: (fixture: T) => Promise<void>,
+          name: string | ((scenario: T) => string),
+          fn: (scenario: T) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
           register({
-            label: trialLabel(name, fixtures, "fixtures", passRate),
+            label: scenariosTitle(name, scenarios, passRate),
             tasks: () =>
-              fixtures.map((fixture) => ({
-                label: resolveLabel(name, fixture),
-                run: () => fn(fixture),
+              scenarios.map((scenario) => ({
+                label: resolveLabel(name, scenario),
+                run: () => fn(scenario),
               })),
             passRate,
             eachOptions,
@@ -453,7 +452,7 @@ export function trial<T>(
   return {
     each(name: string, fn: () => Promise<void>, eachOptions?: EachOptions) {
       register({
-        label: samplesLabel(name, samples, passRate),
+        label: samplesTitle(name, samples, passRate),
         tasks: () =>
           Array.from({ length: samples }, (_, i) => ({
             label: `sample ${i + 1}`,
@@ -467,7 +466,7 @@ export function trial<T>(
     concurrent: {
       each(name: string, fn: () => Promise<void>, eachOptions?: EachOptions) {
         register({
-          label: samplesLabel(name, samples, passRate),
+          label: samplesTitle(name, samples, passRate),
           tasks: () =>
             Array.from({ length: samples }, (_, i) => ({
               label: `sample ${i + 1}`,

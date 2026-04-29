@@ -10,12 +10,12 @@ import {
   test,
 } from "vite-plus/test";
 
-import { trial } from "#litmus-test/trial.ts";
+import { evaluate } from "#litmus-test/evaluate.ts";
 
 describe("each requested repeat runs the body once", () => {
   let runs = 0;
 
-  trial({ samples: 3 }).each("body counts invocations", async () => {
+  evaluate({ samples: 3 }).each("body counts invocations", async () => {
     runs++;
   });
 
@@ -27,7 +27,7 @@ describe("each requested repeat runs the body once", () => {
 describe("tolerates failures up to a configured threshold", () => {
   let calls = 0;
 
-  trial({ samples: 5, passRate: 0.6 }).each(
+  evaluate({ samples: 5, passRate: 0.6 }).each(
     "two fail, three pass",
     async () => {
       calls++;
@@ -40,24 +40,24 @@ describe("tolerates failures up to a configured threshold", () => {
   });
 });
 
-describe("runs the body against each input in turn", () => {
+describe("runs the body against each scenario in turn", () => {
   const seen: string[] = [];
-  const fixtures = [
+  const scenarios = [
     { name: "alice", role: "admin" },
     { name: "bob", role: "user" },
   ];
 
-  trial({ fixtures }).each("checks $name", async (fixture) => {
-    seen.push(fixture.name);
+  evaluate({ scenarios }).each("checks $name", async (scenario) => {
+    seen.push(scenario.name);
   });
 
-  test("each input is observed by the body", () => {
+  test("each scenario is observed by the body", () => {
     expect(seen).toEqual(["alice", "bob"]);
   });
 });
 
-describe("a failing input is identified by its caller-defined label", () => {
-  const fixtures = [
+describe("a failing scenario is identified by its caller-defined label", () => {
+  const scenarios = [
     { name: "alice", role: "admin" },
     { name: "bob", role: "user" },
   ];
@@ -72,10 +72,10 @@ describe("a failing input is identified by its caller-defined label", () => {
     console.warn = originalWarn;
   });
 
-  trial({ fixtures, passRate: 0.5 }).each(
+  evaluate({ scenarios, passRate: 0.5 }).each(
     ({ name, role }) => `${name} (${role})`,
-    async (fixture) => {
-      if (fixture.name === "bob") throw new Error("denied");
+    async (scenario) => {
+      if (scenario.name === "bob") throw new Error("denied");
     },
   );
 
@@ -90,12 +90,12 @@ describe("every repeat sees a freshly built environment", () => {
   const ids: number[] = [];
   let setupCount = 0;
 
-  const withCtx = trial.extend<{ id: number }>(async (use) => {
+  const withFixtures = evaluate.extend<{ id: number }>(async (use) => {
     setupCount++;
     await use({ id: setupCount });
   });
 
-  withCtx({ samples: 3 }).each("captures id", async ({ id }) => {
+  withFixtures({ samples: 3 }).each("captures id", async ({ id }) => {
     ids.push(id);
   });
 
@@ -108,7 +108,7 @@ describe("every repeat sees a freshly built environment", () => {
 describe("the previous environment is torn down before the next starts", () => {
   const events: string[] = [];
 
-  const withTeardown = trial.extend<{ id: number }>(async (use) => {
+  const withTeardown = evaluate.extend<{ id: number }>(async (use) => {
     events.push("setup");
     await use({ id: 1 });
     events.push("teardown");
@@ -133,7 +133,7 @@ describe("the previous environment is torn down before the next starts", () => {
 describe("parallel runs respect the configured limit", () => {
   const sleep = (ms: number) =>
     new Promise((resolve) => setTimeout(resolve, ms));
-  const fixtures = [
+  const scenarios = [
     { name: "a" },
     { name: "b" },
     { name: "c" },
@@ -144,11 +144,11 @@ describe("parallel runs respect the configured limit", () => {
   let active = 0;
   let maxActive = 0;
 
-  const withCtx = trial.extend<{ id: number }>(async (use) => {
+  const withFixtures = evaluate.extend<{ id: number }>(async (use) => {
     await use({ id: 1 });
   });
 
-  withCtx({ fixtures }).concurrent.each(
+  withFixtures({ scenarios }).concurrent.each(
     "tracks max parallelism",
     async () => {
       active++;
@@ -177,10 +177,13 @@ describe("a failing repeat is reported even when the run as a whole passes", () 
   });
 
   let run = 0;
-  trial({ samples: 3, passRate: 0.5 }).each("middle repeat fails", async () => {
-    run++;
-    if (run === 2) throw new Error("boom");
-  });
+  evaluate({ samples: 3, passRate: 0.5 }).each(
+    "middle repeat fails",
+    async () => {
+      run++;
+      if (run === 2) throw new Error("boom");
+    },
+  );
 
   test("the failing repeat produces a warning identifying it", () => {
     expect(warnings).toHaveLength(1);
@@ -202,7 +205,7 @@ describe("a run that fails the threshold is reported as a failed test", () => {
     );
     expect(result?.status).toBe("failed");
     expect(result?.failureMessages.join("\n")).toMatch(
-      /Trial failed: 2\/5 passed/,
+      /Evaluate failed: 2\/5 passed/,
     );
   });
 
@@ -212,7 +215,7 @@ describe("a run that fails the threshold is reported as a failed test", () => {
     );
     expect(result?.status).toBe("failed");
     expect(result?.failureMessages.join("\n")).toMatch(
-      /Trial failed: 0\/1 passed/,
+      /Evaluate failed: 0\/1 passed/,
     );
   });
 });
@@ -237,7 +240,7 @@ function runVitestOnFixture(): Promise<JsonReport> {
         "test",
         "-c",
         join(fixturesDir, "vite.config.ts"),
-        join(fixturesDir, "trial-failures.test.ts"),
+        join(fixturesDir, "evaluate-failures.test.ts"),
         "--reporter=json",
       ],
       { stdio: ["ignore", "pipe", "pipe"] },
