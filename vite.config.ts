@@ -3,6 +3,9 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   test: {
     setupFiles: ["./test-setup.ts", "@litmus/test/vitest-setup"],
+    // fixtures/ dirs hold intentionally-failing files invoked on demand
+    // by subprocess-based acceptance tests; skip auto-discovery.
+    exclude: ["**/node_modules/**", "**/dist/**", "**/fixtures/**"],
   },
   staged: {
     "*": "vp check --fix",

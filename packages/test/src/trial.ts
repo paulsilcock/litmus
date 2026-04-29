@@ -1,3 +1,5 @@
+import { test } from "vite-plus/test";
+
 interface SamplesOptions {
   samples: number;
   passRate?: number;
@@ -14,17 +16,9 @@ interface EachOptions {
 }
 
 interface SamplesRunner {
-  each(
-    name: string,
-    fn: () => Promise<void>,
-    options?: EachOptions,
-  ): Promise<void>;
+  each(name: string, fn: () => Promise<void>, options?: EachOptions): void;
   concurrent: {
-    each(
-      name: string,
-      fn: () => Promise<void>,
-      options?: EachOptions,
-    ): Promise<void>;
+    each(name: string, fn: () => Promise<void>, options?: EachOptions): void;
   };
 }
 
@@ -33,13 +27,13 @@ interface FixturesRunner<T> {
     name: string | ((fixture: T) => string),
     fn: (fixture: T) => Promise<void>,
     options?: EachOptions,
-  ): Promise<void>;
+  ): void;
   concurrent: {
     each(
       name: string | ((fixture: T) => string),
       fn: (fixture: T) => Promise<void>,
       options?: EachOptions,
-    ): Promise<void>;
+    ): void;
   };
 }
 
@@ -149,13 +143,13 @@ interface ContextSamplesRunner<TContext> {
     name: string,
     fn: (ctx: TContext) => Promise<void>,
     options?: EachOptions,
-  ): Promise<void>;
+  ): void;
   concurrent: {
     each(
       name: string,
       fn: (ctx: TContext) => Promise<void>,
       options?: EachOptions,
-    ): Promise<void>;
+    ): void;
   };
 }
 
@@ -164,14 +158,27 @@ interface ContextFixturesRunner<TFixture, TContext> {
     name: string | ((fixture: TFixture) => string),
     fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
     options?: EachOptions,
-  ): Promise<void>;
+  ): void;
   concurrent: {
     each(
       name: string | ((fixture: TFixture) => string),
       fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
       options?: EachOptions,
-    ): Promise<void>;
+    ): void;
   };
+}
+
+function totalTimeout(
+  perRun: number | undefined,
+  runs: number,
+  concurrent: boolean,
+  concurrency: number,
+): number | undefined {
+  if (perRun === undefined) return undefined;
+  const slack = 10_000;
+  return concurrent
+    ? perRun * Math.ceil(runs / concurrency) + slack
+    : perRun * runs + slack;
 }
 
 /**
@@ -213,39 +220,46 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
     if ("fixtures" in options) {
       const fixtures = options.fixtures;
       return {
-        async each(
+        each(
           name: string | ((fixture: TFixture) => string),
           fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
-          const tasks = fixtures.map((fixture) => ({
-            label: resolveLabel(name, fixture),
-            run: () =>
-              setup(async (ctx) => {
-                await fn(fixture, ctx);
-              }),
-          }));
-          await runSequential(tasks, passRate, eachOptions?.timeout);
+          register({
+            label: trialLabel(name, fixtures, "fixtures", passRate),
+            tasks: () =>
+              fixtures.map((fixture) => ({
+                label: resolveLabel(name, fixture),
+                run: () =>
+                  setup(async (ctx: TContext) => {
+                    await fn(fixture, ctx);
+                  }),
+              })),
+            passRate,
+            eachOptions,
+            concurrent: false,
+          });
         },
         concurrent: {
-          async each(
+          each(
             name: string | ((fixture: TFixture) => string),
             fn: (fixture: TFixture, ctx: TContext) => Promise<void>,
             eachOptions?: EachOptions,
           ) {
-            const tasks = fixtures.map((fixture) => ({
-              label: resolveLabel(name, fixture),
-              run: () =>
-                setup(async (ctx) => {
-                  await fn(fixture, ctx);
-                }),
-            }));
-            await runConcurrent(
-              tasks,
+            register({
+              label: trialLabel(name, fixtures, "fixtures", passRate),
+              tasks: () =>
+                fixtures.map((fixture) => ({
+                  label: resolveLabel(name, fixture),
+                  run: () =>
+                    setup(async (ctx: TContext) => {
+                      await fn(fixture, ctx);
+                    }),
+                })),
               passRate,
-              eachOptions?.concurrency ?? 5,
-              eachOptions?.timeout,
-            );
+              eachOptions,
+              concurrent: true,
+            });
           },
         },
       };
@@ -253,39 +267,46 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
 
     const samples = options.samples;
     return {
-      async each(
-        _name: string,
+      each(
+        name: string,
         fn: (ctx: TContext) => Promise<void>,
         eachOptions?: EachOptions,
       ) {
-        const tasks = Array.from({ length: samples }, (_, i) => ({
-          label: `sample ${i + 1}`,
-          run: () =>
-            setup(async (ctx) => {
-              await fn(ctx);
-            }),
-        }));
-        await runSequential(tasks, passRate, eachOptions?.timeout);
+        register({
+          label: samplesLabel(name, samples, passRate),
+          tasks: () =>
+            Array.from({ length: samples }, (_, i) => ({
+              label: `sample ${i + 1}`,
+              run: () =>
+                setup(async (ctx: TContext) => {
+                  await fn(ctx);
+                }),
+            })),
+          passRate,
+          eachOptions,
+          concurrent: false,
+        });
       },
       concurrent: {
-        async each(
-          _name: string,
+        each(
+          name: string,
           fn: (ctx: TContext) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
-          const tasks = Array.from({ length: samples }, (_, i) => ({
-            label: `sample ${i + 1}`,
-            run: () =>
-              setup(async (ctx) => {
-                await fn(ctx);
-              }),
-          }));
-          await runConcurrent(
-            tasks,
+          register({
+            label: samplesLabel(name, samples, passRate),
+            tasks: () =>
+              Array.from({ length: samples }, (_, i) => ({
+                label: `sample ${i + 1}`,
+                run: () =>
+                  setup(async (ctx: TContext) => {
+                    await fn(ctx);
+                  }),
+              })),
             passRate,
-            eachOptions?.concurrency ?? 5,
-            eachOptions?.timeout,
-          );
+            eachOptions,
+            concurrent: true,
+          });
         },
       },
     };
@@ -294,10 +315,61 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
   return extended;
 };
 
+interface RegisterArgs {
+  label: string;
+  tasks: () => RunTask[];
+  passRate: number;
+  eachOptions?: EachOptions;
+  concurrent: boolean;
+}
+
+function register({
+  label,
+  tasks,
+  passRate,
+  eachOptions,
+  concurrent,
+}: RegisterArgs): void {
+  const concurrency = eachOptions?.concurrency ?? 5;
+  const perRun = eachOptions?.timeout;
+
+  test(
+    label,
+    async () => {
+      const ts = tasks();
+      if (concurrent) {
+        await runConcurrent(ts, passRate, concurrency, perRun);
+      } else {
+        await runSequential(ts, passRate, perRun);
+      }
+    },
+    totalTimeout(perRun, taskCount(tasks), concurrent, concurrency),
+  );
+}
+
+function taskCount(tasks: () => RunTask[]): number {
+  return tasks().length;
+}
+
+function trialLabel<T>(
+  name: string | ((fixture: T) => string),
+  fixtures: T[],
+  unit: "fixtures" | "samples",
+  passRate: number,
+): string {
+  const base = typeof name === "string" ? name : "trial";
+  return `${base} [${fixtures.length} ${unit}, ${(passRate * 100).toFixed(0)}% pass]`;
+}
+
+function samplesLabel(name: string, samples: number, passRate: number): string {
+  return `${name} [${samples} samples, ${(passRate * 100).toFixed(0)}% pass]`;
+}
+
 /**
  * Probabilistic test runner for non-deterministic behaviour.
- * Runs a test function multiple times and asserts that enough
- * runs pass to meet a threshold.
+ * Top-level equivalent to vitest's `test`/`it` — registers a vitest
+ * test that runs N samples or fixtures internally and asserts the
+ * overall pass rate.
  *
  * Two modes:
  * - **Samples**: run N times with random/repeated input
@@ -313,15 +385,14 @@ trial.extend = function extend<TContext>(setup: SetupFn<TContext>) {
  *
  * @example
  * ```typescript
- * // Samples mode: 80% of 10 runs must pass
- * await trial({ samples: 10, passRate: 0.8 })
+ * // Top-level — registers a vitest test, no it() wrapper needed
+ * trial({ samples: 10, passRate: 0.8 })
  *   .each("classifies intent", async () => {
  *     const result = await classifier.run("I want a refund");
  *     expect(result.intent).toBe("refund");
  *   });
  *
- * // Fixtures mode: run against each test case
- * await trial({ fixtures: candidates, passRate: 0.8 })
+ * trial({ fixtures: candidates, passRate: 0.8 })
  *   .concurrent.each(
  *     ({ name }) => `screens ${name}`,
  *     async (fixture) => { ... },
@@ -339,33 +410,40 @@ export function trial<T>(
   if ("fixtures" in options) {
     const fixtures = options.fixtures;
     return {
-      async each(
+      each(
         name: string | ((fixture: T) => string),
         fn: (fixture: T) => Promise<void>,
         eachOptions?: EachOptions,
       ) {
-        const tasks = fixtures.map((fixture) => ({
-          label: resolveLabel(name, fixture),
-          run: () => fn(fixture),
-        }));
-        await runSequential(tasks, passRate, eachOptions?.timeout);
+        register({
+          label: trialLabel(name, fixtures, "fixtures", passRate),
+          tasks: () =>
+            fixtures.map((fixture) => ({
+              label: resolveLabel(name, fixture),
+              run: () => fn(fixture),
+            })),
+          passRate,
+          eachOptions,
+          concurrent: false,
+        });
       },
       concurrent: {
-        async each(
+        each(
           name: string | ((fixture: T) => string),
           fn: (fixture: T) => Promise<void>,
           eachOptions?: EachOptions,
         ) {
-          const tasks = fixtures.map((fixture) => ({
-            label: resolveLabel(name, fixture),
-            run: () => fn(fixture),
-          }));
-          await runConcurrent(
-            tasks,
+          register({
+            label: trialLabel(name, fixtures, "fixtures", passRate),
+            tasks: () =>
+              fixtures.map((fixture) => ({
+                label: resolveLabel(name, fixture),
+                run: () => fn(fixture),
+              })),
             passRate,
-            eachOptions?.concurrency ?? 5,
-            eachOptions?.timeout,
-          );
+            eachOptions,
+            concurrent: true,
+          });
         },
       },
     };
@@ -373,33 +451,32 @@ export function trial<T>(
 
   const samples = options.samples;
   return {
-    async each(
-      _name: string,
-      fn: () => Promise<void>,
-      eachOptions?: EachOptions,
-    ) {
-      const tasks = Array.from({ length: samples }, (_, i) => ({
-        label: `sample ${i + 1}`,
-        run: fn,
-      }));
-      await runSequential(tasks, passRate, eachOptions?.timeout);
+    each(name: string, fn: () => Promise<void>, eachOptions?: EachOptions) {
+      register({
+        label: samplesLabel(name, samples, passRate),
+        tasks: () =>
+          Array.from({ length: samples }, (_, i) => ({
+            label: `sample ${i + 1}`,
+            run: fn,
+          })),
+        passRate,
+        eachOptions,
+        concurrent: false,
+      });
     },
     concurrent: {
-      async each(
-        _name: string,
-        fn: () => Promise<void>,
-        options?: EachOptions,
-      ) {
-        const tasks = Array.from({ length: samples }, (_, i) => ({
-          label: `sample ${i + 1}`,
-          run: fn,
-        }));
-        await runConcurrent(
-          tasks,
+      each(name: string, fn: () => Promise<void>, eachOptions?: EachOptions) {
+        register({
+          label: samplesLabel(name, samples, passRate),
+          tasks: () =>
+            Array.from({ length: samples }, (_, i) => ({
+              label: `sample ${i + 1}`,
+              run: fn,
+            })),
           passRate,
-          options?.concurrency ?? 5,
-          options?.timeout,
-        );
+          eachOptions,
+          concurrent: true,
+        });
       },
     },
   };
