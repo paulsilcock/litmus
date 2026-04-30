@@ -204,6 +204,7 @@ function registerBareWithFixtures<TFixtures>(
   fn: (fixtures: TFixtures) => Promise<void>,
   setup: SetupFn<TFixtures>,
   options: EvaluateOptions,
+  mode: RunMode = "run",
 ): void {
   const samples = options.samples ?? 1;
   const passRate = options.passRate ?? 1;
@@ -222,6 +223,7 @@ function registerBareWithFixtures<TFixtures>(
     timeout: options.timeout,
     concurrent: options.concurrent ?? false,
     concurrency: options.concurrency,
+    mode,
   });
 }
 
@@ -232,16 +234,23 @@ function labelForScenario<T>(
   return labelBy ? labelBy(scenario) : scenarioLabel(scenario);
 }
 
+function describeFor(mode: RunMode): (name: string, body: () => void) => void {
+  if (mode === "skip") return describe.skip;
+  if (mode === "only") return describe.only;
+  return describe;
+}
+
 function registerScenariosNoFixtures<TScenario>(
   cases: TScenario[],
   options: ScenariosFnOptions<TScenario>,
   evalName: string,
   fn: (scenario: TScenario) => Promise<void>,
+  mode: RunMode = "run",
 ): void {
   const samples = options.samples ?? 1;
   const passRate = options.passRate ?? 1;
 
-  describe(evalName, () => {
+  describeFor(mode)(evalName, () => {
     for (const scenario of cases) {
       const label = labelForScenario(scenario, options.labelBy);
       register({
@@ -269,11 +278,12 @@ function registerScenariosWithFixtures<TScenario, TFixtures>(
   setup: SetupFn<TFixtures>,
   evalName: string,
   fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
+  mode: RunMode = "run",
 ): void {
   const samples = options.samples ?? 1;
   const passRate = options.passRate ?? 1;
 
-  describe(evalName, () => {
+  describeFor(mode)(evalName, () => {
     for (const scenario of cases) {
       const label = labelForScenario(scenario, options.labelBy);
       register({
@@ -298,12 +308,27 @@ function registerScenariosWithFixtures<TScenario, TFixtures>(
   });
 }
 
+/**
+ * An evaluate-shaped namespace whose registered evals run through a
+ * `setup` function that builds and tears down a fresh fixtures bag per
+ * repeat. Returned by `evaluate.extend(setup)`.
+ */
 interface ExtendedEvaluate<TFixtures> {
+  /**
+   * Registers a single vitest test that runs the body once (or
+   * `samples` times if specified), with `fixtures` injected from
+   * `setup`. Asserts the configured pass rate.
+   */
   (
     name: string,
     fn: (fixtures: TFixtures) => Promise<void>,
     opts?: EvaluateOptions,
   ): void;
+  /**
+   * Registers one vitest test per scenario, grouped under a `describe`.
+   * Each per-scenario test runs `samples` repeats of the body (with
+   * `fixtures` injected) and asserts the per-scenario pass rate.
+   */
   scenarios<TScenario>(
     cases: TScenario[],
     opts?: ScenariosFnOptions<TScenario>,
@@ -311,54 +336,128 @@ interface ExtendedEvaluate<TFixtures> {
     name: string,
     fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
   ) => void;
+  /** Skip variant — registered evals are reported as skipped. */
+  skip: ExtendedEvaluate<TFixtures>;
+  /** Focus variant — only this eval and other `.only` evals run. */
+  only: ExtendedEvaluate<TFixtures>;
+  /** Skip when `condition` is true; otherwise behave like the base. */
+  skipIf: (condition: boolean) => ExtendedEvaluate<TFixtures>;
+  /** Run only when `condition` is true; otherwise skip. */
+  runIf: (condition: boolean) => ExtendedEvaluate<TFixtures>;
 }
 
+/**
+ * The base callable shape: registers a single evaluation as a vitest
+ * test. Modifiers and parameterised forms hang off `evaluate`.
+ */
 interface BareEvaluate {
   (name: string, fn: () => Promise<void>, opts?: EvaluateOptions): void;
 }
 
+/**
+ * Public surface for `evaluate`.
+ *
+ * - `evaluate(name, fn, opts?)` — single eval (optionally stochastic).
+ * - `evaluate.scenarios(cases, opts?)(name, fn)` — one vitest test per
+ *   scenario, grouped under a `describe`.
+ * - `evaluate.extend(setup)` — returns a namespace where every eval
+ *   runs through the setup function, which builds a fresh fixtures bag
+ *   per repeat.
+ * - `evaluate.skip` / `.only` — modifier namespaces; both expose the
+ *   same shape (`.scenarios`, `.extend`, `.skipIf`, `.runIf`) so the
+ *   modifier propagates through composition.
+ * - `evaluate.todo(name)` — placeholder for an eval not yet written.
+ * - `evaluate.skipIf(cond)` / `.runIf(cond)` — conditional modifiers
+ *   returning a namespace that either runs or skips based on `cond`.
+ */
 interface Evaluate extends BareEvaluate {
+  /**
+   * Parameterised eval. Registers one vitest test per scenario under a
+   * `describe(name)`. Per-scenario `samples` and `passRate` apply
+   * inside each scenario test.
+   */
   scenarios<T>(
     cases: T[],
     opts?: ScenariosFnOptions<T>,
   ): (name: string, fn: (scenario: T) => Promise<void>) => void;
+  /**
+   * Returns an evaluate-shaped namespace where every registered eval
+   * runs through the provided setup function. Setup builds and tears
+   * down a fresh fixtures bag per repeat — essential for concurrent
+   * execution where shared state would interfere.
+   */
   extend<TFixtures>(setup: SetupFn<TFixtures>): ExtendedEvaluate<TFixtures>;
-  skip: BareEvaluate;
-  only: BareEvaluate;
+  /** Skip variant — registered evals are reported as skipped. */
+  skip: Evaluate;
+  /** Focus variant — only this eval and other `.only` evals run. */
+  only: Evaluate;
+  /**
+   * Placeholder for an eval not yet written. Surfaces as a `todo` entry
+   * in the vitest report; takes no body.
+   */
   todo: (name: string) => void;
-  skipIf: (condition: boolean) => BareEvaluate;
-  runIf: (condition: boolean) => BareEvaluate;
+  /** Skip when `condition` is true; otherwise behave like the base. */
+  skipIf: (condition: boolean) => Evaluate;
+  /** Run only when `condition` is true; otherwise skip. */
+  runIf: (condition: boolean) => Evaluate;
 }
 
-function bareEvaluate(
-  name: string,
-  fn: () => Promise<void>,
-  opts: EvaluateOptions = {},
-): void {
-  registerBareNoFixtures(name, fn, opts);
-}
-
-function makeScenarios<T>(cases: T[], opts: ScenariosFnOptions<T> = {}) {
-  return function registerEval(
+function makeEvaluate(mode: RunMode): Evaluate {
+  function bare(
     name: string,
-    fn: (scenario: T) => Promise<void>,
+    fn: () => Promise<void>,
+    opts: EvaluateOptions = {},
   ): void {
-    registerScenariosNoFixtures(cases, opts, name, fn);
-  };
+    registerBareNoFixtures(name, fn, opts, mode);
+  }
+
+  function scenarios<T>(cases: T[], opts: ScenariosFnOptions<T> = {}) {
+    return function registerEval(
+      name: string,
+      fn: (scenario: T) => Promise<void>,
+    ): void {
+      registerScenariosNoFixtures(cases, opts, name, fn, mode);
+    };
+  }
+
+  const target = Object.assign(bare, {
+    scenarios,
+    extend: <TFixtures>(setup: SetupFn<TFixtures>) => makeExtended(setup, mode),
+    todo: (name: string) => {
+      test.todo(name);
+    },
+    skipIf: (condition: boolean): Evaluate =>
+      makeEvaluate(condition ? "skip" : mode),
+    runIf: (condition: boolean): Evaluate =>
+      makeEvaluate(condition ? mode : "skip"),
+  });
+
+  Object.defineProperty(target, "skip", {
+    get: () => makeEvaluate("skip"),
+    enumerable: true,
+  });
+  Object.defineProperty(target, "only", {
+    get: () => makeEvaluate("only"),
+    enumerable: true,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return target as Evaluate;
 }
 
-function makeExtend<TFixtures>(
+function makeExtended<TFixtures>(
   setup: SetupFn<TFixtures>,
+  mode: RunMode,
 ): ExtendedEvaluate<TFixtures> {
-  function extendedBare(
+  function bare(
     name: string,
     fn: (fixtures: TFixtures) => Promise<void>,
     opts: EvaluateOptions = {},
   ): void {
-    registerBareWithFixtures(name, fn, setup, opts);
+    registerBareWithFixtures(name, fn, setup, opts, mode);
   }
 
-  function extendedScenarios<TScenario>(
+  function scenarios<TScenario>(
     cases: TScenario[],
     opts: ScenariosFnOptions<TScenario> = {},
   ) {
@@ -366,73 +465,32 @@ function makeExtend<TFixtures>(
       name: string,
       fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
     ): void {
-      registerScenariosWithFixtures(cases, opts, setup, name, fn);
+      registerScenariosWithFixtures(cases, opts, setup, name, fn, mode);
     };
   }
 
-  return Object.assign(extendedBare, { scenarios: extendedScenarios });
+  const target = Object.assign(bare, {
+    scenarios,
+    skipIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
+      makeExtended(setup, condition ? "skip" : mode),
+    runIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
+      makeExtended(setup, condition ? mode : "skip"),
+  });
+
+  Object.defineProperty(target, "skip", {
+    get: () => makeExtended(setup, "skip"),
+    enumerable: true,
+  });
+  Object.defineProperty(target, "only", {
+    get: () => makeExtended(setup, "only"),
+    enumerable: true,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return target as ExtendedEvaluate<TFixtures>;
 }
 
 /**
- * Top-level eval primitive. Registers a vitest test that runs the body
- * once (or `samples` times if specified) and asserts the configured
- * pass rate.
- *
- * @example
- * ```typescript
- * evaluate(
- *   "classifies refund intent",
- *   async () => {
- *     const result = await classifier.run("I want a refund");
- *     expect(result.intent).toBe("refund");
- *   },
- *   { samples: 10, passRate: 0.8 },
- * );
- * ```
- *
- * `evaluate.scenarios(cases, opts)(name, body)` registers one vitest
- * test per scenario, grouped under a `describe` named after the eval.
- * Each per-scenario test runs `samples` repeats of the body and asserts
- * the configured `passRate` for that scenario.
- *
- * `evaluate.extend(setup)` returns a new evaluate-shaped namespace
- * where every registered eval runs through the provided setup function,
- * which builds and tears down a fresh fixtures bag per repeat.
+ * Top-level eval primitive. See {@link Evaluate} for the full surface.
  */
-function bareEvaluateSkip(
-  name: string,
-  fn: () => Promise<void>,
-  opts: EvaluateOptions = {},
-): void {
-  registerBareNoFixtures(name, fn, opts, "skip");
-}
-
-function bareEvaluateOnly(
-  name: string,
-  fn: () => Promise<void>,
-  opts: EvaluateOptions = {},
-): void {
-  registerBareNoFixtures(name, fn, opts, "only");
-}
-
-function bareEvaluateTodo(name: string): void {
-  test.todo(name);
-}
-
-function bareEvaluateSkipIf(condition: boolean): BareEvaluate {
-  return condition ? bareEvaluateSkip : bareEvaluate;
-}
-
-function bareEvaluateRunIf(condition: boolean): BareEvaluate {
-  return condition ? bareEvaluate : bareEvaluateSkip;
-}
-
-export const evaluate: Evaluate = Object.assign(bareEvaluate, {
-  scenarios: makeScenarios,
-  extend: makeExtend,
-  skip: bareEvaluateSkip,
-  only: bareEvaluateOnly,
-  todo: bareEvaluateTodo,
-  skipIf: bareEvaluateSkipIf,
-  runIf: bareEvaluateRunIf,
-});
+export const evaluate: Evaluate = makeEvaluate("run");

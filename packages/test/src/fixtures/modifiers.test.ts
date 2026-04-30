@@ -26,3 +26,13 @@ evaluate.runIf(true)("runif-true", async () => {
 evaluate.runIf(false)("runif-false", async () => {
   append("runif-false");
 });
+
+evaluate.todo("not yet written");
+
+const skipScenarios = [{ name: "alpha" }, { name: "beta" }];
+evaluate.skip.scenarios(skipScenarios)(
+  "skip composes with scenarios",
+  async () => {
+    append("composed-skip-scenarios");
+  },
+);

@@ -120,6 +120,31 @@ describe("modifiers", () => {
     expect(run.logLines).toContain("runif-true");
     expect(run.logLines).not.toContain("runif-false");
   });
+
+  it("a todo eval surfaces as a `todo` entry in the report", () => {
+    expect(statusOf("not yet written")).toBe("todo");
+  });
+
+  it("a skip modifier composes with scenarios — every scenario is skipped", () => {
+    const scenarioStatuses = run.report.testResults[0]!.assertionResults.filter(
+      (r) => r.fullName.startsWith("skip composes with scenarios"),
+    ).map((r) => r.status);
+    expect(scenarioStatuses).toEqual(["skipped", "skipped"]);
+    expect(run.logLines).not.toContain("composed-skip-scenarios");
+  });
+});
+
+describe("only mode", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("only.test.ts");
+  }, 30_000);
+
+  it("focusing one eval skips siblings without the focus marker", () => {
+    expect(run.logLines).toEqual(["focused"]);
+    expect(run.logLines).not.toContain("not-focused");
+  });
 });
 
 describe("failure modes", () => {
