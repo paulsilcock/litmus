@@ -1,28 +1,21 @@
+import { appendFileSync } from "node:fs";
+
 import { evaluate } from "@litmus/test";
 
-let n = 0;
-evaluate(
-  "breaches pass rate",
-  async () => {
-    n++;
-    if (n <= 3) throw new Error("fail");
-  },
-  { samples: 5, passRate: 0.8 },
-);
+const log = process.env.LITMUS_TEST_LOG;
+const append = (s: string) => {
+  if (log) appendFileSync(log, s + "\n");
+};
 
-evaluate(
-  "exceeds timeout",
-  async () => {
-    await new Promise((r) => setTimeout(r, 500));
-  },
-  { timeout: 10 },
-);
+const users = [{ name: "alice" }, { name: "bob" }];
+evaluate.scenarios(users)("agent handles user", async (scenario) => {
+  append(`iter:${scenario.name}`);
+});
 
 const refunds = [
   { customerId: "c1", amount: 50 },
   { customerId: "c2", amount: 120 },
 ];
-
 evaluate.scenarios(refunds, {
   labelBy: (s) => `${s.customerId} for $${s.amount}`,
 })("declines refund", async (scenario) => {

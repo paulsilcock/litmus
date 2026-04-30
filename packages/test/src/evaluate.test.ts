@@ -1,125 +1,84 @@
 import { spawn } from "node:child_process";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  test,
-} from "vite-plus/test";
+import { beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { evaluate } from "#litmus-test/evaluate.ts";
+describe("samples mode", () => {
+  let run: FixtureRun;
 
-describe("each requested repeat runs the body once", () => {
-  let runs = 0;
+  beforeAll(async () => {
+    run = await runFixture("samples.test.ts");
+  }, 30_000);
 
-  evaluate({ samples: 3 }).each("body counts invocations", async () => {
-    runs++;
+  it("the test body runs once per requested sample", () => {
+    expect(run.logLines.filter((l) => l === "inv")).toHaveLength(3);
   });
 
-  test("body invoked exactly N times", () => {
-    expect(runs).toBe(3);
+  it("sample failures are tolerated up to the configured threshold", () => {
+    const calls = run.logLines.filter((l) => l.startsWith("tolerance-call:"));
+    expect(calls).toHaveLength(5);
+    const test = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("first two samples fail"),
+    );
+    expect(test?.status).toBe("passed");
   });
-});
 
-describe("tolerates failures up to a configured threshold", () => {
-  let calls = 0;
-
-  evaluate({ samples: 5, passRate: 0.6 }).each(
-    "two fail, three pass",
-    async () => {
-      calls++;
-      if (calls <= 2) throw new Error("fail");
-    },
-  );
-
-  test("body invoked once per repeat even when some fail", () => {
-    expect(calls).toBe(5);
+  it("parallel execution never exceeds the configured limit", () => {
+    const peaks = run.logLines
+      .filter((l) => l.startsWith("active:"))
+      .map((l) => Number(l.slice("active:".length)));
+    expect(Math.max(...peaks)).toBe(3);
   });
 });
 
-describe("runs the body against each scenario in turn", () => {
-  const seen: string[] = [];
-  const scenarios = [
-    { name: "alice", role: "admin" },
-    { name: "bob", role: "user" },
-  ];
+describe("scenarios mode", () => {
+  let run: FixtureRun;
 
-  evaluate({ scenarios }).each("checks $name", async (scenario) => {
-    seen.push(scenario.name);
+  beforeAll(async () => {
+    run = await runFixture("scenarios.test.ts");
+  }, 30_000);
+
+  it("the test body runs once for each scenario in the array", () => {
+    const order = run.logLines.filter((l) => l.startsWith("iter:"));
+    expect(order).toEqual(["iter:alice", "iter:bob"]);
   });
 
-  test("each scenario is observed by the body", () => {
-    expect(seen).toEqual(["alice", "bob"]);
-  });
-});
-
-describe("a failing scenario is identified by its caller-defined label", () => {
-  const scenarios = [
-    { name: "alice", role: "admin" },
-    { name: "bob", role: "user" },
-  ];
-  const warnings: string[] = [];
-  let originalWarn: typeof console.warn;
-
-  beforeAll(() => {
-    originalWarn = console.warn;
-    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
-  });
-  afterAll(() => {
-    console.warn = originalWarn;
+  it("a passing scenario surfaces as a passed test, named via labelBy", () => {
+    const passed = run.report.testResults[0]!.assertionResults.find(
+      (r) => r.fullName === "declines refund c1 for $50",
+    );
+    expect(passed?.status).toBe("passed");
   });
 
-  evaluate({ scenarios, passRate: 0.5 }).each(
-    ({ name, role }) => `${name} (${role})`,
-    async (scenario) => {
-      if (scenario.name === "bob") throw new Error("denied");
-    },
-  );
-
-  test("the failure warning carries the caller's dynamic label", () => {
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("bob (user)");
-    expect(warnings[0]).toContain("denied");
+  it("a failing scenario surfaces as a failed test, named via labelBy", () => {
+    const failed = run.report.testResults[0]!.assertionResults.find(
+      (r) => r.fullName === "declines refund c2 for $120",
+    );
+    expect(failed?.status).toBe("failed");
   });
 });
 
-describe("every repeat sees a freshly built environment", () => {
-  const ids: number[] = [];
-  let setupCount = 0;
+describe("fixtures lifecycle", () => {
+  let run: FixtureRun;
 
-  const withFixtures = evaluate.extend<{ id: number }>(async (use) => {
-    setupCount++;
-    await use({ id: setupCount });
-  });
+  beforeAll(async () => {
+    run = await runFixture("extend-lifecycle.test.ts");
+  }, 30_000);
 
-  withFixtures({ samples: 3 }).each("captures id", async ({ id }) => {
-    ids.push(id);
-  });
-
-  test("setup ran once per repeat with a unique id", () => {
+  it("each sample sees a freshly built fixtures bag", () => {
+    const ids = run.logLines
+      .filter((l) => l.startsWith("id:"))
+      .map((l) => Number(l.slice("id:".length)));
     expect(ids).toEqual([1, 2, 3]);
-    expect(setupCount).toBe(3);
-  });
-});
-
-describe("the previous environment is torn down before the next starts", () => {
-  const events: string[] = [];
-
-  const withTeardown = evaluate.extend<{ id: number }>(async (use) => {
-    events.push("setup");
-    await use({ id: 1 });
-    events.push("teardown");
   });
 
-  withTeardown({ samples: 2 }).each("records lifecycle", async () => {
-    events.push("test");
-  });
-
-  test("setup → test → teardown order holds across repeats", () => {
-    expect(events).toEqual([
+  it("setup → test → teardown completes in order, once per sample", () => {
+    const lifecycle = run.logLines.filter((l) =>
+      ["setup", "test", "teardown"].includes(l),
+    );
+    expect(lifecycle).toEqual([
       "setup",
       "test",
       "teardown",
@@ -130,77 +89,48 @@ describe("the previous environment is torn down before the next starts", () => {
   });
 });
 
-describe("parallel runs respect the configured limit", () => {
-  const sleep = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
-  const scenarios = [
-    { name: "a" },
-    { name: "b" },
-    { name: "c" },
-    { name: "d" },
-    { name: "e" },
-    { name: "f" },
-  ];
-  let active = 0;
-  let maxActive = 0;
-
-  const withFixtures = evaluate.extend<{ id: number }>(async (use) => {
-    await use({ id: 1 });
-  });
-
-  withFixtures({ scenarios }).concurrent.each(
-    "tracks max parallelism",
-    async () => {
-      active++;
-      maxActive = Math.max(maxActive, active);
-      await sleep(2);
-      active--;
-    },
-    { concurrency: 3 },
-  );
-
-  test("never exceeds the configured concurrency", () => {
-    expect(maxActive).toBe(3);
-  });
-});
-
-describe("a failing repeat is reported even when the run as a whole passes", () => {
-  const warnings: string[] = [];
-  let originalWarn: typeof console.warn;
-
-  beforeAll(() => {
-    originalWarn = console.warn;
-    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
-  });
-  afterAll(() => {
-    console.warn = originalWarn;
-  });
-
-  let run = 0;
-  evaluate({ samples: 3, passRate: 0.5 }).each(
-    "middle repeat fails",
-    async () => {
-      run++;
-      if (run === 2) throw new Error("boom");
-    },
-  );
-
-  test("the failing repeat produces a warning identifying it", () => {
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("sample 2");
-    expect(warnings[0]).toContain("boom");
-  });
-});
-
-describe("a run that fails the threshold is reported as a failed test", () => {
-  let report: JsonReport;
+describe("modifiers", () => {
+  let run: FixtureRun;
 
   beforeAll(async () => {
-    report = await runVitestOnFixture();
+    run = await runFixture("modifiers.test.ts");
   }, 30_000);
 
-  it("breaching the pass-rate threshold fails the registered test", () => {
-    const result = report.testResults[0]!.assertionResults.find((r) =>
+  function statusOf(name: string): string | undefined {
+    return run.report.testResults[0]!.assertionResults.find(
+      (r) => r.fullName === name,
+    )?.status;
+  }
+
+  it("an explicitly skipped eval is reported as skipped and never runs the body", () => {
+    expect(statusOf("skip-direct")).toBe("skipped");
+    expect(run.logLines).not.toContain("skip-direct");
+  });
+
+  it("skipIf with a truthy condition skips; with a falsy condition runs", () => {
+    expect(statusOf("skipif-true")).toBe("skipped");
+    expect(statusOf("skipif-false")).toBe("passed");
+    expect(run.logLines).not.toContain("skipif-true");
+    expect(run.logLines).toContain("skipif-false");
+  });
+
+  it("runIf inverts the gate compared to skipIf", () => {
+    expect(statusOf("runif-true")).toBe("passed");
+    expect(statusOf("runif-false")).toBe("skipped");
+    expect(run.logLines).toContain("runif-true");
+    expect(run.logLines).not.toContain("runif-false");
+  });
+});
+
+describe("failure modes", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("evaluate-failures.test.ts");
+  }, 30_000);
+
+  it("a body that breaches the pass-rate threshold fails the registered test", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
       r.fullName.startsWith("breaches pass rate"),
     );
     expect(result?.status).toBe("failed");
@@ -210,7 +140,7 @@ describe("a run that fails the threshold is reported as a failed test", () => {
   });
 
   it("a body that exceeds the timeout fails the registered test", () => {
-    const result = report.testResults[0]!.assertionResults.find((r) =>
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
       r.fullName.startsWith("exceeds timeout"),
     );
     expect(result?.status).toBe("failed");
@@ -231,8 +161,41 @@ interface JsonReport {
   testResults: { assertionResults: AssertionResult[] }[];
 }
 
-function runVitestOnFixture(): Promise<JsonReport> {
+interface FixtureRun {
+  report: JsonReport;
+  logLines: string[];
+}
+
+async function runFixture(fixtureFile: string): Promise<FixtureRun> {
   const fixturesDir = join(import.meta.dirname, "fixtures");
+  const logPath = join(
+    tmpdir(),
+    `litmus-evaluate-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.log`,
+  );
+
+  try {
+    const report = await spawnVitest(fixturesDir, fixtureFile, logPath);
+    let logLines: string[] = [];
+    try {
+      logLines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
+    } catch {
+      // fixture didn't write any log entries
+    }
+    return { report, logLines };
+  } finally {
+    try {
+      rmSync(logPath, { force: true });
+    } catch {
+      // best effort
+    }
+  }
+}
+
+function spawnVitest(
+  fixturesDir: string,
+  fixtureFile: string,
+  logPath: string,
+): Promise<JsonReport> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       "vp",
@@ -240,10 +203,13 @@ function runVitestOnFixture(): Promise<JsonReport> {
         "test",
         "-c",
         join(fixturesDir, "vite.config.ts"),
-        join(fixturesDir, "evaluate-failures.test.ts"),
+        join(fixturesDir, fixtureFile),
         "--reporter=json",
       ],
-      { stdio: ["ignore", "pipe", "pipe"] },
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, LITMUS_TEST_LOG: logPath },
+      },
     );
 
     let stdout = "";
