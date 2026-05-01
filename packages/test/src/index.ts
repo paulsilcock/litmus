@@ -8,4 +8,4 @@ export {
 } from "#litmus-test/grader.ts";
 export { UserSimulator } from "#litmus-test/simulator.ts";
 export { useInMemoryTracing } from "#litmus-test/tracing.ts";
-export { evaluate } from "#litmus-test/evaluate.ts";
+export { evaluate } from "#litmus-test/evaluate/index.ts";
