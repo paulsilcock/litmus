@@ -233,7 +233,10 @@ function spawnVitest(
       ],
       {
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, LITMUS_TEST_LOG: logPath },
+        // Clear CI so vitest's `allowOnly: !CI` safeguard doesn't block
+        // `evaluate.only` in our fixtures. The subprocess is a fixture
+        // for testing, not the actual CI invocation.
+        env: { ...process.env, CI: "", LITMUS_TEST_LOG: logPath },
       },
     );
 
