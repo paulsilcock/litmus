@@ -230,13 +230,14 @@ function spawnVitest(
         join(fixturesDir, "vite.config.ts"),
         join(fixturesDir, fixtureFile),
         "--reporter=json",
+        // Subprocess is a fixture for testing `.only`, not the real CI
+        // invocation. Override vitest's `allowOnly: !isCI()` default so
+        // the focus marker isn't suppressed under any CI provider.
+        "--allowOnly",
       ],
       {
         stdio: ["ignore", "pipe", "pipe"],
-        // Clear CI so vitest's `allowOnly: !CI` safeguard doesn't block
-        // `evaluate.only` in our fixtures. The subprocess is a fixture
-        // for testing, not the actual CI invocation.
-        env: { ...process.env, CI: "", LITMUS_TEST_LOG: logPath },
+        env: { ...process.env, LITMUS_TEST_LOG: logPath },
       },
     );
 
