@@ -1,0 +1,94 @@
+import { describe, test } from "vite-plus/test";
+
+import { runConcurrent, runSequential, type RunTask } from "./runner.ts";
+
+/**
+ * Adapter between our evaluation model and vitest's test/describe
+ * primitives. Owns the mapping `mode → vitest function` and the
+ * lifecycle of registering a single eval as a vitest test.
+ */
+
+export type RunMode = "run" | "skip" | "only";
+
+export interface RegisterArgs {
+  label: string;
+  tasks: RunTask[];
+  passRate: number;
+  timeout?: number;
+  concurrent: boolean;
+  /** Defaults to 5 if not specified by the caller's options. */
+  concurrency?: number;
+  mode?: RunMode;
+}
+
+const DEFAULT_CONCURRENCY = 5;
+
+type TestFn = (
+  name: string,
+  body: () => Promise<void>,
+  timeout?: number,
+) => void;
+
+/** Pick the vitest test variant matching the requested mode. */
+export function testFor(mode: RunMode): TestFn {
+  if (mode === "skip") return test.skip;
+  if (mode === "only") return test.only;
+  return test;
+}
+
+/** Pick the vitest describe variant matching the requested mode. */
+export function describeFor(
+  mode: RunMode,
+): (name: string, body: () => void) => void {
+  if (mode === "skip") return describe.skip;
+  if (mode === "only") return describe.only;
+  return describe;
+}
+
+/**
+ * Register an evaluation as a single vitest test that runs the supplied
+ * tasks and asserts the configured pass rate.
+ */
+export function register({
+  label,
+  tasks,
+  passRate,
+  timeout,
+  concurrent,
+  concurrency = DEFAULT_CONCURRENCY,
+  mode = "run",
+}: RegisterArgs): void {
+  testFor(mode)(
+    label,
+    async () => {
+      if (concurrent) {
+        await runConcurrent(tasks, passRate, concurrency, timeout);
+      } else {
+        await runSequential(tasks, passRate, timeout);
+      }
+    },
+    totalTimeout(timeout, tasks.length, concurrent, concurrency),
+  );
+}
+
+/**
+ * Vitest needs a per-test timeout that covers every sample plus
+ * room for setup/teardown overhead. We multiply the user's per-run
+ * timeout by the number of runs (or, when concurrent, by the number
+ * of batches), then add a fixed slack so vitest doesn't time out the
+ * test before our own per-run timeouts surface a clear error.
+ */
+function totalTimeout(
+  perRun: number | undefined,
+  runs: number,
+  concurrent: boolean,
+  concurrency: number,
+): number | undefined {
+  if (perRun === undefined) return undefined;
+  // Slack to absorb fixture setup/teardown so the user-facing timeout
+  // surfaces as the failure cause rather than vitest's own cap.
+  const SLACK_MS = 10_000;
+  return concurrent
+    ? perRun * Math.ceil(runs / concurrency) + SLACK_MS
+    : perRun * runs + SLACK_MS;
+}

@@ -1,4 +1,5 @@
 {
+  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
@@ -16,11 +17,14 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git commit *)",
-            "command": ".claude/hooks/validate-exports.sh"
+            "command": ".claude/hooks/validate-exports.sh",
+            "if": "Bash(git commit *)"
           }
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true
   }
 }

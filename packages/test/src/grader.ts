@@ -35,7 +35,7 @@ const VerdictSchema = z.object({
 /**
  * Build an LLM-as-judge `Grader`. Enforces the `{ pass, reason }`
  * output contract via structured decoding, so the result slots into
- * `trial()` without further wiring.
+ * `evaluate()` without further wiring.
  *
  * Two modes:
  * - **Rubric** (simple): `{ model, rubric }`. The helper builds a
