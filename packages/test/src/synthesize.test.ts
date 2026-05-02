@@ -50,7 +50,7 @@ describe("synthesize", () => {
     }
   });
 
-  it("the model receives the prompt the caller builds from the seeds", async () => {
+  it("the caller's prompt drives what the model is asked", async () => {
     let captured = "";
     const model = new MockLanguageModelV3({
       doGenerate: async ({ prompt }) => {
