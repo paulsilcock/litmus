@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
+
 import { generateText, type LanguageModel, Output } from "ai";
 import { z } from "zod";
 
@@ -7,6 +10,47 @@ export interface SynthesizeOptions<T> {
   seeds: T[];
   variants: number;
   prompt: (seeds: T[], variants: number) => string;
+  cache?: string;
+  mode?: "strict" | "regenerate";
+}
+
+interface CacheFile<T> {
+  hash: string;
+  scenarios: T[];
+}
+
+function hashInputs(inputs: {
+  modelId: string;
+  seeds: unknown;
+  variants: number;
+  prompt: string;
+}): string {
+  return createHash("sha256").update(JSON.stringify(inputs)).digest("hex");
+}
+
+function regenInstruction(path: string): string {
+  return `Re-run with LITMUS_SYNTH_MODE=regenerate, then commit ${path}.`;
+}
+
+function resolveMode(
+  explicit: "strict" | "regenerate" | undefined,
+): "strict" | "regenerate" {
+  if (explicit) return explicit;
+  if (process.env.LITMUS_SYNTH_MODE === "regenerate") return "regenerate";
+  return "strict";
+}
+
+async function readCache(path: string): Promise<string> {
+  try {
+    return await readFile(path, "utf-8");
+  } catch (err) {
+    if (err instanceof Error && "code" in err && err.code === "ENOENT") {
+      throw new Error(
+        `Scenario cache not found at ${path}. ${regenInstruction(path)}`,
+      );
+    }
+    throw err;
+  }
 }
 
 /**
@@ -17,6 +61,14 @@ export interface SynthesizeOptions<T> {
  * model. Returns the seeds alongside the variants, so the result is
  * the full scenario set.
  *
+ * When `cache` is supplied, the result is persisted to that path and
+ * reused on subsequent runs. The cache is keyed by a hash of the
+ * inputs (model id, seeds, variant count, and prompt string), so any
+ * change invalidates it. `mode` controls cache behaviour:
+ * `"strict"` (default) reads from the cache and rejects with regen
+ * instructions if it's missing or stale; `"regenerate"` ignores the
+ * cache and overwrites it.
+ *
  * @example
  * ```typescript
  * const scenarios = await synthesize({
@@ -26,17 +78,48 @@ export interface SynthesizeOptions<T> {
  *   variants: 20,
  *   prompt: (seeds, variants) =>
  *     `Vary the tone and urgency of these refund requests. Produce ${variants} new ones:\n${seeds.map((s) => s.message).join("\n")}`,
+ *   cache: "./fixtures/refund.scenarios.json",
  * });
  *
  * evaluate.scenarios(scenarios)("handles $message", async (s) => { ... });
  * ```
  */
 export async function synthesize<T>(opts: SynthesizeOptions<T>): Promise<T[]> {
+  const mode = resolveMode(opts.mode);
+  const promptString = opts.prompt(opts.seeds, opts.variants);
+  const modelId =
+    typeof opts.model === "string" ? opts.model : opts.model.modelId;
+  const hash = hashInputs({
+    modelId,
+    seeds: opts.seeds,
+    variants: opts.variants,
+    prompt: promptString,
+  });
+
+  if (opts.cache && mode === "strict") {
+    const content = await readCache(opts.cache);
+    const parsed: CacheFile<T> = JSON.parse(content);
+    if (parsed.hash !== hash) {
+      throw new Error(
+        `Scenario cache at ${opts.cache} is stale — inputs have changed ` +
+          `since it was generated. ${regenInstruction(opts.cache)}`,
+      );
+    }
+    return parsed.scenarios;
+  }
+
   const responseSchema = z.object({ scenarios: z.array(opts.schema) });
   const { output } = await generateText({
     model: opts.model,
     output: Output.object({ schema: responseSchema }),
-    prompt: opts.prompt(opts.seeds, opts.variants),
+    prompt: promptString,
   });
-  return [...opts.seeds, ...output.scenarios];
+  const scenarios = [...opts.seeds, ...output.scenarios];
+
+  if (opts.cache) {
+    const file: CacheFile<T> = { hash, scenarios };
+    await writeFile(opts.cache, JSON.stringify(file, null, 2));
+  }
+
+  return scenarios;
 }

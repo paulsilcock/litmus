@@ -1,5 +1,16 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { MockLanguageModelV3 } from "ai/test";
-import { describe, expect, it } from "vite-plus/test";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vite-plus/test";
 import { z } from "zod";
 
 import { synthesize } from "#litmus-test/synthesize.ts";
@@ -13,6 +24,17 @@ const mockUsage = {
 };
 
 describe("synthesize", () => {
+  let cacheDir: string;
+
+  beforeEach(async () => {
+    cacheDir = await mkdtemp(join(tmpdir(), "synth-"));
+  });
+
+  afterEach(async () => {
+    await rm(cacheDir, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+  });
+
   it("fans out seeds into more of the same shape", async () => {
     const schema = z.object({ message: z.string() });
     const seeds = [
@@ -73,5 +95,124 @@ describe("synthesize", () => {
     });
 
     expect(captured).toContain("make 7 variants from 2 seeds");
+  });
+
+  it("strict mode rejects a missing cache and tells you how to regenerate", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("model should not be called");
+      },
+    });
+
+    const cachePath = join(cacheDir, "missing.scenarios.json");
+
+    await expect(
+      synthesize({
+        model,
+        schema: z.object({ message: z.string() }),
+        seeds: [{ message: "seed" }],
+        variants: 3,
+        prompt: (s, v) => `${v} from ${s.length}`,
+        cache: cachePath,
+      }),
+    ).rejects.toThrow(/LITMUS_SYNTH_MODE=regenerate/);
+  });
+
+  it("the LITMUS_SYNTH_MODE env var sets the default cache mode", async () => {
+    vi.stubEnv("LITMUS_SYNTH_MODE", "regenerate");
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockUsage,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ scenarios: [{ message: "fresh" }] }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const result = await synthesize({
+      model,
+      schema: z.object({ message: z.string() }),
+      seeds: [{ message: "seed" }],
+      variants: 1,
+      prompt: () => "p",
+      cache: join(cacheDir, "missing.scenarios.json"),
+    });
+
+    expect(result).toEqual([{ message: "seed" }, { message: "fresh" }]);
+  });
+
+  it("strict mode rejects a cache produced from different inputs", async () => {
+    const cachePath = join(cacheDir, "x.scenarios.json");
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockUsage,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ scenarios: [{ message: "x" }] }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const base = {
+      model,
+      schema: z.object({ message: z.string() }),
+      seeds: [{ message: "seed" }],
+      variants: 1,
+      cache: cachePath,
+    };
+
+    await synthesize({
+      ...base,
+      prompt: () => "first prompt",
+      mode: "regenerate",
+    });
+
+    await expect(
+      synthesize({ ...base, prompt: () => "different prompt" }),
+    ).rejects.toThrow(/LITMUS_SYNTH_MODE=regenerate/);
+  });
+
+  it("a repeat run with the same inputs avoids calling the model", async () => {
+    let calls = 0;
+    const generated = Array.from({ length: 3 }, (_, i) => ({
+      message: `synthesised ${i + 1}`,
+    }));
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => {
+        calls++;
+        return {
+          ...mockUsage,
+          content: [
+            { type: "text", text: JSON.stringify({ scenarios: generated }) },
+          ],
+          finishReason: { unified: "stop", raw: undefined },
+        };
+      },
+    });
+
+    const opts = {
+      model,
+      schema: z.object({ message: z.string() }),
+      seeds: [{ message: "seed" }],
+      variants: 3,
+      prompt: (s: { message: string }[], v: number) =>
+        `produce ${v} from ${s.length}`,
+      cache: join(cacheDir, "x.scenarios.json"),
+    };
+
+    const first = await synthesize({ ...opts, mode: "regenerate" });
+    const second = await synthesize(opts);
+
+    expect(calls).toBe(1);
+    expect(second).toEqual(first);
   });
 });
