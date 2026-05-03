@@ -89,6 +89,23 @@ describe("scenarios synthesize mode", () => {
   });
 });
 
+describe("scenarios synthesize strict cache hit", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-synthesize-cached.test.ts");
+  }, 30_000);
+
+  it("a valid cache enables labelBy for test names", () => {
+    const tests = run.report.testResults[0]!.assertionResults.filter((r) =>
+      r.fullName.startsWith("decline refunds"),
+    ).map((r) => r.fullName);
+    expect(tests).toContain("decline refunds c1 for $50");
+    expect(tests).toContain("decline refunds c2 for $75");
+    expect(tests).toContain("decline refunds c3 for $125");
+  });
+});
+
 describe("scenarios synthesize stale cache", () => {
   let run: FixtureRun;
 
@@ -96,18 +113,33 @@ describe("scenarios synthesize stale cache", () => {
     run = await runFixture("scenarios-synthesize-stale.test.ts");
   }, 30_000);
 
-  it("a stale cache fails the eval with regen instructions", () => {
-    const stale = run.report.testResults[0]!.assertionResults.filter(
-      (r) => r.fullName.startsWith("stale eval") && r.status === "failed",
+  it("a stale cache fails one test with regen instructions, no per-scenario entries", () => {
+    const fullNames = run.report.testResults[0]!.assertionResults.map(
+      (r) => r.fullName,
     );
-    expect(stale.length).toBeGreaterThan(0);
-    expect(stale[0]!.failureMessages.join("\n")).toMatch(
+    expect(fullNames).toContain("stale eval");
+    expect(fullNames.filter((n) => n.startsWith("stale eval "))).toHaveLength(
+      0,
+    );
+
+    const stale = run.report.testResults[0]!.assertionResults.find(
+      (r) => r.fullName === "stale eval",
+    );
+    expect(stale?.status).toBe("failed");
+    expect(stale?.failureMessages.join("\n")).toMatch(
       /LITMUS_SYNTH_MODE=regenerate/,
     );
   });
 
   it("the test body is not invoked when the cache is stale", () => {
     expect(run.logLines).not.toContain("should-not-run:stale-content");
+  });
+
+  it("an unrelated test in the same file still runs", () => {
+    const unrelated = run.report.testResults[0]!.assertionResults.find(
+      (r) => r.fullName === "unrelated test runs fine",
+    );
+    expect(unrelated?.status).toBe("passed");
   });
 });
 

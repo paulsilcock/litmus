@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { evaluate } from "@litmus/test";
 import { MockLanguageModelV3 } from "ai/test";
+import { expect, it } from "vite-plus/test";
 import { z } from "zod";
 
 const log = process.env.LITMUS_TEST_LOG;
@@ -41,4 +42,8 @@ evaluate.scenarios({
   },
 })("stale eval", async (scenario) => {
   append(`should-not-run:${scenario.name}`);
+});
+
+it("unrelated test runs fine", () => {
+  expect(1 + 1).toBe(2);
 });

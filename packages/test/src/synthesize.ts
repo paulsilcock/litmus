@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 
 import { generateText, type LanguageModel, Output } from "ai";
 import { expect } from "vite-plus/test";
@@ -34,7 +35,7 @@ function regenInstruction(path: string): string {
   return `Re-run with LITMUS_SYNTH_MODE=regenerate, then commit ${path}.`;
 }
 
-function resolveMode(
+export function resolveMode(
   explicit: "strict" | "regenerate" | undefined,
 ): "strict" | "regenerate" {
   if (explicit) return explicit;
@@ -57,17 +58,63 @@ function autoDeriveCachePath(name: string | undefined): string | undefined {
   return `${stem}${suffix}`;
 }
 
-async function readCache(path: string): Promise<string> {
+function computeHash<T>(opts: SynthesizeOptions<T>): string {
+  const promptString = opts.prompt(opts.seeds, opts.variants);
+  const modelId =
+    typeof opts.model === "string" ? opts.model : opts.model.modelId;
+  return hashInputs({
+    modelId,
+    seeds: opts.seeds,
+    variants: opts.variants,
+    prompt: promptString,
+  });
+}
+
+function resolveCachePath<T>(opts: SynthesizeOptions<T>): string | undefined {
+  return opts.cache ?? autoDeriveCachePath(opts.name);
+}
+
+function validateAndExtract<T>(
+  content: string,
+  expectedHash: string,
+  cachePath: string,
+): T[] {
+  const parsed: CacheFile<T> = JSON.parse(content);
+  if (parsed.hash !== expectedHash) {
+    throw new Error(
+      `Scenario cache at ${cachePath} is stale — inputs have changed ` +
+        `since it was generated. ${regenInstruction(cachePath)}`,
+    );
+  }
+  return parsed.scenarios;
+}
+
+/**
+ * Synchronously load cached scenarios for the given options. Throws a
+ * helpful error if the cache file is missing or its hash doesn't match
+ * the inputs. Used by the registration phase of `evaluate.scenarios`
+ * to surface stale-cache failures with full label quality on success.
+ */
+export function readCachedScenariosSync<T>(opts: SynthesizeOptions<T>): T[] {
+  const cachePath = resolveCachePath(opts);
+  if (!cachePath) {
+    throw new Error(
+      "Cache path required: pass `cache` explicitly or run inside a test file " +
+        "so the path can be auto-derived.",
+    );
+  }
+  let content: string;
   try {
-    return await readFile(path, "utf-8");
+    content = readFileSync(cachePath, "utf-8");
   } catch (err) {
     if (err instanceof Error && "code" in err && err.code === "ENOENT") {
       throw new Error(
-        `Scenario cache not found at ${path}. ${regenInstruction(path)}`,
+        `Scenario cache not found at ${cachePath}. ${regenInstruction(cachePath)}`,
       );
     }
     throw err;
   }
+  return validateAndExtract<T>(content, computeHash(opts), cachePath);
 }
 
 /**
@@ -103,39 +150,22 @@ async function readCache(path: string): Promise<string> {
  */
 export async function synthesize<T>(opts: SynthesizeOptions<T>): Promise<T[]> {
   const mode = resolveMode(opts.mode);
-  const promptString = opts.prompt(opts.seeds, opts.variants);
-  const modelId =
-    typeof opts.model === "string" ? opts.model : opts.model.modelId;
-  const hash = hashInputs({
-    modelId,
-    seeds: opts.seeds,
-    variants: opts.variants,
-    prompt: promptString,
-  });
-  const cachePath = opts.cache ?? autoDeriveCachePath(opts.name);
+  const cachePath = resolveCachePath(opts);
 
   if (cachePath && mode === "strict") {
-    const content = await readCache(cachePath);
-    const parsed: CacheFile<T> = JSON.parse(content);
-    if (parsed.hash !== hash) {
-      throw new Error(
-        `Scenario cache at ${cachePath} is stale — inputs have changed ` +
-          `since it was generated. ${regenInstruction(cachePath)}`,
-      );
-    }
-    return parsed.scenarios;
+    return readCachedScenariosSync<T>(opts);
   }
 
   const responseSchema = z.object({ scenarios: z.array(opts.schema) });
   const { output } = await generateText({
     model: opts.model,
     output: Output.object({ schema: responseSchema }),
-    prompt: promptString,
+    prompt: opts.prompt(opts.seeds, opts.variants),
   });
   const scenarios = [...opts.seeds, ...output.scenarios];
 
   if (cachePath) {
-    const file: CacheFile<T> = { hash, scenarios };
+    const file: CacheFile<T> = { hash: computeHash(opts), scenarios };
     await writeFile(cachePath, JSON.stringify(file, null, 2));
   }
 

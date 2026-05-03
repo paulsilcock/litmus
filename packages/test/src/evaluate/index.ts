@@ -1,9 +1,14 @@
 import { test } from "vite-plus/test";
 
-import { synthesize, type SynthesizeOptions } from "#litmus-test/synthesize.ts";
+import {
+  readCachedScenariosSync,
+  resolveMode,
+  synthesize,
+  type SynthesizeOptions,
+} from "#litmus-test/synthesize.ts";
 
 import { evaluationLabel, scenarioLabel } from "./labels.ts";
-import { describeFor, register, type RunMode } from "./register.ts";
+import { describeFor, register, testFor, type RunMode } from "./register.ts";
 import { type RunTask } from "./runner.ts";
 
 /** Options accepted by every form of `evaluate`. */
@@ -61,7 +66,7 @@ export interface ExtendedEvaluate<TFixtures> {
    */
   (
     name: string,
-    fn: (fixtures: TFixtures) => Promise<void>,
+    fn: (fixtures: TFixtures) => void | Promise<void>,
     opts?: EvaluateOptions,
   ): void;
   /**
@@ -74,7 +79,7 @@ export interface ExtendedEvaluate<TFixtures> {
     opts?: ScenariosFnOptions<TScenario>,
   ): (
     name: string,
-    fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
+    fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
   ) => void;
   /** Skip variant — registered evals are reported as skipped. */
   skip: ExtendedEvaluate<TFixtures>;
@@ -108,7 +113,7 @@ export interface Evaluate {
    * (or `samples` times if specified); pass-rate is asserted at the
    * end.
    */
-  (name: string, fn: () => Promise<void>, opts?: EvaluateOptions): void;
+  (name: string, fn: () => void | Promise<void>, opts?: EvaluateOptions): void;
   /**
    * Parameterised eval. Registers one vitest test per scenario under a
    * `describe(name)`. Per-scenario `samples` and `passRate` apply
@@ -117,7 +122,7 @@ export interface Evaluate {
   scenarios<T>(
     cases: T[],
     opts?: ScenariosFnOptions<T>,
-  ): (name: string, fn: (scenario: T) => Promise<void>) => void;
+  ): (name: string, fn: (scenario: T) => void | Promise<void>) => void;
   /**
    * Synthesize-form: registers one vitest test per scenario the
    * synthesizer will produce. The expected count is known synchronously
@@ -128,7 +133,7 @@ export interface Evaluate {
    */
   scenarios<T>(
     input: ScenariosSynthesizeInput<T>,
-  ): (name: string, fn: (scenario: T) => Promise<void>) => void;
+  ): (name: string, fn: (scenario: T) => void | Promise<void>) => void;
   /**
    * Returns an evaluate-shaped namespace where every registered eval
    * runs through the provided setup function. Setup builds and tears
@@ -170,18 +175,24 @@ function sampleTasks(
 }
 
 function withFixturesRun<TFixtures>(
-  fn: (fixtures: TFixtures) => Promise<void>,
+  fn: (fixtures: TFixtures) => void | Promise<void>,
   setup: SetupFn<TFixtures>,
 ): () => Promise<void> {
-  return () => setup(async (fixtures) => fn(fixtures));
+  return () =>
+    setup(async (fixtures) => {
+      await fn(fixtures);
+    });
 }
 
 function scenarioWithFixturesRun<TScenario, TFixtures>(
-  fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
+  fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
   setup: SetupFn<TFixtures>,
   scenario: TScenario,
 ): () => Promise<void> {
-  return () => setup(async (fixtures) => fn(scenario, fixtures));
+  return () =>
+    setup(async (fixtures) => {
+      await fn(scenario, fixtures);
+    });
 }
 
 // ── Registration entry points ────────────────────────────────────────
@@ -282,10 +293,10 @@ function registerScenarios<TScenario>(
 function makeEvaluate(mode: RunMode): Evaluate {
   function evaluateOne(
     name: string,
-    fn: () => Promise<void>,
+    fn: () => void | Promise<void>,
     opts: EvaluateOptions = {},
   ): void {
-    registerSingle(name, () => fn, opts, mode);
+    registerSingle(name, () => async () => fn(), opts, mode);
   }
 
   function scenarios<T>(
@@ -293,23 +304,46 @@ function makeEvaluate(mode: RunMode): Evaluate {
     opts: ScenariosFnOptions<T> = {},
   ) {
     if (Array.isArray(casesOrInput)) {
-      return (name: string, fn: (scenario: T) => Promise<void>): void =>
+      return (name: string, fn: (scenario: T) => void | Promise<void>): void =>
         registerScenarios(
           casesOrInput,
           opts,
           name,
-          (scenario) => () => fn(scenario),
+          (scenario) => async () => fn(scenario),
           mode,
         );
     }
     const input = casesOrInput;
-    return (name: string, fn: (scenario: T) => Promise<void>): void => {
-      registerSynthesizedScenarios(
-        input,
-        name,
-        (scenario) => () => fn(scenario),
-        mode,
-      );
+    return (name: string, fn: (scenario: T) => void | Promise<void>): void => {
+      const synthOpts = { name, ...input.synthesize };
+
+      if (resolveMode(synthOpts.mode) === "regenerate") {
+        registerSynthesizedScenarios(
+          input,
+          name,
+          (scenario) => async () => fn(scenario),
+          mode,
+        );
+        return;
+      }
+
+      try {
+        const cached = readCachedScenariosSync<T>(synthOpts);
+        registerScenarios(
+          cached,
+          input,
+          name,
+          (scenario) => async () => fn(scenario),
+          mode,
+        );
+      } catch (err) {
+        // Cache missing or stale: register a single failing test that
+        // surfaces the regen instruction. Other tests in the file are
+        // unaffected — only the eval whose cache is bad fails.
+        testFor(mode)(name, () => {
+          throw err;
+        });
+      }
     };
   }
 
@@ -344,7 +378,7 @@ function makeExtended<TFixtures>(
 ): ExtendedEvaluate<TFixtures> {
   function evaluateOne(
     name: string,
-    fn: (fixtures: TFixtures) => Promise<void>,
+    fn: (fixtures: TFixtures) => void | Promise<void>,
     opts: EvaluateOptions = {},
   ): void {
     registerSingle(name, () => withFixturesRun(fn, setup), opts, mode);
@@ -356,7 +390,7 @@ function makeExtended<TFixtures>(
   ) {
     return (
       name: string,
-      fn: (scenario: TScenario, fixtures: TFixtures) => Promise<void>,
+      fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
     ): void =>
       registerScenarios(
         cases,
