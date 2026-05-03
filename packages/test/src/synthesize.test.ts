@@ -190,7 +190,7 @@ describe("synthesize", () => {
     ).rejects.toThrow(/LITMUS_SYNTH_MODE=regenerate/);
   });
 
-  it("scenarios cached during a test run live next to the test file by default", async () => {
+  it("the scenario cache lives next to its test file by default", async () => {
     const testPath = expect.getState().testPath;
     if (!testPath) throw new Error("test path unavailable");
     const expected = testPath.replace(/\.test\.[jt]sx?$/, ".scenarios.json");
@@ -220,7 +220,7 @@ describe("synthesize", () => {
     expect(existsSync(expected)).toBe(true);
   });
 
-  it("scenarios with different names live in distinct cache files", async () => {
+  it("distinct scenario sets in the same file get isolated caches", async () => {
     const testPath = expect.getState().testPath;
     if (!testPath) throw new Error("test path unavailable");
     const stem = testPath.replace(/\.test\.[jt]sx?$/, "");

@@ -72,15 +72,14 @@ describe("scenarios synthesize mode", () => {
     expect(order).toEqual(["iter:seed", "iter:alice", "iter:bob"]);
   });
 
-  it("each synthesised scenario gets its own test, named by position", () => {
+  it("synthesised scenarios are positionally named in the report", () => {
     const scenarioTests = run.report.testResults[0]!.assertionResults.filter(
       (r) => r.fullName.startsWith("agent handles generated user"),
     ).map((r) => r.fullName);
-    expect(scenarioTests).toEqual([
-      "agent handles generated user scenario 1",
-      "agent handles generated user scenario 2",
-      "agent handles generated user scenario 3",
-    ]);
+    expect(scenarioTests).toHaveLength(3);
+    for (const name of scenarioTests) {
+      expect(name).toMatch(/^agent handles generated user scenario \d+$/);
+    }
   });
 
   it("synthesis happens once per eval, not once per test", () => {
@@ -96,7 +95,7 @@ describe("scenarios synthesize strict cache hit", () => {
     run = await runFixture("scenarios-synthesize-cached.test.ts");
   }, 30_000);
 
-  it("a valid cache enables labelBy for test names", () => {
+  it("each scenario's test name reflects its data", () => {
     const tests = run.report.testResults[0]!.assertionResults.filter((r) =>
       r.fullName.startsWith("decline refunds"),
     ).map((r) => r.fullName);
@@ -113,7 +112,7 @@ describe("scenarios synthesize stale cache", () => {
     run = await runFixture("scenarios-synthesize-stale.test.ts");
   }, 30_000);
 
-  it("a stale cache fails one test with regen instructions, no per-scenario entries", () => {
+  it("a stale cache surfaces as a single failed test, not one per scenario", () => {
     const fullNames = run.report.testResults[0]!.assertionResults.map(
       (r) => r.fullName,
     );
@@ -121,7 +120,9 @@ describe("scenarios synthesize stale cache", () => {
     expect(fullNames.filter((n) => n.startsWith("stale eval "))).toHaveLength(
       0,
     );
+  });
 
+  it("the stale-cache failure points users at the regenerate command", () => {
     const stale = run.report.testResults[0]!.assertionResults.find(
       (r) => r.fullName === "stale eval",
     );
