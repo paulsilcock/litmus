@@ -24,6 +24,26 @@ const mockUsage = {
   warnings: [],
 };
 
+function mockModelReturning<T>(
+  scenarios: T[],
+  modelId?: string,
+): MockLanguageModelV3 {
+  return new MockLanguageModelV3({
+    modelId,
+    doGenerate: async () => ({
+      ...mockUsage,
+      content: [{ type: "text", text: JSON.stringify({ scenarios }) }],
+      finishReason: { unified: "stop", raw: undefined },
+    }),
+  });
+}
+
+const failingModel = new MockLanguageModelV3({
+  doGenerate: async () => {
+    throw new Error("model should not be called");
+  },
+});
+
 describe("synthesize", () => {
   let cacheDir: string;
 
@@ -50,23 +70,12 @@ describe("synthesize", () => {
       { message: "I was charged twice" },
     ];
     const variants = 5;
-
     const generated = Array.from({ length: variants }, (_, i) => ({
       message: `synthesised ${i + 1}`,
     }));
 
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockUsage,
-        content: [
-          { type: "text", text: JSON.stringify({ scenarios: generated }) },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
-    });
-
     const scenarios = await synthesize({
-      model,
+      model: mockModelReturning(generated),
       schema,
       seeds,
       variants,
@@ -107,22 +116,14 @@ describe("synthesize", () => {
   });
 
   it("running with a missing cache fails with a regenerate instruction", async () => {
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => {
-        throw new Error("model should not be called");
-      },
-    });
-
-    const cachePath = join(cacheDir, "missing.scenarios.json");
-
     await expect(
       synthesize({
-        model,
+        model: failingModel,
         schema: z.object({ message: z.string() }),
         seeds: [{ message: "seed" }],
         variants: 3,
         prompt: (s, v) => `${v} from ${s.length}`,
-        cache: cachePath,
+        cache: join(cacheDir, "missing.scenarios.json"),
       }),
     ).rejects.toThrow(/LITMUS_SYNTH_MODE=regenerate/);
   });
@@ -130,21 +131,8 @@ describe("synthesize", () => {
   it("regeneration can be enabled without code changes via an env var", async () => {
     vi.stubEnv("LITMUS_SYNTH_MODE", "regenerate");
 
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockUsage,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ scenarios: [{ message: "fresh" }] }),
-          },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
-    });
-
     const result = await synthesize({
-      model,
+      model: mockModelReturning([{ message: "fresh" }]),
       schema: z.object({ message: z.string() }),
       seeds: [{ message: "seed" }],
       variants: 1,
@@ -155,10 +143,10 @@ describe("synthesize", () => {
     expect(result).toEqual([{ message: "seed" }, { message: "fresh" }]);
   });
 
-  it("a cache produced from different inputs is rejected", async () => {
+  it("a cache is invalidated by a change to any of its inputs", async () => {
     const cachePath = join(cacheDir, "x.scenarios.json");
-
-    const model = new MockLanguageModelV3({
+    const baseModel = new MockLanguageModelV3({
+      modelId: "model-a",
       doGenerate: async () => ({
         ...mockUsage,
         content: [
@@ -170,24 +158,33 @@ describe("synthesize", () => {
         finishReason: { unified: "stop", raw: undefined },
       }),
     });
+    const otherModel = new MockLanguageModelV3({
+      modelId: "model-b",
+      doGenerate: baseModel.doGenerate,
+    });
 
     const base = {
-      model,
+      model: baseModel,
       schema: z.object({ message: z.string() }),
       seeds: [{ message: "seed" }],
       variants: 1,
+      prompt: () => "first prompt",
       cache: cachePath,
     };
 
-    await synthesize({
-      ...base,
-      prompt: () => "first prompt",
-      mode: "regenerate",
-    });
+    await synthesize({ ...base, mode: "regenerate" });
 
-    await expect(
-      synthesize({ ...base, prompt: () => "different prompt" }),
-    ).rejects.toThrow(/LITMUS_SYNTH_MODE=regenerate/);
+    const variations = [
+      { ...base, prompt: () => "different prompt" },
+      { ...base, seeds: [{ message: "different seed" }] },
+      { ...base, variants: 2 },
+      { ...base, model: otherModel },
+    ];
+    for (const opts of variations) {
+      await expect(synthesize(opts)).rejects.toThrow(
+        /LITMUS_SYNTH_MODE=regenerate/,
+      );
+    }
   });
 
   it("the scenario cache lives next to its test file by default", async () => {
@@ -195,21 +192,8 @@ describe("synthesize", () => {
     if (!testPath) throw new Error("test path unavailable");
     const expected = testPath.replace(/\.test\.[jt]sx?$/, ".scenarios.json");
 
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockUsage,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ scenarios: [{ message: "auto" }] }),
-          },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
-    });
-
     await synthesize({
-      model,
+      model: mockModelReturning([{ message: "auto" }]),
       schema: z.object({ message: z.string() }),
       seeds: [{ message: "seed" }],
       variants: 1,
@@ -227,21 +211,8 @@ describe("synthesize", () => {
     const firstPath = `${stem}.first.scenarios.json`;
     const secondPath = `${stem}.second.scenarios.json`;
 
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockUsage,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ scenarios: [{ message: "x" }] }),
-          },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
-    });
-
     const base = {
-      model,
+      model: mockModelReturning([{ message: "x" }]),
       schema: z.object({ message: z.string() }),
       seeds: [{ message: "seed" }],
       variants: 1,
@@ -259,6 +230,20 @@ describe("synthesize", () => {
       rmSync(firstPath, { force: true });
       rmSync(secondPath, { force: true });
     }
+  });
+
+  it("synthesize refuses to call the model when no cache path is resolvable", async () => {
+    expect.setState({ testPath: undefined });
+
+    await expect(
+      synthesize({
+        model: failingModel,
+        schema: z.object({ message: z.string() }),
+        seeds: [{ message: "seed" }],
+        variants: 1,
+        prompt: () => "p",
+      }),
+    ).rejects.toThrow(/cache/i);
   });
 
   it("a repeat run with the same inputs avoids calling the model", async () => {

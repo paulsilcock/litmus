@@ -52,7 +52,7 @@ function slugify(name: string): string {
 
 function autoDeriveCachePath(name: string | undefined): string | undefined {
   const testPath = expect.getState().testPath;
-  if (!testPath || !/\.test\.[jt]sx?$/.test(testPath)) return undefined;
+  if (!testPath) return undefined;
   const stem = testPath.replace(/\.test\.[jt]sx?$/, "");
   const suffix = name ? `.${slugify(name)}.scenarios.json` : ".scenarios.json";
   return `${stem}${suffix}`;
@@ -131,11 +131,15 @@ export function readCachedScenariosSync<T>(opts: SynthesizeOptions<T>): T[] {
  * inputs (model id, seeds, variant count, and prompt string). Any
  * change to those inputs invalidates the cache.
  *
- * - `cache: "./fixtures/refund.scenarios.json"` — explicit path. Use
- *   this from scripts.
+ * Two ways to specify the path:
+ * - `cache: "./fixtures/refund.scenarios.json"` — explicit path.
+ *   Required when running outside a test (e.g. from a script).
+ *   Takes precedence; `name` is ignored when `cache` is supplied.
  * - Inside a test file, omit `cache` and the path is auto-derived
- *   from `expect.getState().testPath` (and the optional `name`
- *   discriminator) as `<test-stem>[.<name-slug>].scenarios.json`.
+ *   from `expect.getState().testPath` as
+ *   `<test-stem>[.<name-slug>].scenarios.json`. The optional `name`
+ *   adds a slug, only needed to disambiguate when multiple
+ *   `synthesize` calls share the same test file.
  *
  * ## Mode
  *
@@ -186,10 +190,7 @@ export function readCachedScenariosSync<T>(opts: SynthesizeOptions<T>): T[] {
  * ```
  */
 export async function synthesize<T>(opts: SynthesizeOptions<T>): Promise<T[]> {
-  const mode = resolveMode(opts.mode);
-  const cachePath = resolveCachePath(opts);
-
-  if (cachePath && mode === "strict") {
+  if (resolveMode(opts.mode) === "strict") {
     return readCachedScenariosSync<T>(opts);
   }
 
@@ -201,6 +202,7 @@ export async function synthesize<T>(opts: SynthesizeOptions<T>): Promise<T[]> {
   });
   const scenarios = [...opts.seeds, ...output.scenarios];
 
+  const cachePath = resolveCachePath(opts);
   if (cachePath) {
     const file: CacheFile<T> = { hash: computeHash(opts), scenarios };
     await writeFile(cachePath, JSON.stringify(file, null, 2));
