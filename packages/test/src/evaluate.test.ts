@@ -60,6 +60,90 @@ describe("scenarios mode", () => {
   });
 });
 
+describe("scenarios synthesize mode", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-synthesize.test.ts");
+  }, 30_000);
+
+  it("the test body runs once for each synthesised scenario", () => {
+    const order = run.logLines.filter((l) => l.startsWith("iter:"));
+    expect(order).toEqual(["iter:seed", "iter:alice", "iter:bob"]);
+  });
+
+  it("synthesised scenarios are positionally named in the report", () => {
+    const scenarioTests = run.report.testResults[0]!.assertionResults.filter(
+      (r) => r.fullName.startsWith("agent handles generated user"),
+    ).map((r) => r.fullName);
+    expect(scenarioTests).toHaveLength(3);
+    for (const name of scenarioTests) {
+      expect(name).toMatch(/^agent handles generated user scenario \d+$/);
+    }
+  });
+
+  it("synthesis happens once per eval, not once per test", () => {
+    const calls = run.logLines.filter((l) => l === "model-called");
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("scenarios synthesize strict cache hit", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-synthesize-cached.test.ts");
+  }, 30_000);
+
+  it("each scenario's test name reflects its data", () => {
+    const tests = run.report.testResults[0]!.assertionResults.filter((r) =>
+      r.fullName.startsWith("decline refunds"),
+    ).map((r) => r.fullName);
+    expect(tests).toContain("decline refunds c1 for $50");
+    expect(tests).toContain("decline refunds c2 for $75");
+    expect(tests).toContain("decline refunds c3 for $125");
+  });
+});
+
+describe("scenarios synthesize stale cache", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-synthesize-stale.test.ts");
+  }, 30_000);
+
+  it("a stale cache surfaces as a single failed test, not one per scenario", () => {
+    const fullNames = run.report.testResults[0]!.assertionResults.map(
+      (r) => r.fullName,
+    );
+    expect(fullNames).toContain("stale eval");
+    expect(fullNames.filter((n) => n.startsWith("stale eval "))).toHaveLength(
+      0,
+    );
+  });
+
+  it("the stale-cache failure points users at the regenerate command", () => {
+    const stale = run.report.testResults[0]!.assertionResults.find(
+      (r) => r.fullName === "stale eval",
+    );
+    expect(stale?.status).toBe("failed");
+    expect(stale?.failureMessages.join("\n")).toMatch(
+      /LITMUS_SYNTH_MODE=regenerate/,
+    );
+  });
+
+  it("the test body is not invoked when the cache is stale", () => {
+    expect(run.logLines).not.toContain("should-not-run:stale-content");
+  });
+
+  it("an unrelated test in the same file still runs", () => {
+    const unrelated = run.report.testResults[0]!.assertionResults.find(
+      (r) => r.fullName === "unrelated test runs fine",
+    );
+    expect(unrelated?.status).toBe("passed");
+  });
+});
+
 describe("fixtures lifecycle", () => {
   let run: FixtureRun;
 
