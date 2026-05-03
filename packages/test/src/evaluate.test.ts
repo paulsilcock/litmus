@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { beforeAll, describe, expect, it } from "vite-plus/test";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 describe("samples mode", () => {
   let run: FixtureRun;
@@ -57,6 +57,68 @@ describe("scenarios mode", () => {
       (r) => r.fullName === "declines refund c2 for $120",
     );
     expect(failed?.status).toBe("failed");
+  });
+});
+
+describe("scenarios generate mode", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-generate.test.ts");
+  }, 30_000);
+
+  it("the test body runs once for each synthesised scenario", () => {
+    const order = run.logLines.filter((l) => l.startsWith("iter:"));
+    expect(order).toEqual(["iter:seed", "iter:alice", "iter:bob"]);
+  });
+});
+
+describe("scenarios generate auto-cache", () => {
+  const fixturesDir = join(import.meta.dirname, "fixtures");
+  const expectedCachePath = join(
+    fixturesDir,
+    "scenarios-generate-auto.auto-cache-eval.scenarios.json",
+  );
+
+  beforeAll(async () => {
+    rmSync(expectedCachePath, { force: true });
+    await runFixture("scenarios-generate-auto.test.ts");
+  }, 30_000);
+
+  afterAll(() => {
+    rmSync(expectedCachePath, { force: true });
+  });
+
+  it("the cache file lives next to the test file when cache is omitted", () => {
+    expect(existsSync(expectedCachePath)).toBe(true);
+  });
+});
+
+describe("scenarios generate auto-cache multi-call", () => {
+  const fixturesDir = join(import.meta.dirname, "fixtures");
+  const firstCache = join(
+    fixturesDir,
+    "scenarios-generate-multi.first-eval.scenarios.json",
+  );
+  const secondCache = join(
+    fixturesDir,
+    "scenarios-generate-multi.second-eval.scenarios.json",
+  );
+
+  beforeAll(async () => {
+    rmSync(firstCache, { force: true });
+    rmSync(secondCache, { force: true });
+    await runFixture("scenarios-generate-multi.test.ts");
+  }, 30_000);
+
+  afterAll(() => {
+    rmSync(firstCache, { force: true });
+    rmSync(secondCache, { force: true });
+  });
+
+  it("each generate eval has its own auto-derived cache file", () => {
+    expect(existsSync(firstCache)).toBe(true);
+    expect(existsSync(secondCache)).toBe(true);
   });
 });
 

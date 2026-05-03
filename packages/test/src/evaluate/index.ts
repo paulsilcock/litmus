@@ -1,4 +1,25 @@
-import { test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
+
+import { synthesize, type SynthesizeOptions } from "#litmus-test/synthesize.ts";
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function deriveCachePath(evalName: string): string {
+  const testPath = expect.getState().testPath;
+  if (!testPath) {
+    throw new Error(
+      "evaluate.scenarios({ generate }) requires a test-file context — " +
+        "either run inside a vitest test file or supply `generate.cache` explicitly.",
+    );
+  }
+  const stem = testPath.replace(/\.test\.[jt]sx?$/, "");
+  return `${stem}.${slugify(evalName)}.scenarios.json`;
+}
 
 import { evaluationLabel, scenarioLabel } from "./labels.ts";
 import { describeFor, register, type RunMode } from "./register.ts";
@@ -26,6 +47,15 @@ export interface ScenariosFnOptions<T = unknown> extends EvaluateOptions {
    * to `scenario.name`, then `scenario.id`, then `"scenario"`.
    */
   labelBy?: (scenario: T) => string;
+}
+
+/**
+ * Generate-form input for `evaluate.scenarios`. Synthesises scenarios
+ * via the configured model on first run, caches them next to the test
+ * file, and reuses the cache on subsequent runs.
+ */
+export interface ScenariosGenerateInput<T> extends ScenariosFnOptions<T> {
+  generate: SynthesizeOptions<T>;
 }
 
 /**
@@ -107,6 +137,15 @@ export interface Evaluate {
     cases: T[],
     opts?: ScenariosFnOptions<T>,
   ): (name: string, fn: (scenario: T) => Promise<void>) => void;
+  /**
+   * Generate-form: synthesises scenarios via the configured model and
+   * registers one vitest test per scenario. The returned registrar is
+   * async — callers must await it so synthesis can run before the eval
+   * registers its tests.
+   */
+  scenarios<T>(
+    input: ScenariosGenerateInput<T>,
+  ): (name: string, fn: (scenario: T) => Promise<void>) => Promise<void>;
   /**
    * Returns an evaluate-shaped namespace where every registered eval
    * runs through the provided setup function. Setup builds and tears
@@ -218,15 +257,37 @@ function makeEvaluate(mode: RunMode): Evaluate {
     registerSingle(name, () => fn, opts, mode);
   }
 
-  function scenarios<T>(cases: T[], opts: ScenariosFnOptions<T> = {}) {
-    return (name: string, fn: (scenario: T) => Promise<void>): void =>
+  function scenarios<T>(
+    casesOrInput: T[] | ScenariosGenerateInput<T>,
+    opts: ScenariosFnOptions<T> = {},
+  ) {
+    if (Array.isArray(casesOrInput)) {
+      return (name: string, fn: (scenario: T) => Promise<void>): void =>
+        registerScenarios(
+          casesOrInput,
+          opts,
+          name,
+          (scenario) => () => fn(scenario),
+          mode,
+        );
+    }
+    const input = casesOrInput;
+    return async (
+      name: string,
+      fn: (scenario: T) => Promise<void>,
+    ): Promise<void> => {
+      const generateOpts = input.generate.cache
+        ? input.generate
+        : { ...input.generate, cache: deriveCachePath(name) };
+      const cases = await synthesize(generateOpts);
       registerScenarios(
         cases,
-        opts,
+        input,
         name,
         (scenario) => () => fn(scenario),
         mode,
       );
+    };
   }
 
   const target = Object.assign(evaluateOne, {
