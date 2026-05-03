@@ -119,14 +119,16 @@ export interface Evaluate {
     opts?: ScenariosFnOptions<T>,
   ): (name: string, fn: (scenario: T) => Promise<void>) => void;
   /**
-   * Synthesize-form: synthesises scenarios via the configured model and
-   * registers one vitest test per scenario. The returned registrar is
-   * async — callers must await it so synthesis can run before the eval
-   * registers its tests.
+   * Synthesize-form: registers one vitest test per scenario the
+   * synthesizer will produce. The expected count is known synchronously
+   * (`seeds.length + variants`), so registration is sync; synthesis
+   * runs lazily on the first test execution and is shared across all
+   * tests in the eval. Tests are named by position (`scenario 1`,
+   * `scenario 2`, …).
    */
   scenarios<T>(
     input: ScenariosSynthesizeInput<T>,
-  ): (name: string, fn: (scenario: T) => Promise<void>) => Promise<void>;
+  ): (name: string, fn: (scenario: T) => Promise<void>) => void;
   /**
    * Returns an evaluate-shaped namespace where every registered eval
    * runs through the provided setup function. Setup builds and tears
@@ -203,6 +205,54 @@ function registerSingle(
   });
 }
 
+function registerSynthesizedScenarios<TScenario>(
+  input: ScenariosSynthesizeInput<TScenario>,
+  evalName: string,
+  buildRun: (scenario: TScenario) => () => Promise<void>,
+  mode: RunMode,
+): void {
+  const samples = input.samples ?? 1;
+  const passRate = input.passRate ?? 1;
+  const expectedCount =
+    input.synthesize.seeds.length + input.synthesize.variants;
+
+  let resolvedScenarios: TScenario[] = [];
+  let cachedPromise: Promise<TScenario[]> | undefined;
+  async function ensureScenarios(): Promise<void> {
+    cachedPromise ??= synthesize({ name: evalName, ...input.synthesize }).then(
+      (s) => {
+        resolvedScenarios = s;
+        return s;
+      },
+    );
+    await cachedPromise;
+  }
+
+  describeFor(mode)(evalName, () => {
+    for (let i = 0; i < expectedCount; i++) {
+      const label = `scenario ${i + 1}`;
+      register({
+        label: evaluationLabel(label, samples, passRate),
+        setup: ensureScenarios,
+        tasks: sampleTasks(label, samples, () => async () => {
+          const scenario = resolvedScenarios[i];
+          if (scenario === undefined) {
+            throw new Error(
+              `Synthesised scenario at index ${i} is undefined — ` +
+                `expected ${expectedCount} scenarios, got ${resolvedScenarios.length}.`,
+            );
+          }
+          await buildRun(scenario)();
+        }),
+        passRate,
+        timeout: input.timeout,
+        concurrent: input.concurrent ?? false,
+        concurrency: input.concurrency,
+      });
+    }
+  });
+}
+
 function registerScenarios<TScenario>(
   cases: TScenario[],
   opts: ScenariosFnOptions<TScenario>,
@@ -253,14 +303,8 @@ function makeEvaluate(mode: RunMode): Evaluate {
         );
     }
     const input = casesOrInput;
-    return async (
-      name: string,
-      fn: (scenario: T) => Promise<void>,
-    ): Promise<void> => {
-      const synthesizeOpts = { name, ...input.synthesize };
-      const cases = await synthesize(synthesizeOpts);
-      registerScenarios(
-        cases,
+    return (name: string, fn: (scenario: T) => Promise<void>): void => {
+      registerSynthesizedScenarios(
         input,
         name,
         (scenario) => () => fn(scenario),

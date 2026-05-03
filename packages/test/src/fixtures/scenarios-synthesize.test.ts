@@ -17,25 +17,28 @@ const cachePath = join(
 );
 
 const model = new MockLanguageModelV3({
-  doGenerate: async () => ({
-    usage: {
-      inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
-      outputTokens: { total: 5, text: 5, reasoning: 0 },
-    },
-    warnings: [],
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify({
-          scenarios: [{ name: "alice" }, { name: "bob" }],
-        }),
+  doGenerate: async () => {
+    append("model-called");
+    return {
+      usage: {
+        inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
+        outputTokens: { total: 5, text: 5, reasoning: 0 },
       },
-    ],
-    finishReason: { unified: "stop", raw: undefined },
-  }),
+      warnings: [],
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            scenarios: [{ name: "alice" }, { name: "bob" }],
+          }),
+        },
+      ],
+      finishReason: { unified: "stop", raw: undefined },
+    };
+  },
 });
 
-await evaluate.scenarios({
+evaluate.scenarios({
   synthesize: {
     model,
     schema: z.object({ name: z.string() }),

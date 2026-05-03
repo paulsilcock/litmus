@@ -71,6 +71,44 @@ describe("scenarios synthesize mode", () => {
     const order = run.logLines.filter((l) => l.startsWith("iter:"));
     expect(order).toEqual(["iter:seed", "iter:alice", "iter:bob"]);
   });
+
+  it("each synthesised scenario gets its own test, named by position", () => {
+    const scenarioTests = run.report.testResults[0]!.assertionResults.filter(
+      (r) => r.fullName.startsWith("agent handles generated user"),
+    ).map((r) => r.fullName);
+    expect(scenarioTests).toEqual([
+      "agent handles generated user scenario 1",
+      "agent handles generated user scenario 2",
+      "agent handles generated user scenario 3",
+    ]);
+  });
+
+  it("synthesis happens once per eval, not once per test", () => {
+    const calls = run.logLines.filter((l) => l === "model-called");
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("scenarios synthesize stale cache", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-synthesize-stale.test.ts");
+  }, 30_000);
+
+  it("a stale cache fails the eval with regen instructions", () => {
+    const stale = run.report.testResults[0]!.assertionResults.filter(
+      (r) => r.fullName.startsWith("stale eval") && r.status === "failed",
+    );
+    expect(stale.length).toBeGreaterThan(0);
+    expect(stale[0]!.failureMessages.join("\n")).toMatch(
+      /LITMUS_SYNTH_MODE=regenerate/,
+    );
+  });
+
+  it("the test body is not invoked when the cache is stale", () => {
+    expect(run.logLines).not.toContain("should-not-run:stale-content");
+  });
 });
 
 describe("fixtures lifecycle", () => {

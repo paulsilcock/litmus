@@ -19,6 +19,13 @@ export interface RegisterArgs {
   /** Defaults to 5 if not specified by the caller's options. */
   concurrency?: number;
   mode?: RunMode;
+  /**
+   * Optional setup that runs before the tasks. Errors propagate
+   * directly to vitest as the test failure, bypassing the per-task
+   * pass-rate gate — use for failures the user must see verbatim
+   * (e.g. stale-cache instructions).
+   */
+  setup?: () => Promise<void>;
 }
 
 const DEFAULT_CONCURRENCY = 5;
@@ -57,10 +64,12 @@ export function register({
   concurrent,
   concurrency = DEFAULT_CONCURRENCY,
   mode = "run",
+  setup,
 }: RegisterArgs): void {
   testFor(mode)(
     label,
     async () => {
+      if (setup) await setup();
       if (concurrent) {
         await runConcurrent(tasks, passRate, concurrency, timeout);
       } else {
