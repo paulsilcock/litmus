@@ -119,33 +119,70 @@ export function readCachedScenariosSync<T>(opts: SynthesizeOptions<T>): T[] {
 
 /**
  * Fans out a small set of hand-written seeds into a larger set of
- * scenarios of the same shape, for use with `evaluate.scenarios()`.
- * The caller supplies the `prompt` builder, which receives the seeds
- * and the requested variant count and returns the prompt sent to the
- * model. Returns the seeds alongside the variants, so the result is
- * the full scenario set.
+ * scenarios of the same shape, typically used to feed
+ * `evaluate.scenarios()`. The caller supplies the `prompt` builder,
+ * which receives the seeds and requested variant count and returns
+ * the prompt sent to the model. Returns the seeds alongside the
+ * variants — the full scenario set.
  *
- * When `cache` is supplied, the result is persisted to that path and
- * reused on subsequent runs. The cache is keyed by a hash of the
- * inputs (model id, seeds, variant count, and prompt string), so any
- * change invalidates it. `mode` controls cache behaviour:
- * `"strict"` (default) reads from the cache and rejects with regen
- * instructions if it's missing or stale; `"regenerate"` ignores the
- * cache and overwrites it.
+ * ## Cache
  *
- * @example
+ * Scenarios are persisted to a JSON file keyed by a hash of the
+ * inputs (model id, seeds, variant count, and prompt string). Any
+ * change to those inputs invalidates the cache.
+ *
+ * - `cache: "./fixtures/refund.scenarios.json"` — explicit path. Use
+ *   this from scripts.
+ * - Inside a test file, omit `cache` and the path is auto-derived
+ *   from `expect.getState().testPath` (and the optional `name`
+ *   discriminator) as `<test-stem>[.<name-slug>].scenarios.json`.
+ *
+ * ## Mode
+ *
+ * - `"strict"` (default) reads the cache and rejects with regen
+ *   instructions if it's missing or stale. **Never calls the model.**
+ * - `"regenerate"` ignores the cache and overwrites it. Calls the
+ *   model.
+ *
+ * Mode resolves from the `mode` option, then the `LITMUS_SYNTH_MODE`
+ * env var, then defaults to `"strict"`. Generation is opt-in: a bare
+ * `vp test` never spends tokens.
+ *
+ * ## Workflow
+ *
+ * Iterate at small variant counts (`variants: 3`) until the prompt
+ * produces good output, then bump to a larger set (`variants: 30`)
+ * for production coverage. Every change to inputs triggers a regen
+ * automatically — set `LITMUS_SYNTH_MODE=regenerate` for the run.
+ *
+ * For test integration, prefer `evaluate.scenarios({ synthesize })`
+ * over awaiting `synthesize` at the top level — it sync-registers,
+ * forwards the eval name as the cache slug, and surfaces stale-cache
+ * failures as a single failed test.
+ *
+ * @example Standalone (script):
  * ```typescript
- * const scenarios = await synthesize({
+ * await synthesize({
  *   model: anthropic("claude-haiku-4-5-20251001"),
  *   schema: z.object({ message: z.string() }),
  *   seeds: [{ message: "I want a refund" }],
  *   variants: 20,
- *   prompt: (seeds, variants) =>
- *     `Vary the tone and urgency of these refund requests. Produce ${variants} new ones:\n${seeds.map((s) => s.message).join("\n")}`,
+ *   prompt: (seeds, n) =>
+ *     `Vary tone and urgency. Produce ${n} new examples:\n${seeds.map((s) => s.message).join("\n")}`,
  *   cache: "./fixtures/refund.scenarios.json",
+ *   mode: "regenerate",
  * });
+ * ```
  *
- * evaluate.scenarios(scenarios)("handles $message", async (s) => { ... });
+ * @example Integrated form (test file):
+ * ```typescript
+ * evaluate.scenarios({
+ *   synthesize: { model, schema, seeds, variants: 20, prompt },
+ *   labelBy: (s) => s.message,
+ * })("handles refund requests", async (scenario) => {
+ *   const response = await refundAgent.handle(scenario);
+ *   expect(response.outcome).toBe("refund_issued");
+ * });
  * ```
  */
 export async function synthesize<T>(opts: SynthesizeOptions<T>): Promise<T[]> {

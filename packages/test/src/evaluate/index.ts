@@ -124,12 +124,24 @@ export interface Evaluate {
     opts?: ScenariosFnOptions<T>,
   ): (name: string, fn: (scenario: T) => void | Promise<void>) => void;
   /**
-   * Synthesize-form: registers one vitest test per scenario the
-   * synthesizer will produce. The expected count is known synchronously
-   * (`seeds.length + variants`), so registration is sync; synthesis
-   * runs lazily on the first test execution and is shared across all
-   * tests in the eval. Tests are named by position (`scenario 1`,
-   * `scenario 2`, …).
+   * Synthesize-form: produces scenarios via `synthesize` and registers
+   * one vitest test per scenario, grouped under a `describe(name)`.
+   * Registration is synchronous so vitest can collect tests normally.
+   *
+   * Behaviour depends on the resolved cache mode:
+   * - `"strict"` (default) — the cache file is read and validated at
+   *   registration time. On hit, scenarios are known up-front and
+   *   tests are named via `labelBy` (or the scenario's name/id field).
+   *   On miss or stale, a single failing test surfaces the regen
+   *   instruction; per-scenario tests don't appear, and unrelated
+   *   tests in the same file are unaffected.
+   * - `"regenerate"` — synthesis is deferred to the first test
+   *   execution and shared across all tests in the eval. Tests are
+   *   named by position (`scenario 1`, `scenario 2`, …) because
+   *   scenarios aren't known at registration time.
+   *
+   * The cache path is auto-derived from the test file (and the eval
+   * name as a slug) unless `synthesize.cache` is supplied explicitly.
    */
   scenarios<T>(
     input: ScenariosSynthesizeInput<T>,
