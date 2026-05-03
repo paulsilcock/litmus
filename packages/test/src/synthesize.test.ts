@@ -1,3 +1,4 @@
+import { existsSync, rmSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -33,6 +34,12 @@ describe("synthesize", () => {
   afterEach(async () => {
     await rm(cacheDir, { recursive: true, force: true });
     vi.unstubAllEnvs();
+    const testPath = expect.getState().testPath;
+    if (testPath) {
+      rmSync(testPath.replace(/\.test\.[jt]sx?$/, ".scenarios.json"), {
+        force: true,
+      });
+    }
   });
 
   it("fans out seeds into more of the same shape", async () => {
@@ -64,6 +71,7 @@ describe("synthesize", () => {
       seeds,
       variants,
       prompt: (s, v) => `produce ${v} from ${s.length}`,
+      mode: "regenerate",
     });
 
     expect(scenarios).toHaveLength(seeds.length + variants);
@@ -92,12 +100,13 @@ describe("synthesize", () => {
       variants: 7,
       prompt: (seeds, variants) =>
         `make ${variants} variants from ${seeds.length} seeds`,
+      mode: "regenerate",
     });
 
     expect(captured).toContain("make 7 variants from 2 seeds");
   });
 
-  it("strict mode rejects a missing cache and tells you how to regenerate", async () => {
+  it("running with a missing cache fails with a regenerate instruction", async () => {
     const model = new MockLanguageModelV3({
       doGenerate: async () => {
         throw new Error("model should not be called");
@@ -118,7 +127,7 @@ describe("synthesize", () => {
     ).rejects.toThrow(/LITMUS_SYNTH_MODE=regenerate/);
   });
 
-  it("the LITMUS_SYNTH_MODE env var sets the default cache mode", async () => {
+  it("regeneration can be enabled without code changes via an env var", async () => {
     vi.stubEnv("LITMUS_SYNTH_MODE", "regenerate");
 
     const model = new MockLanguageModelV3({
@@ -146,7 +155,7 @@ describe("synthesize", () => {
     expect(result).toEqual([{ message: "seed" }, { message: "fresh" }]);
   });
 
-  it("strict mode rejects a cache produced from different inputs", async () => {
+  it("a cache produced from different inputs is rejected", async () => {
     const cachePath = join(cacheDir, "x.scenarios.json");
 
     const model = new MockLanguageModelV3({
@@ -179,6 +188,77 @@ describe("synthesize", () => {
     await expect(
       synthesize({ ...base, prompt: () => "different prompt" }),
     ).rejects.toThrow(/LITMUS_SYNTH_MODE=regenerate/);
+  });
+
+  it("scenarios cached during a test run live next to the test file by default", async () => {
+    const testPath = expect.getState().testPath;
+    if (!testPath) throw new Error("test path unavailable");
+    const expected = testPath.replace(/\.test\.[jt]sx?$/, ".scenarios.json");
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockUsage,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ scenarios: [{ message: "auto" }] }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    await synthesize({
+      model,
+      schema: z.object({ message: z.string() }),
+      seeds: [{ message: "seed" }],
+      variants: 1,
+      prompt: () => "p",
+      mode: "regenerate",
+    });
+
+    expect(existsSync(expected)).toBe(true);
+  });
+
+  it("scenarios with different names live in distinct cache files", async () => {
+    const testPath = expect.getState().testPath;
+    if (!testPath) throw new Error("test path unavailable");
+    const stem = testPath.replace(/\.test\.[jt]sx?$/, "");
+    const firstPath = `${stem}.first.scenarios.json`;
+    const secondPath = `${stem}.second.scenarios.json`;
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockUsage,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ scenarios: [{ message: "x" }] }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const base = {
+      model,
+      schema: z.object({ message: z.string() }),
+      seeds: [{ message: "seed" }],
+      variants: 1,
+      prompt: () => "p",
+      mode: "regenerate" as const,
+    };
+
+    try {
+      await synthesize({ ...base, name: "first" });
+      await synthesize({ ...base, name: "second" });
+
+      expect(existsSync(firstPath)).toBe(true);
+      expect(existsSync(secondPath)).toBe(true);
+    } finally {
+      rmSync(firstPath, { force: true });
+      rmSync(secondPath, { force: true });
+    }
   });
 
   it("a repeat run with the same inputs avoids calling the model", async () => {

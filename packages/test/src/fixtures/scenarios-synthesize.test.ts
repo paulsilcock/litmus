@@ -1,4 +1,6 @@
 import { appendFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { evaluate } from "@litmus/test";
 import { MockLanguageModelV3 } from "ai/test";
@@ -8,6 +10,11 @@ const log = process.env.LITMUS_TEST_LOG;
 const append = (s: string) => {
   if (log) appendFileSync(log, s + "\n");
 };
+
+const cachePath = join(
+  tmpdir(),
+  `synth-fixture-${process.pid}-${Date.now()}.scenarios.json`,
+);
 
 const model = new MockLanguageModelV3({
   doGenerate: async () => ({
@@ -19,7 +26,9 @@ const model = new MockLanguageModelV3({
     content: [
       {
         type: "text",
-        text: JSON.stringify({ scenarios: [{ name: "auto" }] }),
+        text: JSON.stringify({
+          scenarios: [{ name: "alice" }, { name: "bob" }],
+        }),
       },
     ],
     finishReason: { unified: "stop", raw: undefined },
@@ -27,14 +36,15 @@ const model = new MockLanguageModelV3({
 });
 
 await evaluate.scenarios({
-  generate: {
+  synthesize: {
     model,
     schema: z.object({ name: z.string() }),
     seeds: [{ name: "seed" }],
-    variants: 1,
+    variants: 2,
     prompt: () => "produce variations",
+    cache: cachePath,
     mode: "regenerate",
   },
-})("auto-cache eval", async (scenario) => {
+})("agent handles generated user", async (scenario) => {
   append(`iter:${scenario.name}`);
 });

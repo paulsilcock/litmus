@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
 import { generateText, type LanguageModel, Output } from "ai";
+import { expect } from "vite-plus/test";
 import { z } from "zod";
 
 export interface SynthesizeOptions<T> {
@@ -12,6 +13,7 @@ export interface SynthesizeOptions<T> {
   prompt: (seeds: T[], variants: number) => string;
   cache?: string;
   mode?: "strict" | "regenerate";
+  name?: string;
 }
 
 interface CacheFile<T> {
@@ -38,6 +40,21 @@ function resolveMode(
   if (explicit) return explicit;
   if (process.env.LITMUS_SYNTH_MODE === "regenerate") return "regenerate";
   return "strict";
+}
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function autoDeriveCachePath(name: string | undefined): string | undefined {
+  const testPath = expect.getState().testPath;
+  if (!testPath || !/\.test\.[jt]sx?$/.test(testPath)) return undefined;
+  const stem = testPath.replace(/\.test\.[jt]sx?$/, "");
+  const suffix = name ? `.${slugify(name)}.scenarios.json` : ".scenarios.json";
+  return `${stem}${suffix}`;
 }
 
 async function readCache(path: string): Promise<string> {
@@ -95,14 +112,15 @@ export async function synthesize<T>(opts: SynthesizeOptions<T>): Promise<T[]> {
     variants: opts.variants,
     prompt: promptString,
   });
+  const cachePath = opts.cache ?? autoDeriveCachePath(opts.name);
 
-  if (opts.cache && mode === "strict") {
-    const content = await readCache(opts.cache);
+  if (cachePath && mode === "strict") {
+    const content = await readCache(cachePath);
     const parsed: CacheFile<T> = JSON.parse(content);
     if (parsed.hash !== hash) {
       throw new Error(
-        `Scenario cache at ${opts.cache} is stale — inputs have changed ` +
-          `since it was generated. ${regenInstruction(opts.cache)}`,
+        `Scenario cache at ${cachePath} is stale — inputs have changed ` +
+          `since it was generated. ${regenInstruction(cachePath)}`,
       );
     }
     return parsed.scenarios;
@@ -116,9 +134,9 @@ export async function synthesize<T>(opts: SynthesizeOptions<T>): Promise<T[]> {
   });
   const scenarios = [...opts.seeds, ...output.scenarios];
 
-  if (opts.cache) {
+  if (cachePath) {
     const file: CacheFile<T> = { hash, scenarios };
-    await writeFile(opts.cache, JSON.stringify(file, null, 2));
+    await writeFile(cachePath, JSON.stringify(file, null, 2));
   }
 
   return scenarios;
