@@ -6,10 +6,21 @@ import {
 } from "playwright";
 
 import { BaseDriver } from "#litmus-test/drivers/base.ts";
+import { installAudioPump } from "#litmus-test/drivers/browser-audio.ts";
+
+declare global {
+  // Installed inside the browser by `installAudioPump` when `audio: true`.
+  // Only valid inside `page.evaluate` callbacks.
+  // oxlint-disable-next-line no-var
+  var __litmusAudio:
+    | { send(samples: number[], sampleRate: number): Promise<void> }
+    | undefined;
+}
 
 interface BrowserDriverOptions {
   baseUrl: string;
   headless?: boolean;
+  audio?: boolean;
 }
 
 /**
@@ -39,6 +50,12 @@ interface BrowserDriverOptions {
  *   Allows `this.page.goto("/orders")` instead of full URLs.
  * @param options.headless - Run the browser headlessly. Defaults to
  *   `true`. Set to `false` for debugging.
+ * @param options.audio - Enable audio I/O support. When `true`,
+ *   `navigator.mediaDevices.getUserMedia({ audio: true })` returns a
+ *   synthetic `MediaStream` controlled by the driver, and `sendAudio`
+ *   becomes available for pushing PCM into the page's mic. Video and
+ *   other constraints fall through to the real `getUserMedia`.
+ *   Defaults to `false`.
  *
  * @example
  * ```typescript
@@ -84,14 +101,50 @@ export abstract class BaseBrowserDriver extends BaseDriver {
   async init(): Promise<void> {
     this.#browser = await chromium.launch({
       headless: this.#options.headless ?? true,
+      args: this.#options.audio
+        ? ["--autoplay-policy=no-user-gesture-required"]
+        : undefined,
     });
     this.#context = await this.#browser.newContext({
       baseURL: this.#options.baseUrl,
     });
+    if (this.#options.audio) {
+      await this.#context.addInitScript(installAudioPump);
+    }
     this.#page = await this.#context.newPage();
   }
 
   async cleanup(): Promise<void> {
     await this.#browser?.close();
+  }
+
+  /**
+   * Push a buffer of PCM samples into the page's microphone. Requires
+   * the driver to have been constructed with `audio: true`. Resolves
+   * once playback completes, so subclasses can chain further actions
+   * (e.g. read a response from the page) without manual waits.
+   *
+   * @param samples - Mono PCM samples in the range `[-1, 1]`.
+   * @param sampleRate - Sample rate of `samples`, in Hz (e.g. `48000`).
+   */
+  protected async sendAudio(
+    samples: number[],
+    sampleRate: number,
+  ): Promise<void> {
+    if (!this.#options.audio) {
+      throw new Error(
+        "BaseBrowserDriver: sendAudio requires `audio: true` in constructor options",
+      );
+    }
+    await this.page.evaluate(
+      ({ samples, sampleRate }) => {
+        const audio = globalThis.__litmusAudio;
+        if (audio === undefined) {
+          throw new Error("__litmusAudio not initialised in page");
+        }
+        return audio.send(samples, sampleRate);
+      },
+      { samples, sampleRate },
+    );
   }
 }
