@@ -25,6 +25,8 @@ type OnMessageCallback = (message: string) => Promise<MessageResponse>;
 interface RunInput {
   /** Optional first message. If omitted, the LLM generates one from the persona and goal. */
   opening?: string;
+  /** Awaits an opening turn from the other side before the user generates their first reply. Useful when the SUT speaks first (e.g. a voice agent greeting). */
+  awaitOpening?: () => Promise<string>;
   /** Called each time the simulated user sends a message. Return a string to continue, or `{ done, reason }` to end the conversation. */
   onMessage: OnMessageCallback;
 }
@@ -68,12 +70,17 @@ Decide your next message and whether your goal has been met.`;
  * an agent, a use case, or a full system. Uses an LLM to generate
  * realistic user messages driving multi-turn conversations.
  *
- * Two modes:
+ * Two prompt modes:
  * - **Persona/goal** (simple): supply `persona` and `goal`; the
  *   simulator builds a default prompt per turn.
  * - **Prompt** (full control): supply `prompt: (turns) => string`;
  *   you own the entire prompt. The simulator still enforces the
  *   `{ message, done }` output contract.
+ *
+ * Either side can speak first. By default the simulated user opens.
+ * Pass `awaitOpening` to `run()` when the SUT speaks first (e.g. a
+ * voice agent greeting) — its returned string becomes the opening
+ * turn and the user generates a reply to it.
  *
  * @example
  * ```typescript
@@ -112,6 +119,11 @@ export class UserSimulator {
    * is being tested and returns its response.
    *
    * @param input.opening - Optional first message from the user.
+   *   Mutually exclusive with `awaitOpening`.
+   * @param input.awaitOpening - Optional callback awaited before the
+   *   user generates their first message. Its returned string is
+   *   recorded as the opening turn (assistant role). Use when the
+   *   SUT initiates the conversation.
    * @param input.onMessage - Callback that receives user messages
    *   and returns a response. Return a string to continue the
    *   conversation, or `{ done, reason }` to terminate it.
@@ -119,6 +131,11 @@ export class UserSimulator {
    */
   async run(input: RunInput): Promise<Conversation> {
     const turns: Turn[] = [];
+
+    if (input.awaitOpening) {
+      const opening = await input.awaitOpening();
+      turns.push({ role: "assistant", content: opening });
+    }
 
     for (let i = 0; i < this.#maxTurns; i++) {
       let userMessage: string;

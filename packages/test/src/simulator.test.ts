@@ -181,6 +181,40 @@ describe("UserSimulator", () => {
     });
   });
 
+  it("the assistant speaks first, then the user responds to its opening", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              message: "I'd like to book a flight",
+              done: true,
+            }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const simulator = new UserSimulator({
+      model,
+      persona: "Customer needing to book a flight",
+      goal: "Book a flight to Tokyo",
+    });
+
+    const conversation = await simulator.run({
+      awaitOpening: async () => "Hello, how can I help you today?",
+      onMessage: async () => ({ done: true, reason: "test complete" }),
+    });
+
+    expect(conversation.turns).toEqual([
+      { role: "assistant", content: "Hello, how can I help you today?" },
+      { role: "user", content: "I'd like to book a flight" },
+    ]);
+  });
+
   it("simulated user can take actions via tools before responding", async () => {
     const toolCalls: Array<{ code: string }> = [];
 
