@@ -13,7 +13,12 @@ declare global {
   // Only valid inside `page.evaluate` callbacks.
   // oxlint-disable-next-line no-var
   var __litmusAudio:
-    | { send(samples: number[], sampleRate: number): Promise<void> }
+    | {
+        send(samples: number[], sampleRate: number): Promise<void>;
+        capture(
+          durationMs: number,
+        ): Promise<{ samples: number[]; sampleRate: number }>;
+      }
     | undefined;
 }
 
@@ -116,6 +121,34 @@ export abstract class BaseBrowserDriver extends BaseDriver {
 
   async cleanup(): Promise<void> {
     await this.#browser?.close();
+  }
+
+  /**
+   * Capture audio the page plays for the given duration. Requires
+   * the driver to have been constructed with `audio: true`. Returns
+   * the PCM samples collected during the window plus the sample rate
+   * at which they were captured.
+   *
+   * @param durationMs - How long to capture, in milliseconds.
+   */
+  protected async captureAudio(
+    durationMs: number,
+  ): Promise<{ samples: number[]; sampleRate: number }> {
+    if (!this.#options.audio) {
+      throw new Error(
+        "BaseBrowserDriver: captureAudio requires `audio: true` in constructor options",
+      );
+    }
+    return this.page.evaluate(
+      ({ durationMs }) => {
+        const audio = globalThis.__litmusAudio;
+        if (audio === undefined) {
+          throw new Error("__litmusAudio not initialised in page");
+        }
+        return audio.capture(durationMs);
+      },
+      { durationMs },
+    );
   }
 
   /**

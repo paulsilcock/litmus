@@ -1,38 +1,24 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 
 import { BaseBrowserDriver } from "#litmus-test/drivers/browser.ts";
 
+const fixture = (name: string): string =>
+  readFileSync(
+    fileURLToPath(new URL(`./fixtures/${name}.html`, import.meta.url)),
+    "utf8",
+  );
+
 const app = new Hono()
   .get("/", (c) => c.html("<h1 id='greeting'>Hello, world</h1>"))
-  .get("/audio-mic", (c) =>
-    c.html(`<!DOCTYPE html>
-<html><body><script>
-  window.__observedFreq__ = 0;
-  window.__observedPeak__ = 0;
-  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-    const ctx = new AudioContext();
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 4096;
-    source.connect(analyser);
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    (function loop() {
-      analyser.getByteFrequencyData(data);
-      let maxMag = 0, maxIdx = 0;
-      for (let i = 0; i < data.length; i++) {
-        if (data[i] > maxMag) { maxMag = data[i]; maxIdx = i; }
-      }
-      if (maxMag > window.__observedPeak__) {
-        window.__observedPeak__ = maxMag;
-        window.__observedFreq__ = (maxIdx * ctx.sampleRate) / analyser.fftSize;
-      }
-      requestAnimationFrame(loop);
-    })();
-  });
-</script></body></html>`),
-  );
+  .get("/audio-mic", (c) => c.html(fixture("audio-mic")))
+  .get("/audio-speaker", (c) => c.html(fixture("audio-speaker")))
+  .get("/audio-element", (c) => c.html(fixture("audio-element")))
+  .get("/audio-webrtc", (c) => c.html(fixture("audio-webrtc")));
 
 function sineWavePcm(
   frequencyHz: number,
@@ -45,6 +31,18 @@ function sineWavePcm(
   );
 }
 
+/** Estimate dominant frequency of a pure tone via zero-crossings. */
+function detectFrequency(samples: number[], sampleRate: number): number {
+  if (samples.length < 2) return 0;
+  let crossings = 0;
+  for (let i = 1; i < samples.length; i++) {
+    const prev = samples[i - 1] ?? 0;
+    const curr = samples[i] ?? 0;
+    if ((prev < 0 && curr >= 0) || (prev >= 0 && curr < 0)) crossings++;
+  }
+  return (crossings * sampleRate) / (2 * samples.length);
+}
+
 class TestDriver extends BaseBrowserDriver {
   async greeting() {
     await this.page.goto("/");
@@ -55,8 +53,24 @@ class TestDriver extends BaseBrowserDriver {
     await this.page.goto("/audio-mic");
   }
 
+  async openSpeaker() {
+    await this.page.goto("/audio-speaker");
+  }
+
+  async openMediaElement() {
+    await this.page.goto("/audio-element");
+  }
+
+  async openWebRtc() {
+    await this.page.goto("/audio-webrtc");
+  }
+
   async sendTone(samples: number[], sampleRate: number) {
     await this.sendAudio(samples, sampleRate);
+  }
+
+  async captureTone(durationMs: number) {
+    return this.captureAudio(durationMs);
   }
 
   async observedFrequency(): Promise<number> {
@@ -102,6 +116,49 @@ describe("BaseBrowserDriver", () => {
       const observed = await audioDriver.observedFrequency();
       expect(observed).toBeGreaterThan(340);
       expect(observed).toBeLessThan(540);
+    } finally {
+      await audioDriver.cleanup();
+    }
+  });
+
+  it("audio played by the page is captured by the test", async () => {
+    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await audioDriver.init();
+    try {
+      await audioDriver.openSpeaker();
+      const { samples, sampleRate } = await audioDriver.captureTone(500);
+      const observed = detectFrequency(samples, sampleRate);
+      expect(observed).toBeGreaterThan(560);
+      expect(observed).toBeLessThan(760);
+    } finally {
+      await audioDriver.cleanup();
+    }
+  });
+
+  it("audio attached to a media element is captured by the test", async () => {
+    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await audioDriver.init();
+    try {
+      await audioDriver.openMediaElement();
+      const { samples, sampleRate } = await audioDriver.captureTone(500);
+      const observed = detectFrequency(samples, sampleRate);
+      expect(observed).toBeGreaterThan(780);
+      expect(observed).toBeLessThan(980);
+    } finally {
+      await audioDriver.cleanup();
+    }
+  });
+
+  it("audio received via a peer connection is captured by the test", async () => {
+    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await audioDriver.init();
+    try {
+      await audioDriver.openWebRtc();
+      await new Promise((r) => setTimeout(r, 3000));
+      const { samples, sampleRate } = await audioDriver.captureTone(1000);
+      const observed = detectFrequency(samples, sampleRate);
+      expect(observed).toBeGreaterThan(1000);
+      expect(observed).toBeLessThan(1200);
     } finally {
       await audioDriver.cleanup();
     }
