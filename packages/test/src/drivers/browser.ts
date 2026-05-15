@@ -6,10 +6,29 @@ import {
 } from "playwright";
 
 import { BaseDriver } from "#litmus-test/drivers/base.ts";
+import { installAudioPump } from "#litmus-test/drivers/browser-audio.ts";
+
+declare global {
+  // Installed inside the browser by `installAudioPump` when `audio: true`.
+  // Only valid inside `page.evaluate` callbacks.
+  // oxlint-disable-next-line no-var
+  var __litmusAudio:
+    | {
+        send(samples: number[], sampleRate: number): Promise<void>;
+        capture(
+          durationMs: number,
+        ): Promise<{ samples: number[]; sampleRate: number }>;
+      }
+    | undefined;
+}
 
 interface BrowserDriverOptions {
   baseUrl: string;
   headless?: boolean;
+  audio?: boolean;
+  channel?: string;
+  userAgent?: string;
+  launchArgs?: string[];
 }
 
 /**
@@ -82,16 +101,63 @@ export abstract class BaseBrowserDriver extends BaseDriver {
   }
 
   async init(): Promise<void> {
+    const baseArgs = this.#options.audio
+      ? ["--autoplay-policy=no-user-gesture-required"]
+      : [];
     this.#browser = await chromium.launch({
       headless: this.#options.headless ?? true,
+      channel: this.#options.channel,
+      args: [...baseArgs, ...(this.#options.launchArgs ?? [])],
     });
     this.#context = await this.#browser.newContext({
       baseURL: this.#options.baseUrl,
+      userAgent: this.#options.userAgent,
     });
+    if (this.#options.audio) {
+      await this.#context.addInitScript(installAudioPump);
+    }
     this.#page = await this.#context.newPage();
   }
 
   async cleanup(): Promise<void> {
     await this.#browser?.close();
+  }
+
+  protected async sendAudio(
+    samples: number[],
+    sampleRate: number,
+  ): Promise<void> {
+    if (!this.#options.audio) {
+      throw new Error(
+        "BaseBrowserDriver: sendAudio requires `audio: true` in constructor options",
+      );
+    }
+    await this.page.evaluate(
+      ({ samples, sampleRate }) => {
+        const audio = globalThis.__litmusAudio;
+        if (audio === undefined) {
+          throw new Error("__litmusAudio not initialised in page");
+        }
+        return audio.send(samples, sampleRate);
+      },
+      { samples, sampleRate },
+    );
+  }
+
+  protected async captureAudio(
+    durationMs: number,
+  ): Promise<{ samples: number[]; sampleRate: number }> {
+    if (!this.#options.audio) {
+      throw new Error(
+        "BaseBrowserDriver: captureAudio requires `audio: true` in constructor options",
+      );
+    }
+    return this.page.evaluate((d) => {
+      const audio = globalThis.__litmusAudio;
+      if (audio === undefined) {
+        throw new Error("__litmusAudio not initialised in page");
+      }
+      return audio.capture(d);
+    }, durationMs);
   }
 }
