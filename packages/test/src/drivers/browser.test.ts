@@ -68,6 +68,22 @@ class TestDriver extends BaseBrowserDriver {
     await this.page.goto("/audio-webrtc");
   }
 
+  async navigatorIdentity(): Promise<{
+    userAgent: string;
+    brands: string[];
+  }> {
+    await this.page.goto("/");
+    return this.page.evaluate(
+      `(() => {
+        const uad = navigator.userAgentData;
+        return {
+          userAgent: navigator.userAgent,
+          brands: uad ? uad.brands.map((b) => b.brand) : [],
+        };
+      })()`,
+    );
+  }
+
   async openMicStopsTrack() {
     await this.page.goto("/audio-mic-stops-track");
     await this.page.waitForFunction("globalThis.__readyForAudio__ === true", {
@@ -127,6 +143,30 @@ describe("BaseBrowserDriver", () => {
 
   it("subclasses can navigate and query the page", async () => {
     expect(await driver.greeting()).toBe("Hello, world");
+  });
+
+  it("the page reports the configured userAgent via both navigator.userAgent and navigator.userAgentData", async () => {
+    // Many sites detect Chrome via `navigator.userAgentData.brands`
+    // rather than parsing the UA string. Playwright's `userAgent`
+    // option only sets the UA string + HTTP header — it does NOT
+    // touch userAgentData. The driver must keep both consistent or
+    // sites that read userAgentData will see the underlying engine
+    // (Chromium) and refuse to render their Chrome-only paths.
+    const d = new TestDriver({
+      baseUrl,
+      userAgent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/131.0.0.0 Safari/537.36",
+    });
+    await d.init();
+    try {
+      const reported = await d.navigatorIdentity();
+      expect(reported.userAgent).toContain("Chrome/131");
+      expect(reported.brands).toContain("Google Chrome");
+    } finally {
+      await d.cleanup();
+    }
   });
 
   it("audio sent to the page's mic is received by client code", async () => {

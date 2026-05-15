@@ -7,6 +7,7 @@ import {
 
 import { BaseDriver } from "#litmus-test/drivers/base.ts";
 import { installAudioPump } from "#litmus-test/drivers/browser-audio.ts";
+import { spoofUserAgentData } from "#litmus-test/drivers/browser-ua.ts";
 
 declare global {
   // Installed inside the browser by `installAudioPump` when `audio: true`.
@@ -122,6 +123,13 @@ export abstract class BaseBrowserDriver extends BaseDriver {
       baseURL: this.#options.baseUrl,
       userAgent: this.#options.userAgent,
     });
+    if (this.#options.userAgent) {
+      // Playwright's `userAgent` only sets the UA string + HTTP
+      // header. Mirror it onto `navigator.userAgentData` so sites
+      // that read Client Hints see the same identity.
+      const userAgent = this.#options.userAgent;
+      await this.#context.addInitScript(spoofUserAgentData, { userAgent });
+    }
     if (this.#options.audio) {
       await this.#context.addInitScript(installAudioPump);
     }
