@@ -1,0 +1,29 @@
+{
+  "name": "@litmus-examples/voice-agent-elevenlabs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end demo: drive the ElevenLabs docs voice agent via Litmus's BaseBrowserDriver, with OpenAI Realtime acting as the user.",
+  "type": "module",
+  "scripts": {
+    "explore": "vp dlx tsx ./src/explore.ts",
+    "record": "vp dlx tsx ./src/record-greeting.ts",
+    "realtime-test": "vp dlx tsx ./src/realtime-test.ts",
+    "record-resampled": "vp dlx tsx ./src/record-resampled.ts",
+    "eval": "vp test src/eval.test.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "3.0.63",
+    "@litmus/test": "workspace:*",
+    "ai": "catalog:",
+    "dotenv": "16.4.5",
+    "openai": "6.37.0",
+    "playwright": "catalog:",
+    "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "8.5.13",
+    "tsx": "4.19.2",
+    "vite-plus": "catalog:"
+  }
+}

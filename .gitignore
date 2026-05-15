@@ -25,3 +25,11 @@ dist-ssr
 
 # AI agent worktrees
 .claude/worktrees/
+
+# Local secrets
+.env
+.env.local
+.env.*.local
+
+# Example outputs (screenshots, recordings, findings)
+examples/*/out/

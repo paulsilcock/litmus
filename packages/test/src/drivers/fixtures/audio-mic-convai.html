@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <body>
+    <!--
+      Embeds the actual @elevenlabs/convai-widget-embed bundle so the
+      test exercises the same widget code that runs on the docs page —
+      same getUserMedia call, same audio plumbing, same Chromium
+      interaction. Hits unpkg + api.us.elevenlabs.io at runtime; if
+      this fixture can reproduce the silent-injection bug under our
+      test harness, we have a real failing test to drive the fix.
+    -->
+    <elevenlabs-convai agent-id="q6EtujId97WBxLEUlEgQ"></elevenlabs-convai>
+    <script
+      src="https://unpkg.com/@elevenlabs/convai-widget-embed"
+      async
+      type="text/javascript"
+    ></script>
+  </body>
+</html>

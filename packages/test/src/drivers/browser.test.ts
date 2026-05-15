@@ -18,7 +18,8 @@ const app = new Hono()
   .get("/audio-mic", (c) => c.html(fixture("audio-mic")))
   .get("/audio-speaker", (c) => c.html(fixture("audio-speaker")))
   .get("/audio-element", (c) => c.html(fixture("audio-element")))
-  .get("/audio-webrtc", (c) => c.html(fixture("audio-webrtc")));
+  .get("/audio-webrtc", (c) => c.html(fixture("audio-webrtc")))
+  .get("/audio-mic-convai", (c) => c.html(fixture("audio-mic-convai")));
 
 function sineWavePcm(
   frequencyHz: number,
@@ -63,6 +64,37 @@ class TestDriver extends BaseBrowserDriver {
 
   async openWebRtc() {
     await this.page.goto("/audio-webrtc");
+  }
+
+  async openConvaiWidgetAndStartCall() {
+    await this.page.goto("/audio-mic-convai");
+    // Widget loads from unpkg, then injects the "Ask anything" trigger
+    // and a panel UI. Click through to a live voice call.
+    const ask = this.page.getByText("Ask anything").first();
+    await ask.waitFor({ state: "visible", timeout: 20_000 });
+    await ask.click();
+    const accept = this.page.getByRole("button", { name: /accept/i }).first();
+    await accept.waitFor({ state: "visible", timeout: 10_000 });
+    await accept.click();
+    const phone = this.page
+      .locator('button:has(slot[name="icon-phone"])')
+      .first();
+    await phone.waitFor({ state: "visible", timeout: 10_000 });
+    await phone.click();
+  }
+
+  async micProbeSnapshot(): Promise<{
+    peak: number;
+    rms: number;
+    samples: number;
+  }> {
+    return this.page.evaluate(
+      "globalThis.__litmusMicProbe ? globalThis.__litmusMicProbe.snapshot() : { peak: 0, rms: 0, samples: 0 }",
+    );
+  }
+
+  async micProbeReset(): Promise<void> {
+    await this.page.evaluate("globalThis.__litmusMicProbe?.reset()");
   }
 
   async sendTone(samples: number[], sampleRate: number) {
@@ -120,6 +152,48 @@ describe("BaseBrowserDriver", () => {
       await audioDriver.cleanup();
     }
   });
+
+  it(
+    "audio sent to the page's mic is audible inside the live convai widget",
+    { timeout: 60_000 },
+    async () => {
+      // Loads the real @elevenlabs/convai-widget-embed bundle (from
+      // unpkg) into our test harness. Requires network. Reproduces the
+      // exact JS that runs on elevenlabs.io, but under our test
+      // infrastructure so we can drive a fix.
+      const audioDriver = new TestDriver({
+        baseUrl,
+        audio: true,
+        channel: "chromium",
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+          "AppleWebKit/537.36 (KHTML, like Gecko) " +
+          "Chrome/131.0.0.0 Safari/537.36",
+        launchArgs: [
+          "--use-fake-device-for-media-stream",
+          "--use-fake-ui-for-media-stream",
+        ],
+      });
+      await audioDriver.init();
+      try {
+        await audioDriver.openConvaiWidgetAndStartCall();
+        // Wait for the WS handshake + greeting to flow before we try
+        // to inject anything (matches real-world timing).
+        await new Promise((r) => setTimeout(r, 6000));
+        await audioDriver.micProbeReset();
+
+        const sampleRate = 48000;
+        const pcm = sineWavePcm(440, sampleRate, 800);
+        await audioDriver.sendTone(pcm, sampleRate);
+        await new Promise((r) => setTimeout(r, 500));
+
+        const probe = await audioDriver.micProbeSnapshot();
+        expect(probe.peak).toBeGreaterThan(0.5);
+      } finally {
+        await audioDriver.cleanup();
+      }
+    },
+  );
 
   it("audio played by the page is captured by the test", async () => {
     const audioDriver = new TestDriver({ baseUrl, audio: true });

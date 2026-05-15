@@ -31,12 +31,12 @@ interface RunInput {
   onMessage: OnMessageCallback;
 }
 
-interface Turn {
+export interface Turn {
   role: "user" | "assistant";
   content: string;
 }
 
-interface Conversation {
+export interface Conversation {
   turns: Turn[];
   outcome: "goal_met" | "max_turns" | "terminated";
 }
