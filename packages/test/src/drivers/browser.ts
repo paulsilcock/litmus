@@ -26,9 +26,7 @@ interface BrowserDriverOptions {
   baseUrl: string;
   headless?: boolean;
   audio?: boolean;
-  channel?: string;
   userAgent?: string;
-  launchArgs?: string[];
 }
 
 /**
@@ -101,13 +99,24 @@ export abstract class BaseBrowserDriver extends BaseDriver {
   }
 
   async init(): Promise<void> {
-    const baseArgs = this.#options.audio
-      ? ["--autoplay-policy=no-user-gesture-required"]
-      : [];
+    // Use Chromium's new headless mode (real Chromium binary, GPU
+    // rasterization) rather than Playwright's default
+    // `chrome-headless-shell` (legacy headless, software rendering).
+    // New-headless handles audio/video work without the CPU spikes
+    // that the legacy shell hits when pages do heavy rendering.
     this.#browser = await chromium.launch({
       headless: this.#options.headless ?? true,
-      channel: this.#options.channel,
-      args: [...baseArgs, ...(this.#options.launchArgs ?? [])],
+      channel: "chromium",
+      args: this.#options.audio
+        ? [
+            "--autoplay-policy=no-user-gesture-required",
+            // Skip the mic permission prompt — without it, the
+            // first call to getUserMedia hangs waiting for user
+            // approval that never comes in a headless context.
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+          ]
+        : undefined,
     });
     this.#context = await this.#browser.newContext({
       baseURL: this.#options.baseUrl,
