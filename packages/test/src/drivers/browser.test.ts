@@ -19,7 +19,10 @@ const app = new Hono()
   .get("/audio-speaker", (c) => c.html(fixture("audio-speaker")))
   .get("/audio-element", (c) => c.html(fixture("audio-element")))
   .get("/audio-webrtc", (c) => c.html(fixture("audio-webrtc")))
-  .get("/audio-mic-convai", (c) => c.html(fixture("audio-mic-convai")));
+  .get("/audio-mic-convai", (c) => c.html(fixture("audio-mic-convai")))
+  .get("/audio-mic-stops-track", (c) =>
+    c.html(fixture("audio-mic-stops-track")),
+  );
 
 function sineWavePcm(
   frequencyHz: number,
@@ -64,6 +67,13 @@ class TestDriver extends BaseBrowserDriver {
 
   async openWebRtc() {
     await this.page.goto("/audio-webrtc");
+  }
+
+  async openMicStopsTrack() {
+    await this.page.goto("/audio-mic-stops-track");
+    await this.page.waitForFunction("globalThis.__readyForAudio__ === true", {
+      timeout: 5000,
+    });
   }
 
   async openConvaiWidgetAndStartCall() {
@@ -148,6 +158,30 @@ describe("BaseBrowserDriver", () => {
       const observed = await audioDriver.observedFrequency();
       expect(observed).toBeGreaterThan(340);
       expect(observed).toBeLessThan(540);
+    } finally {
+      await audioDriver.cleanup();
+    }
+  });
+
+  it("audio injection survives a consumer calling track.stop() on the mic track", async () => {
+    // Some consumers (notably @elevenlabs/convai-widget-embed) call
+    // `track.stop()` on the mic track during setup. A stopped track is
+    // terminal — it produces silence permanently and breaks all
+    // subsequent injection. The driver must guarantee its synthetic
+    // tracks survive this.
+    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await audioDriver.init();
+    try {
+      await audioDriver.openMicStopsTrack();
+      await audioDriver.micProbeReset();
+
+      const sampleRate = 48000;
+      const pcm = sineWavePcm(440, sampleRate, 500);
+      await audioDriver.sendTone(pcm, sampleRate);
+      await new Promise((r) => setTimeout(r, 200));
+
+      const probe = await audioDriver.micProbeSnapshot();
+      expect(probe.peak).toBeGreaterThan(0.5);
     } finally {
       await audioDriver.cleanup();
     }
