@@ -19,8 +19,21 @@ declare global {
         capture(
           durationMs: number,
         ): Promise<{ samples: number[]; sampleRate: number }>;
+        startStream(): { id: number; sampleRate: number };
+        readStream(id: number): { samples: number[]; sampleRate: number };
+        stopStream(id: number): void;
       }
     | undefined;
+}
+
+/**
+ * Open stream of captured audio. Each `read()` returns samples that
+ * have flowed through the page's audio outputs since the previous
+ * read (or since the stream was opened). Call `close()` to detach.
+ */
+export interface AudioStream {
+  read(): Promise<{ samples: number[]; sampleRate: number }>;
+  close(): Promise<void>;
 }
 
 interface BrowserDriverOptions {
@@ -176,5 +189,39 @@ export abstract class BaseBrowserDriver extends BaseDriver {
       }
       return audio.capture(d);
     }, durationMs);
+  }
+
+  protected async captureAudioStream(): Promise<AudioStream> {
+    if (!this.#options.audio) {
+      throw new Error(
+        "BaseBrowserDriver: captureAudioStream requires `audio: true` in constructor options",
+      );
+    }
+    const { id } = await this.page.evaluate(() => {
+      const audio = globalThis.__litmusAudio;
+      if (audio === undefined) {
+        throw new Error("__litmusAudio not initialised in page");
+      }
+      return audio.startStream();
+    });
+    const page = this.page;
+    return {
+      async read() {
+        return page.evaluate((streamId) => {
+          const audio = globalThis.__litmusAudio;
+          if (audio === undefined) {
+            throw new Error("__litmusAudio not initialised in page");
+          }
+          return audio.readStream(streamId);
+        }, id);
+      },
+      async close() {
+        await page.evaluate((streamId) => {
+          const audio = globalThis.__litmusAudio;
+          if (audio === undefined) return;
+          audio.stopStream(streamId);
+        }, id);
+      },
+    };
   }
 }

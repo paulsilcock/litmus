@@ -194,6 +194,9 @@ export function installAudioPump(): void {
 
   // --- Public API ---------------------------------------------------------
 
+  const streams = new Map();
+  let nextStreamId = 0;
+
   globalThis.__litmusAudio = {
     send(samples, sampleRate) {
       const { ctx, dest } = ensureMic();
@@ -219,6 +222,29 @@ export function installAudioPump(): void {
           resolve({ samples: collected, sampleRate: lastSampleRate });
         }, durationMs);
       });
+    },
+    startStream() {
+      ensureCaptureRoute();
+      const id = ++nextStreamId;
+      const buffer = [];
+      const sink = (chunk) => {
+        for (let i = 0; i < chunk.length; i++) buffer.push(chunk[i]);
+      };
+      captureSinks.add(sink);
+      streams.set(id, { buffer, sink });
+      return { id, sampleRate: lastSampleRate };
+    },
+    readStream(id) {
+      const entry = streams.get(id);
+      if (!entry) return { samples: [], sampleRate: lastSampleRate };
+      const out = entry.buffer.splice(0, entry.buffer.length);
+      return { samples: out, sampleRate: lastSampleRate };
+    },
+    stopStream(id) {
+      const entry = streams.get(id);
+      if (!entry) return;
+      captureSinks.delete(entry.sink);
+      streams.delete(id);
     },
   };
 }

@@ -113,6 +113,10 @@ class TestDriver extends BaseBrowserDriver {
     return this.captureAudio(durationMs);
   }
 
+  async captureToneStream() {
+    return this.captureAudioStream();
+  }
+
   async observedFrequency(): Promise<number> {
     return this.page.evaluate("globalThis.__observedFreq__ ?? 0");
   }
@@ -247,6 +251,39 @@ describe("BaseBrowserDriver", () => {
       const observed = detectFrequency(samples, sampleRate);
       expect(observed).toBeGreaterThan(1000);
       expect(observed).toBeLessThan(1200);
+    } finally {
+      await audioDriver.cleanup();
+    }
+  });
+
+  it("audio played by the page can be drained progressively while it's still playing", async () => {
+    // Voice-agent scenarios need to read what the agent has said so
+    // far without waiting for it to stop. A stream handle should
+    // return samples accumulated since the last read, not block on a
+    // fixed duration.
+    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await audioDriver.init();
+    try {
+      await audioDriver.openSpeaker();
+      const stream = await audioDriver.captureToneStream();
+      try {
+        await new Promise((r) => setTimeout(r, 300));
+        const first = await stream.read();
+        await new Promise((r) => setTimeout(r, 300));
+        const second = await stream.read();
+
+        expect(first.samples.length).toBeGreaterThan(0);
+        expect(second.samples.length).toBeGreaterThan(0);
+        // Second read must not re-include samples from the first.
+        const overlap = first.samples.length + second.samples.length;
+        expect(overlap).toBeGreaterThan(first.samples.length);
+
+        const observed = detectFrequency(second.samples, second.sampleRate);
+        expect(observed).toBeGreaterThan(560);
+        expect(observed).toBeLessThan(760);
+      } finally {
+        await stream.close();
+      }
     } finally {
       await audioDriver.cleanup();
     }
