@@ -261,6 +261,23 @@ describe("guardrails: failure", () => {
   });
 });
 
+describe("guardrails: chained registration", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-chained.test.ts");
+  }, 30_000);
+
+  it("downstream evals inherit guardrails from earlier chain steps", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("agent answers within policy and on tone"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("tone check");
+    expect(message).toContain("policy check");
+  });
+});
+
 describe("guardrails: multiple", () => {
   let run: FixtureRun;
 

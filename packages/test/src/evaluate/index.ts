@@ -93,6 +93,9 @@ export interface ExtendedEvaluate<TFixtures> {
    * the configured pass rate. All graders run before the failure is
    * reported, so reasons from multiple failing guardrails surface
    * together in the failure message.
+   *
+   * Chained calls accumulate — the returned extended evaluate sees
+   * every guardrail registered on the chain so far.
    */
   guardrails(map: GuardrailMap): ExtendedEvaluate<TFixtures>;
   /** Skip variant — registered evals are reported as skipped. */
@@ -447,7 +450,7 @@ function makeExtended<TFixtures>(
   const target = Object.assign(evaluateOne, {
     scenarios,
     guardrails: (map: GuardrailMap): ExtendedEvaluate<TFixtures> =>
-      makeExtended(setup, mode, map),
+      makeExtended(setup, mode, { ...guardrails, ...map }),
     skipIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
       makeExtended(setup, condition ? "skip" : mode),
     runIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
