@@ -254,6 +254,25 @@ describe("guardrails: failure", () => {
   });
 });
 
+describe("guardrails: multiple", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-multiple.test.ts");
+  }, 30_000);
+
+  it("when several guardrails fail, every name and reason surfaces", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("agent answers within policy and on tone"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("tone check");
+    expect(message).toContain("tone too curt");
+    expect(message).toContain("policy check");
+    expect(message).toContain("violates content policy");
+  });
+});
+
 describe("only mode", () => {
   let run: FixtureRun;
 
