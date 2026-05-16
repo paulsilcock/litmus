@@ -261,6 +261,22 @@ describe("guardrails: failure", () => {
   });
 });
 
+describe("guardrails: modifier composition", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-only.test.ts");
+  }, 30_000);
+
+  it("modifiers preserve registered guardrails through composition", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("focused eval still runs guardrails"),
+    );
+    expect(result?.status).toBe("failed");
+    expect(result?.failureMessages.join("\n") ?? "").toContain("policy check");
+  });
+});
+
 describe("guardrails: empty registration", () => {
   let run: FixtureRun;
 

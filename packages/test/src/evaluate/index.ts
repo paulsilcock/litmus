@@ -436,6 +436,9 @@ function makeExtended<TFixtures, K extends string = never>(
   mode: RunMode,
   guardrails: GuardrailMap = {},
 ): ExtendedEvaluate<TFixtures, K> {
+  const withMode = (m: RunMode): ExtendedEvaluate<TFixtures, K> =>
+    makeExtended<TFixtures, K>(setup, m, guardrails);
+
   function evaluateOne(
     name: string,
     fn: (fixtures: TFixtures) => unknown,
@@ -476,17 +479,17 @@ function makeExtended<TFixtures, K extends string = never>(
         ...map,
       }),
     skipIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
-      makeExtended<TFixtures, K>(setup, condition ? "skip" : mode),
+      withMode(condition ? "skip" : mode),
     runIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
-      makeExtended<TFixtures, K>(setup, condition ? mode : "skip"),
+      withMode(condition ? mode : "skip"),
   });
 
   Object.defineProperty(target, "skip", {
-    get: () => makeExtended<TFixtures, K>(setup, "skip"),
+    get: () => withMode("skip"),
     enumerable: true,
   });
   Object.defineProperty(target, "only", {
-    get: () => makeExtended<TFixtures, K>(setup, "only"),
+    get: () => withMode("only"),
     enumerable: true,
   });
 
