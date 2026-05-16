@@ -261,6 +261,21 @@ describe("guardrails: failure", () => {
   });
 });
 
+describe("guardrails: empty registration", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-empty.test.ts");
+  }, 30_000);
+
+  it("registering no guardrails leaves the eval body unconstrained and the scenario passing", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("eval with no registered guardrails"),
+    );
+    expect(result?.status).toBe("passed");
+  });
+});
+
 describe("guardrails: chained registration", () => {
   let run: FixtureRun;
 

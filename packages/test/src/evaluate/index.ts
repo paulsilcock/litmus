@@ -111,11 +111,12 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
    *
    * Chained calls accumulate — the returned extended evaluate sees
    * every guardrail registered on the chain so far. Re-registering an
-   * existing name is a compile-time error.
+   * existing name is a compile-time error. An empty map is a no-op
+   * and leaves the body return type unconstrained.
    */
-  guardrails<NewK extends string>(
-    map: Record<NewK, Grader<string>> & { [P in K & NewK]: never },
-  ): ExtendedEvaluate<TFixtures, K | NewK>;
+  guardrails<G extends { [P in keyof G]: Grader<string> }>(
+    map: G & { [P in keyof G & K]: never },
+  ): ExtendedEvaluate<TFixtures, K | (keyof G & string)>;
   /** Skip variant — registered evals are reported as skipped. */
   skip: ExtendedEvaluate<TFixtures, K>;
   /** Focus variant — only this eval and other `.only` evals run. */
@@ -467,10 +468,10 @@ function makeExtended<TFixtures, K extends string = never>(
 
   const target = Object.assign(evaluateOne, {
     scenarios,
-    guardrails: <NewK extends string>(
-      map: Record<NewK, Grader<string>> & { [P in K & NewK]: never },
-    ): ExtendedEvaluate<TFixtures, K | NewK> =>
-      makeExtended<TFixtures, K | NewK>(setup, mode, {
+    guardrails: <G extends { [P in keyof G]: Grader<string> }>(
+      map: G & { [P in keyof G & K]: never },
+    ): ExtendedEvaluate<TFixtures, K | (keyof G & string)> =>
+      makeExtended<TFixtures, K | (keyof G & string)>(setup, mode, {
         ...guardrails,
         ...map,
       }),
