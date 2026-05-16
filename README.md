@@ -1,8 +1,8 @@
 # Litmus
 
-Litmus is a TypeScript framework for building reliable AI-powered apps. Most agent[^workflow-vs-agent] frameworks either reinvent or ignore decades of software engineering. Litmus exploits the overlap instead: proven primitives keep the deterministic parts simple, the same primitives make AI components tractable, and one testing discipline covers both deterministic logic and AI behaviour. Agent-as-actor falls out as a natural consequence: AI agents drive the same use cases that fire when a person clicks a button or runs a CLI command — different entrypoint, one system.
+Litmus is a TypeScript framework for building reliable AI-powered apps. Most agent frameworks either reinvent or ignore decades of software engineering. Litmus exploits the overlap instead: proven primitives keep the deterministic parts simple, the same primitives make AI components tractable, and one testing discipline covers both deterministic logic and AI behaviour. Agent-as-actor falls out as a natural consequence: AI agents drive the same use cases that fire when a person clicks a button or runs a CLI command — different entrypoint, one system.
 
-[^workflow-vs-agent]: "Agent" here means an LLM choosing its own steps at runtime. For features with known steps, prefer a _workflow_: compose `AiTask`s inside a `CommandHandler` with ordinary control flow. Deterministic control flow is easier to debug, cheaper, and faster — and it's still tested through the same use case surface. Reach for `Agent` (see [below](#agent)) only when the path through the system genuinely can't be enumerated up front.
+> **Agent or workflow?** "Agent" here means an LLM choosing its own steps at runtime. For features with known steps, prefer a _workflow_: compose `AiTask`s inside a `CommandHandler` with ordinary control flow. Deterministic control flow is easier to debug, cheaper, and faster — and it's still tested through the same use case surface. Reach for [`Agent`](#agent) only when the path through the system genuinely can't be enumerated up front.
 
 ## Why Litmus
 
