@@ -1,5 +1,6 @@
 import { test } from "vite-plus/test";
 
+import { type Grader } from "#litmus-test/grader.ts";
 import {
   readCachedScenariosSync,
   resolveMode,
@@ -53,6 +54,9 @@ export type SetupFn<TFixtures> = (
   use: (fixtures: TFixtures) => Promise<void>,
 ) => Promise<void>;
 
+/** Map of guardrail registration key → grader. */
+export type GuardrailMap = Record<string, Grader<string>>;
+
 /**
  * An evaluate-shaped namespace whose registered evals run through a
  * `setup` function that builds and tears down a fresh fixtures bag per
@@ -66,7 +70,7 @@ export interface ExtendedEvaluate<TFixtures> {
    */
   (
     name: string,
-    fn: (fixtures: TFixtures) => void | Promise<void>,
+    fn: (fixtures: TFixtures) => unknown,
     opts?: EvaluateOptions,
   ): void;
   /**
@@ -81,6 +85,12 @@ export interface ExtendedEvaluate<TFixtures> {
     name: string,
     fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
   ) => void;
+  /**
+   * Register a set of guardrails on this extended evaluate. Every
+   * registered eval body returns the value to grade; each guardrail's
+   * grader is invoked with that value after the body completes.
+   */
+  guardrails(map: GuardrailMap): ExtendedEvaluate<TFixtures>;
   /** Skip variant — registered evals are reported as skipped. */
   skip: ExtendedEvaluate<TFixtures>;
   /** Focus variant — only this eval and other `.only` evals run. */
@@ -187,12 +197,16 @@ function sampleTasks(
 }
 
 function withFixturesRun<TFixtures>(
-  fn: (fixtures: TFixtures) => void | Promise<void>,
+  fn: (fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
+  guardrails: GuardrailMap = {},
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      await fn(fixtures);
+      const output = await fn(fixtures);
+      for (const grade of Object.values(guardrails)) {
+        await grade(String(output));
+      }
     });
 }
 
@@ -387,13 +401,19 @@ function makeEvaluate(mode: RunMode): Evaluate {
 function makeExtended<TFixtures>(
   setup: SetupFn<TFixtures>,
   mode: RunMode,
+  guardrails: GuardrailMap = {},
 ): ExtendedEvaluate<TFixtures> {
   function evaluateOne(
     name: string,
-    fn: (fixtures: TFixtures) => void | Promise<void>,
+    fn: (fixtures: TFixtures) => unknown,
     opts: EvaluateOptions = {},
   ): void {
-    registerSingle(name, () => withFixturesRun(fn, setup), opts, mode);
+    registerSingle(
+      name,
+      () => withFixturesRun(fn, setup, guardrails),
+      opts,
+      mode,
+    );
   }
 
   function scenarios<TScenario>(
@@ -415,6 +435,8 @@ function makeExtended<TFixtures>(
 
   const target = Object.assign(evaluateOne, {
     scenarios,
+    guardrails: (map: GuardrailMap): ExtendedEvaluate<TFixtures> =>
+      makeExtended(setup, mode, map),
     skipIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
       makeExtended(setup, condition ? "skip" : mode),
     runIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>

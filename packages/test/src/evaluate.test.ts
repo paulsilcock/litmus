@@ -218,6 +218,18 @@ describe("modifiers", () => {
   });
 });
 
+describe("guardrails", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-invoked.test.ts");
+  }, 30_000);
+
+  it("a registered guardrail's grader receives the body's return value", () => {
+    expect(run.logLines).toContain("grader-called:hello");
+  });
+});
+
 describe("only mode", () => {
   let run: FixtureRun;
 
