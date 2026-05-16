@@ -61,8 +61,13 @@ export type GuardrailMap = Record<string, Grader<string>>;
  * An evaluate-shaped namespace whose registered evals run through a
  * `setup` function that builds and tears down a fresh fixtures bag per
  * repeat. Returned by `evaluate.extend(setup)`.
+ *
+ * The second type parameter is the union of guardrail names already
+ * registered via `.guardrails(...)`. It defaults to `never` (no
+ * guardrails) and accumulates with each chained call, enabling a
+ * compile-time check against duplicate registrations.
  */
-export interface ExtendedEvaluate<TFixtures> {
+export interface ExtendedEvaluate<TFixtures, K extends string = never> {
   /**
    * Registers a single vitest test that runs the body once (or
    * `samples` times if specified), with `fixtures` injected from
@@ -95,17 +100,20 @@ export interface ExtendedEvaluate<TFixtures> {
    * together in the failure message.
    *
    * Chained calls accumulate — the returned extended evaluate sees
-   * every guardrail registered on the chain so far.
+   * every guardrail registered on the chain so far. Re-registering an
+   * existing name is a compile-time error.
    */
-  guardrails(map: GuardrailMap): ExtendedEvaluate<TFixtures>;
+  guardrails<NewK extends string>(
+    map: Record<NewK, Grader<string>> & { [P in K & NewK]: never },
+  ): ExtendedEvaluate<TFixtures, K | NewK>;
   /** Skip variant — registered evals are reported as skipped. */
-  skip: ExtendedEvaluate<TFixtures>;
+  skip: ExtendedEvaluate<TFixtures, K>;
   /** Focus variant — only this eval and other `.only` evals run. */
-  only: ExtendedEvaluate<TFixtures>;
+  only: ExtendedEvaluate<TFixtures, K>;
   /** Skip when `condition` is true; otherwise behave like the base. */
-  skipIf: (condition: boolean) => ExtendedEvaluate<TFixtures>;
+  skipIf: (condition: boolean) => ExtendedEvaluate<TFixtures, K>;
   /** Run only when `condition` is true; otherwise skip. */
-  runIf: (condition: boolean) => ExtendedEvaluate<TFixtures>;
+  runIf: (condition: boolean) => ExtendedEvaluate<TFixtures, K>;
 }
 
 /**
@@ -412,11 +420,11 @@ function makeEvaluate(mode: RunMode): Evaluate {
   return target as Evaluate;
 }
 
-function makeExtended<TFixtures>(
+function makeExtended<TFixtures, K extends string = never>(
   setup: SetupFn<TFixtures>,
   mode: RunMode,
   guardrails: GuardrailMap = {},
-): ExtendedEvaluate<TFixtures> {
+): ExtendedEvaluate<TFixtures, K> {
   function evaluateOne(
     name: string,
     fn: (fixtures: TFixtures) => unknown,
@@ -449,25 +457,30 @@ function makeExtended<TFixtures>(
 
   const target = Object.assign(evaluateOne, {
     scenarios,
-    guardrails: (map: GuardrailMap): ExtendedEvaluate<TFixtures> =>
-      makeExtended(setup, mode, { ...guardrails, ...map }),
-    skipIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
-      makeExtended(setup, condition ? "skip" : mode),
-    runIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
-      makeExtended(setup, condition ? mode : "skip"),
+    guardrails: <NewK extends string>(
+      map: Record<NewK, Grader<string>> & { [P in K & NewK]: never },
+    ): ExtendedEvaluate<TFixtures, K | NewK> =>
+      makeExtended<TFixtures, K | NewK>(setup, mode, {
+        ...guardrails,
+        ...map,
+      }),
+    skipIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
+      makeExtended<TFixtures, K>(setup, condition ? "skip" : mode),
+    runIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
+      makeExtended<TFixtures, K>(setup, condition ? mode : "skip"),
   });
 
   Object.defineProperty(target, "skip", {
-    get: () => makeExtended(setup, "skip"),
+    get: () => makeExtended<TFixtures, K>(setup, "skip"),
     enumerable: true,
   });
   Object.defineProperty(target, "only", {
-    get: () => makeExtended(setup, "only"),
+    get: () => makeExtended<TFixtures, K>(setup, "only"),
     enumerable: true,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  return target as ExtendedEvaluate<TFixtures>;
+  return target as ExtendedEvaluate<TFixtures, K>;
 }
 
 /**
