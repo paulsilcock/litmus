@@ -230,6 +230,21 @@ describe("guardrails", () => {
   });
 });
 
+describe("guardrails: failure", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-fail.test.ts");
+  }, 30_000);
+
+  it("a guardrail returning pass:false fails the scenario", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("body output is rejected by guardrail"),
+    );
+    expect(result?.status).toBe("failed");
+  });
+});
+
 describe("only mode", () => {
   let run: FixtureRun;
 

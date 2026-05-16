@@ -88,7 +88,9 @@ export interface ExtendedEvaluate<TFixtures> {
   /**
    * Register a set of guardrails on this extended evaluate. Every
    * registered eval body returns the value to grade; each guardrail's
-   * grader is invoked with that value after the body completes.
+   * grader is invoked with that value after the body completes. A
+   * grader returning `pass: false` fails the sample, counting against
+   * the configured pass rate.
    */
   guardrails(map: GuardrailMap): ExtendedEvaluate<TFixtures>;
   /** Skip variant — registered evals are reported as skipped. */
@@ -205,7 +207,10 @@ function withFixturesRun<TFixtures>(
     setup(async (fixtures) => {
       const output = await fn(fixtures);
       for (const grade of Object.values(guardrails)) {
-        await grade(String(output));
+        const verdict = await grade(String(output));
+        if (!verdict.pass) {
+          throw new Error("guardrail failed");
+        }
       }
     });
 }
