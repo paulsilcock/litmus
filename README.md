@@ -2,7 +2,7 @@
 
 Litmus is a TypeScript framework for building reliable AI-powered apps. Most agent frameworks either reinvent or ignore decades of software engineering. Litmus exploits the overlap instead: proven primitives keep the deterministic parts simple, the same primitives make AI components tractable, and one testing discipline covers both deterministic logic and AI behaviour. Agent-as-actor falls out as a natural consequence: AI agents drive the same use cases that fire when a person clicks a button or runs a CLI command — different entrypoint, one system.
 
-> **Agent or workflow?** "Agent" here means an LLM choosing its own steps at runtime. For features with known steps, prefer a _workflow_: compose `AiTask`s inside a `CommandHandler` with ordinary control flow. Deterministic control flow is easier to debug, cheaper, and faster — and it's still tested through the same use case surface. Reach for [`Agent`](#agent) only when the path through the system genuinely can't be enumerated up front.
+> **Agent or workflow?** An "agent" is an LLM choosing its own steps at runtime. It's tempting to personify AI and reach straight for full autonomy, but most features don't need it — at least to begin with. When the steps are known up front, prefer a _workflow_: compose `AiTask`s inside a `CommandHandler` with ordinary control flow. Easier to debug, cheaper, faster, and still tested through the same use case surface. Reach for [`Agent`](#agent) only when the path through the system genuinely can't be enumerated in advance.
 
 ## Why Litmus
 
