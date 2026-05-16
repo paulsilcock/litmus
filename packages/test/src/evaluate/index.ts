@@ -58,6 +58,16 @@ export type SetupFn<TFixtures> = (
 export type GuardrailMap = Record<string, Grader<string>>;
 
 /**
+ * Body return type required by the eval. With no guardrails registered
+ * (`K = never`), the body may return anything. Once a guardrail is
+ * registered, the body must return a string-typed value to feed each
+ * grader.
+ */
+export type BodyReturn<K extends string> = [K] extends [never]
+  ? unknown
+  : string | Promise<string>;
+
+/**
  * An evaluate-shaped namespace whose registered evals run through a
  * `setup` function that builds and tears down a fresh fixtures bag per
  * repeat. Returned by `evaluate.extend(setup)`.
@@ -75,7 +85,7 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
    */
   (
     name: string,
-    fn: (fixtures: TFixtures) => unknown,
+    fn: (fixtures: TFixtures) => BodyReturn<K>,
     opts?: EvaluateOptions,
   ): void;
   /**

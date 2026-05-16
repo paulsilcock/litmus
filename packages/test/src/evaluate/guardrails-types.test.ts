@@ -14,4 +14,19 @@ const base = evaluate
 // @ts-expect-error re-registering an existing guardrail name is a compile error
 base.guardrails({ "policy check": noop });
 
-it("guardrail name uniqueness is enforced at compile time", () => {});
+// Type-only assertions; never invoked at runtime, but the function body is
+// still type-checked so the @ts-expect-error directives apply.
+function bodyReturnTypeConstraints(): void {
+  // @ts-expect-error body must return a string when guardrails are registered
+  base("returns a non-string", async () => 42);
+
+  // @ts-expect-error body must return *something* when guardrails are registered
+  base("returns void", async () => {});
+}
+
+it("re-registering a guardrail name is a compile-time error", () => {});
+
+it("eval body return type is constrained by registered guardrails", () => {
+  // Reference the type-only function so the compiler considers it used.
+  void bodyReturnTypeConstraints;
+});
