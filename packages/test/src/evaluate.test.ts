@@ -243,6 +243,15 @@ describe("guardrails: failure", () => {
     );
     expect(result?.status).toBe("failed");
   });
+
+  it("the failure message names the guardrail and includes the reason", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("body output is rejected by guardrail"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("always fails");
+    expect(message).toContain("nope");
+  });
 });
 
 describe("only mode", () => {

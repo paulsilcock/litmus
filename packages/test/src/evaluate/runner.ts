@@ -16,11 +16,17 @@ export async function runSequential(
   passRate: number,
   timeout?: number,
 ): Promise<void> {
-  let passed = 0;
+  const failures: string[] = [];
   for (const task of tasks) {
-    if (await runTask(task, timeout)) passed++;
+    const failure = await runTask(task, timeout);
+    if (failure !== null) failures.push(failure);
   }
-  assertPassRate(passed, tasks.length, passRate);
+  assertPassRate(
+    tasks.length - failures.length,
+    tasks.length,
+    passRate,
+    failures,
+  );
 }
 
 export async function runConcurrent(
@@ -29,30 +35,40 @@ export async function runConcurrent(
   concurrency: number,
   timeout?: number,
 ): Promise<void> {
-  let passed = 0;
+  const failures: string[] = [];
   let index = 0;
 
   async function worker() {
     while (index < tasks.length) {
       const task = tasks[index++]!;
-      if (await runTask(task, timeout)) passed++;
+      const failure = await runTask(task, timeout);
+      if (failure !== null) failures.push(failure);
     }
   }
 
   await Promise.all(
     Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker()),
   );
-  assertPassRate(passed, tasks.length, passRate);
+  assertPassRate(
+    tasks.length - failures.length,
+    tasks.length,
+    passRate,
+    failures,
+  );
 }
 
-async function runTask(task: RunTask, timeout?: number): Promise<boolean> {
+async function runTask(
+  task: RunTask,
+  timeout?: number,
+): Promise<string | null> {
   try {
     const p = task.run();
     await (timeout ? withTimeout(p, timeout, task.label) : p);
-    return true;
+    return null;
   } catch (e) {
-    warnFailure(task.label, e);
-    return false;
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn(`Evaluate warning: ${task.label} failed — ${message}`);
+    return message;
   }
 }
 
@@ -72,16 +88,20 @@ function withTimeout<T>(
   ]);
 }
 
-function warnFailure(label: string, e: unknown): void {
-  const message = e instanceof Error ? e.message : String(e);
-  console.warn(`Evaluate warning: ${label} failed — ${message}`);
-}
-
-function assertPassRate(passed: number, total: number, required: number): void {
+function assertPassRate(
+  passed: number,
+  total: number,
+  required: number,
+  failures: string[],
+): void {
   const actual = passed / total;
   if (actual < required) {
+    const reasons =
+      failures.length > 0
+        ? "\n" + failures.map((f) => `  - ${f}`).join("\n")
+        : "";
     throw new Error(
-      `Evaluate failed: ${passed}/${total} passed (${(actual * 100).toFixed(0)}%), required ${(required * 100).toFixed(0)}%`,
+      `Evaluate failed: ${passed}/${total} passed (${(actual * 100).toFixed(0)}%), required ${(required * 100).toFixed(0)}%${reasons}`,
     );
   }
 }

@@ -206,10 +206,10 @@ function withFixturesRun<TFixtures>(
   return () =>
     setup(async (fixtures) => {
       const output = await fn(fixtures);
-      for (const grade of Object.values(guardrails)) {
+      for (const [name, grade] of Object.entries(guardrails)) {
         const verdict = await grade(String(output));
         if (!verdict.pass) {
-          throw new Error("guardrail failed");
+          throw new Error(`guardrail "${name}" failed: ${verdict.reason}`);
         }
       }
     });
