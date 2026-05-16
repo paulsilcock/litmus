@@ -261,6 +261,28 @@ describe("guardrails: failure", () => {
   });
 });
 
+describe("guardrails: scenarios form", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-scenarios.test.ts");
+  }, 30_000);
+
+  it("guardrails grade each scenario's body return and fail it on rejection", () => {
+    const alice = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.endsWith("alice"),
+    );
+    const bob = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.endsWith("bob"),
+    );
+    expect(alice?.status).toBe("failed");
+    expect(bob?.status).toBe("failed");
+    const aliceMessage = alice?.failureMessages.join("\n") ?? "";
+    expect(aliceMessage).toContain("policy check");
+    expect(aliceMessage).toContain("violates content policy");
+  });
+});
+
 describe("guardrails: modifier composition", () => {
   let run: FixtureRun;
 

@@ -98,7 +98,7 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
     opts?: ScenariosFnOptions<TScenario>,
   ): (
     name: string,
-    fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
+    fn: (scenario: TScenario, fixtures: TFixtures) => BodyReturn<K>,
   ) => void;
   /**
    * Register a set of guardrails on this extended evaluate. Every
@@ -244,13 +244,24 @@ function withFixturesRun<TFixtures>(
 }
 
 function scenarioWithFixturesRun<TScenario, TFixtures>(
-  fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
+  fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
   scenario: TScenario,
+  guardrails: GuardrailMap = {},
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      await fn(scenario, fixtures);
+      const output = await fn(scenario, fixtures);
+      const failures: string[] = [];
+      for (const [name, grade] of Object.entries(guardrails)) {
+        const verdict = await grade(String(output));
+        if (!verdict.pass) {
+          failures.push(`guardrail "${name}" failed: ${verdict.reason}`);
+        }
+      }
+      if (failures.length > 0) {
+        throw new Error(failures.join("; "));
+      }
     });
 }
 
@@ -458,13 +469,13 @@ function makeExtended<TFixtures, K extends string = never>(
   ) {
     return (
       name: string,
-      fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
+      fn: (scenario: TScenario, fixtures: TFixtures) => BodyReturn<K>,
     ): void =>
       registerScenarios(
         cases,
         opts,
         name,
-        (scenario) => scenarioWithFixturesRun(fn, setup, scenario),
+        (scenario) => scenarioWithFixturesRun(fn, setup, scenario, guardrails),
         mode,
       );
   }
