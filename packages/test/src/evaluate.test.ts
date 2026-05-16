@@ -228,6 +228,13 @@ describe("guardrails", () => {
   it("a registered guardrail's grader receives the body's return value", () => {
     expect(run.logLines).toContain("grader-called:hello");
   });
+
+  it("a passing guardrail leaves the scenario passing", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("agent greets the customer"),
+    );
+    expect(result?.status).toBe("passed");
+  });
 });
 
 describe("guardrails: failure", () => {
