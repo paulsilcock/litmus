@@ -12,12 +12,12 @@ const e = evaluate
     await use({ greeting: "hello" });
   })
   .guardrails({
-    "echo guardrail": async (input) => {
+    "transcript review": async (input) => {
       append(`grader-called:${input}`);
       return { pass: true, reason: "" };
     },
   });
 
-e("body output flows to guardrail", async ({ greeting }) => {
+e("agent greets the customer", async ({ greeting }) => {
   return greeting;
 });

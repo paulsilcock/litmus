@@ -1,13 +1,16 @@
 import { evaluate } from "@litmus/test";
 
 const e = evaluate
-  .extend<{ output: string }>(async (use) => {
-    await use({ output: "anything" });
+  .extend<{ answer: string }>(async (use) => {
+    await use({ answer: "any response" });
   })
   .guardrails({
-    "always fails": async () => ({ pass: false, reason: "nope" }),
+    "policy check": async () => ({
+      pass: false,
+      reason: "violates content policy",
+    }),
   });
 
-e("body output is rejected by guardrail", async ({ output }) => {
-  return output;
+e("agent answers within policy", async ({ answer }) => {
+  return answer;
 });

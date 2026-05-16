@@ -239,18 +239,18 @@ describe("guardrails: failure", () => {
 
   it("a guardrail returning pass:false fails the scenario", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("body output is rejected by guardrail"),
+      r.fullName.startsWith("agent answers within policy"),
     );
     expect(result?.status).toBe("failed");
   });
 
   it("the failure message names the guardrail and includes the reason", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("body output is rejected by guardrail"),
+      r.fullName.startsWith("agent answers within policy"),
     );
     const message = result?.failureMessages.join("\n") ?? "";
-    expect(message).toContain("always fails");
-    expect(message).toContain("nope");
+    expect(message).toContain("policy check");
+    expect(message).toContain("violates content policy");
   });
 });
 
