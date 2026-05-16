@@ -222,6 +222,27 @@ function sampleTasks(
   }));
 }
 
+/**
+ * Run every registered guardrail's grader against the body's return
+ * value, accumulating per-guardrail failure reasons. Throws once with
+ * all reasons concatenated if any grader returned `pass: false`.
+ */
+async function runGuardrails(
+  output: unknown,
+  guardrails: GuardrailMap,
+): Promise<void> {
+  const failures: string[] = [];
+  for (const [name, grade] of Object.entries(guardrails)) {
+    const verdict = await grade(String(output));
+    if (!verdict.pass) {
+      failures.push(`guardrail "${name}" failed: ${verdict.reason}`);
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(failures.join("; "));
+  }
+}
+
 function withFixturesRun<TFixtures>(
   fn: (fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
@@ -230,16 +251,7 @@ function withFixturesRun<TFixtures>(
   return () =>
     setup(async (fixtures) => {
       const output = await fn(fixtures);
-      const failures: string[] = [];
-      for (const [name, grade] of Object.entries(guardrails)) {
-        const verdict = await grade(String(output));
-        if (!verdict.pass) {
-          failures.push(`guardrail "${name}" failed: ${verdict.reason}`);
-        }
-      }
-      if (failures.length > 0) {
-        throw new Error(failures.join("; "));
-      }
+      await runGuardrails(output, guardrails);
     });
 }
 
@@ -252,16 +264,7 @@ function scenarioWithFixturesRun<TScenario, TFixtures>(
   return () =>
     setup(async (fixtures) => {
       const output = await fn(scenario, fixtures);
-      const failures: string[] = [];
-      for (const [name, grade] of Object.entries(guardrails)) {
-        const verdict = await grade(String(output));
-        if (!verdict.pass) {
-          failures.push(`guardrail "${name}" failed: ${verdict.reason}`);
-        }
-      }
-      if (failures.length > 0) {
-        throw new Error(failures.join("; "));
-      }
+      await runGuardrails(output, guardrails);
     });
 }
 

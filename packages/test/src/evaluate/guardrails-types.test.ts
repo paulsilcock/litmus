@@ -22,6 +22,14 @@ function bodyReturnTypeConstraints(): void {
 
   // @ts-expect-error body must return *something* when guardrails are registered
   base("returns void", async () => {});
+
+  const cases = [{ id: "a" }, { id: "b" }];
+
+  // @ts-expect-error scenarios body must return a string when guardrails are registered
+  base.scenarios(cases)("non-string", async () => 42);
+
+  // @ts-expect-error scenarios body must return *something* when guardrails are registered
+  base.scenarios(cases)("void", async () => {});
 }
 
 it("re-registering a guardrail name is a compile-time error", () => {});
