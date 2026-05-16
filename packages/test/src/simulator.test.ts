@@ -181,21 +181,29 @@ describe("UserSimulator", () => {
     });
   });
 
-  it("the assistant speaks first, then the user responds to its opening", async () => {
+  it("when the SUT speaks first, its opening is recorded and informs the user's first reply", async () => {
+    // `awaitOpening` is how the test author tells the simulator
+    // "wait for the SUT to greet, then start". In a real test this
+    // callback would invoke a DSL/driver method that knows how to
+    // detect the SUT's first message; here we stub it.
+    let capturedPrompt = "";
     const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockResult,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              message: "I'd like to book a flight",
-              done: true,
-            }),
-          },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
+      doGenerate: async ({ prompt }) => {
+        capturedPrompt = JSON.stringify(prompt);
+        return {
+          ...mockResult,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                message: "I'd like to book a flight",
+                done: true,
+              }),
+            },
+          ],
+          finishReason: { unified: "stop", raw: undefined },
+        };
+      },
     });
 
     const simulator = new UserSimulator({
@@ -205,6 +213,8 @@ describe("UserSimulator", () => {
     });
 
     const conversation = await simulator.run({
+      // Stand-in for `dsl.agent.respondsWith()` — anything that
+      // resolves once the SUT has spoken.
       awaitOpening: async () => "Hello, how can I help you today?",
       onMessage: async () => ({ done: true, reason: "test complete" }),
     });
@@ -213,6 +223,9 @@ describe("UserSimulator", () => {
       { role: "assistant", content: "Hello, how can I help you today?" },
       { role: "user", content: "I'd like to book a flight" },
     ]);
+    // The opening reaches the prompt context, so the user's reply
+    // is grounded in what the SUT actually said.
+    expect(capturedPrompt).toContain("Hello, how can I help you today?");
   });
 
   it("simulated user can take actions via tools before responding", async () => {
