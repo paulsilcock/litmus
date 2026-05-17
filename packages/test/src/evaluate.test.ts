@@ -321,12 +321,20 @@ describe("guardrails: scenarios form", () => {
     run = await runFixture("guardrails-scenarios.test.ts");
   }, 30_000);
 
-  it("guardrails grade each scenario's body return and fail it on rejection", () => {
+  it("the grader is invoked once per (scenario, sample) pair with that run's body output", () => {
+    const graded = run.logLines.filter((l) => l.startsWith("graded:"));
+    // 2 scenarios × 2 samples = 4 invocations, each with its own body output.
+    expect(graded).toHaveLength(4);
+    expect(graded.filter((l) => l === "graded:hello alice")).toHaveLength(2);
+    expect(graded.filter((l) => l === "graded:hello bob")).toHaveLength(2);
+  });
+
+  it("a rejecting grader fails every scenario and surfaces its reason", () => {
     const alice = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.endsWith("alice"),
+      r.fullName.includes("alice"),
     );
     const bob = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.endsWith("bob"),
+      r.fullName.includes("bob"),
     );
     expect(alice?.status).toBe("failed");
     expect(bob?.status).toBe("failed");
