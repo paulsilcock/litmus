@@ -31,40 +31,25 @@ describe("bookshop", () => {
   });
 
   it("customer can purchase a book", async () => {
-    await dsl.ensureBookIsInStock({
+    await dsl.books.hasOnSale({
       title: "The Hobbit",
       author: "Tolkien",
       price: 12.99,
     });
-    await dsl.ensureCustomerIsRegistered({
+    await dsl.customers.hasAccount({
       name: "Alice",
       email: "alice@example.com",
     });
 
-    await dsl.loginAsCustomer({ email: "alice@example.com" });
-    await dsl.searchForBook({ author: "Tolkien" });
-    await dsl.addBookToCart({ title: "The Hobbit" });
-    await dsl.checkOut();
+    await dsl.customers.logIn({ email: "alice@example.com" });
+    await dsl.books.searchBy({ author: "Tolkien" });
+    await dsl.cart.addBook({ title: "The Hobbit" });
+    await dsl.cart.checkOut();
 
-    await dsl.assertBookPurchased({ title: "The Hobbit" });
+    await dsl.orders.confirmPurchased({ title: "The Hobbit" });
   });
 
   it("customer is emailed a confirmation after purchase", async () => {
-    await dsl.ensureBookIsInStock({
-      title: "The Fellowship of the Ring",
-      author: "Tolkien",
-      price: 14.99,
-    });
-    await dsl.ensureCustomerIsRegistered({
-      name: "Bob",
-      email: "bob@example.com",
-    });
-
-    await dsl.loginAsCustomer({ email: "bob@example.com" });
-    await dsl.searchForBook({ author: "Tolkien" });
-    await dsl.addBookToCart({ title: "The Fellowship of the Ring" });
-    await dsl.checkOut();
-
-    await dsl.assertOrderConfirmationEmailSentTo("bob@example.com");
+    throw new Error("not yet refactored to the new DSL shape");
   });
 });
