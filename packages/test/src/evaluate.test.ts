@@ -218,81 +218,95 @@ describe("modifiers", () => {
   });
 });
 
-describe("guardrails: invocation", () => {
+describe("guardrails", () => {
   let run: FixtureRun;
 
   beforeAll(async () => {
-    run = await runFixture("guardrails-invocation.test.ts");
+    run = await runFixture("guardrails.test.ts");
   }, 30_000);
 
-  it("a registered grader is invoked with the body's return value", () => {
-    expect(run.logLines).toContain("grader-called:hello");
+  describe("invocation", () => {
+    it("a registered grader is invoked with the body's return value", () => {
+      expect(run.logLines).toContain("grader-called:hello");
+    });
+
+    it("a passing grader leaves the scenario passing", () => {
+      const result = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.startsWith("a passing grader leaves the scenario passing"),
+      );
+      expect(result?.status).toBe("passed");
+    });
   });
 
-  it("a passing grader leaves the scenario passing", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("a passing grader leaves the scenario passing"),
-    );
-    expect(result?.status).toBe("passed");
-  });
-});
+  describe("failure semantics", () => {
+    it("a guardrail returning pass:false fails the scenario", () => {
+      const result = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.startsWith("guardrail rejection fails the scenario"),
+      );
+      expect(result?.status).toBe("failed");
+    });
 
-describe("guardrails: failure semantics", () => {
-  let run: FixtureRun;
+    it("the failure message names the guardrail and includes its reason", () => {
+      const result = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.startsWith("guardrail rejection fails the scenario"),
+      );
+      const message = result?.failureMessages.join("\n") ?? "";
+      expect(message).toContain("policy check");
+      expect(message).toContain("violates content policy");
+    });
 
-  beforeAll(async () => {
-    run = await runFixture("guardrails-failure.test.ts");
-  }, 30_000);
-
-  it("a guardrail returning pass:false fails the scenario", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("guardrail rejection fails the scenario"),
-    );
-    expect(result?.status).toBe("failed");
-  });
-
-  it("the failure message names the guardrail and includes its reason", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("guardrail rejection fails the scenario"),
-    );
-    const message = result?.failureMessages.join("\n") ?? "";
-    expect(message).toContain("policy check");
-    expect(message).toContain("violates content policy");
+    it("when several guardrails fail, every name and reason surfaces", () => {
+      const result = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.startsWith("every failing guardrail surfaces"),
+      );
+      const message = result?.failureMessages.join("\n") ?? "";
+      expect(message).toContain("tone check");
+      expect(message).toContain("tone too curt");
+      expect(message).toContain("policy check");
+      expect(message).toContain("violates content policy");
+    });
   });
 
-  it("when several guardrails fail, every name and reason surfaces", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("every failing guardrail surfaces"),
-    );
-    const message = result?.failureMessages.join("\n") ?? "";
-    expect(message).toContain("tone check");
-    expect(message).toContain("tone too curt");
-    expect(message).toContain("policy check");
-    expect(message).toContain("violates content policy");
-  });
-});
+  describe("composition", () => {
+    it("chained .guardrails calls accumulate — downstream sees every registration", () => {
+      const result = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.startsWith("chained .guardrails calls accumulate"),
+      );
+      const message = result?.failureMessages.join("\n") ?? "";
+      expect(message).toContain("tone check");
+      expect(message).toContain("policy check");
+    });
 
-describe("guardrails: composition", () => {
-  let run: FixtureRun;
-
-  beforeAll(async () => {
-    run = await runFixture("guardrails-composition.test.ts");
-  }, 30_000);
-
-  it("chained .guardrails calls accumulate — downstream sees every registration", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("chained .guardrails calls accumulate"),
-    );
-    const message = result?.failureMessages.join("\n") ?? "";
-    expect(message).toContain("tone check");
-    expect(message).toContain("policy check");
+    it(".guardrails({}) registers nothing and lets the eval run", () => {
+      const result = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.startsWith(".guardrails({}) registers nothing"),
+      );
+      expect(result?.status).toBe("passed");
+    });
   });
 
-  it(".guardrails({}) registers nothing and lets the eval run", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith(".guardrails({}) registers nothing"),
-    );
-    expect(result?.status).toBe("passed");
+  describe("scenarios form", () => {
+    it("the grader is invoked once per (scenario, sample) pair with that run's body output", () => {
+      const graded = run.logLines.filter((l) => l.startsWith("graded:"));
+      // 2 scenarios × 2 samples = 4 invocations, each with its own body output.
+      expect(graded).toHaveLength(4);
+      expect(graded.filter((l) => l === "graded:hello alice")).toHaveLength(2);
+      expect(graded.filter((l) => l === "graded:hello bob")).toHaveLength(2);
+    });
+
+    it("a rejecting grader fails every scenario and surfaces its reason", () => {
+      const alice = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.includes("alice"),
+      );
+      const bob = run.report.testResults[0]!.assertionResults.find((r) =>
+        r.fullName.includes("bob"),
+      );
+      expect(alice?.status).toBe("failed");
+      expect(bob?.status).toBe("failed");
+      const aliceMessage = alice?.failureMessages.join("\n") ?? "";
+      expect(aliceMessage).toContain("policy check");
+      expect(aliceMessage).toContain("violates content policy");
+    });
   });
 });
 
@@ -311,36 +325,6 @@ describe("guardrails: modifier composition", () => {
     );
     expect(result?.status).toBe("failed");
     expect(result?.failureMessages.join("\n") ?? "").toContain("policy check");
-  });
-});
-
-describe("guardrails: scenarios form", () => {
-  let run: FixtureRun;
-
-  beforeAll(async () => {
-    run = await runFixture("guardrails-scenarios.test.ts");
-  }, 30_000);
-
-  it("the grader is invoked once per (scenario, sample) pair with that run's body output", () => {
-    const graded = run.logLines.filter((l) => l.startsWith("graded:"));
-    // 2 scenarios × 2 samples = 4 invocations, each with its own body output.
-    expect(graded).toHaveLength(4);
-    expect(graded.filter((l) => l === "graded:hello alice")).toHaveLength(2);
-    expect(graded.filter((l) => l === "graded:hello bob")).toHaveLength(2);
-  });
-
-  it("a rejecting grader fails every scenario and surfaces its reason", () => {
-    const alice = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.includes("alice"),
-    );
-    const bob = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.includes("bob"),
-    );
-    expect(alice?.status).toBe("failed");
-    expect(bob?.status).toBe("failed");
-    const aliceMessage = alice?.failureMessages.join("\n") ?? "";
-    expect(aliceMessage).toContain("policy check");
-    expect(aliceMessage).toContain("violates content policy");
   });
 });
 
