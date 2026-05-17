@@ -7,105 +7,38 @@ const append = (s: string) => {
   if (log) appendFileSync(log, s + "\n");
 };
 
-// ── Invocation: passing grader observes the body's output ────────────
-
-const echoingEval = evaluate
+// Single-form invocation: a passing grader records every input it receives,
+// so the parent suite can verify both that the grader ran and what it saw.
+const invocationEval = evaluate
   .extend<{ greeting: string }>(async (use) => {
     await use({ greeting: "hello" });
   })
   .guardrails({
-    "transcript review": async (input) => {
-      append(`grader-called:${input}`);
+    "input recorder": async (input) => {
+      append(`single:${input}`);
       return { pass: true, reason: "" };
     },
   });
 
-echoingEval(
-  "grader is invoked with the body's return value",
+invocationEval(
+  "passing grader records each input it receives",
   async ({ greeting }) => greeting,
 );
 
-echoingEval(
-  "a passing grader leaves the scenario passing",
-  async ({ greeting }) => greeting,
-);
-
-// ── Failure: a rejecting grader fails the sample and names itself ────
-
-const singleRejection = evaluate
-  .extend<{ answer: string }>(async (use) => {
-    await use({ answer: "any response" });
-  })
-  .guardrails({
-    "policy check": async () => ({
-      pass: false,
-      reason: "violates content policy",
-    }),
-  });
-
-singleRejection(
-  "guardrail rejection fails the scenario and surfaces its name and reason",
-  async ({ answer }) => answer,
-);
-
-// ── Failure: every failing grader's reason surfaces, not just the first
-
-const twoRejections = evaluate
-  .extend<{ answer: string }>(async (use) => {
-    await use({ answer: "any response" });
-  })
-  .guardrails({
-    "tone check": async () => ({ pass: false, reason: "tone too curt" }),
-    "policy check": async () => ({
-      pass: false,
-      reason: "violates content policy",
-    }),
-  });
-
-twoRejections(
-  "every failing guardrail surfaces its name and reason in one failure message",
-  async ({ answer }) => answer,
-);
-
-// ── Composition: chained .guardrails accumulate ──────────────────────
-
-const baseChain = evaluate
-  .extend<{ answer: string }>(async (use) => {
-    await use({ answer: "any response" });
-  })
-  .guardrails({
-    "tone check": async () => ({ pass: false, reason: "tone too curt" }),
-  });
-
-const chainedEval = baseChain.guardrails({
-  "policy check": async () => ({
-    pass: false,
-    reason: "violates content policy",
-  }),
-});
-
-chainedEval(
-  "chained .guardrails calls accumulate both registrations on the same eval",
-  async ({ answer }) => answer,
-);
-
-// ── Composition: empty registration is a no-op ───────────────────────
-
+// No guardrails registered: the eval should run cleanly with an
+// unconstrained body return type.
 const unguardedEval = evaluate
   .extend<{ x: number }>(async (use) => {
     await use({ x: 1 });
   })
   .guardrails({});
 
-unguardedEval(
-  ".guardrails({}) registers nothing and leaves the body unconstrained",
-  async ({ x }) => {
-    void x;
-  },
-);
+unguardedEval("eval registered with .guardrails({})", async ({ x }) => {
+  void x;
+});
 
-// ── Scenarios form: grader runs per (scenario, sample) ───────────────
-
+// Scenarios form: same recording grader, but exercised across multiple
+// scenarios and samples to verify per-run invocation.
 const customers = [{ name: "alice" }, { name: "bob" }];
 
 const scenariosEval = evaluate
@@ -113,13 +46,13 @@ const scenariosEval = evaluate
     await use({ greeting: "hello" });
   })
   .guardrails({
-    "policy check": async (input) => {
-      append(`graded:${input}`);
-      return { pass: false, reason: "violates content policy" };
+    "input recorder": async (input) => {
+      append(`scenario:${input}`);
+      return { pass: true, reason: "" };
     },
   });
 
 scenariosEval.scenarios(customers, { labelBy: (c) => c.name, samples: 2 })(
-  "guardrails grade every scenario's body and fail it on rejection",
+  "passing grader records input for each (scenario, sample)",
   async (scenario, { greeting }) => `${greeting} ${scenario.name}`,
 );

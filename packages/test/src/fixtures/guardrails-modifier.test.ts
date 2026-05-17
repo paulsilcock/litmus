@@ -1,9 +1,8 @@
 import { evaluate } from "@litmus/test";
 
-// .only must preserve guardrails through the modifier — without this the
-// focused eval would silently bypass every grader. Lives in its own fixture
-// because .only filters the entire vitest file: any sibling evals here would
-// be skipped, defeating the rest of the suite's assertions.
+// .only filters the whole vitest file — anything else here would be
+// silently skipped, defeating sibling assertions. Lives alone for that
+// reason.
 const guardedEval = evaluate
   .extend<{ answer: string }>(async (use) => {
     await use({ answer: "any response" });
@@ -16,6 +15,6 @@ const guardedEval = evaluate
   });
 
 guardedEval.only(
-  "focused eval still runs every registered guardrail",
+  "rejecting grader registered, then .only applied",
   async ({ answer }) => answer,
 );
