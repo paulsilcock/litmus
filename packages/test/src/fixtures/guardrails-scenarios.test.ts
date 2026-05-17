@@ -2,7 +2,7 @@ import { evaluate } from "@litmus/test";
 
 const customers = [{ name: "alice" }, { name: "bob" }];
 
-const e = evaluate
+const guardedEval = evaluate
   .extend<{ greeting: string }>(async (use) => {
     await use({ greeting: "hello" });
   })
@@ -13,7 +13,7 @@ const e = evaluate
     }),
   });
 
-e.scenarios(customers, { labelBy: (c) => c.name })(
-  "agent greets each customer",
+guardedEval.scenarios(customers, { labelBy: (c) => c.name })(
+  "guardrails grade every scenario's body and fail it on rejection",
   async (scenario, { greeting }) => `${greeting} ${scenario.name}`,
 );

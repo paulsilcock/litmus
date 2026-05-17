@@ -218,46 +218,99 @@ describe("modifiers", () => {
   });
 });
 
-describe("guardrails", () => {
+describe("guardrails: invocation", () => {
   let run: FixtureRun;
 
   beforeAll(async () => {
-    run = await runFixture("guardrails-invoked.test.ts");
+    run = await runFixture("guardrails-invocation.test.ts");
   }, 30_000);
 
-  it("a registered guardrail's grader receives the body's return value", () => {
+  it("a registered grader is invoked with the body's return value", () => {
     expect(run.logLines).toContain("grader-called:hello");
   });
 
-  it("a passing guardrail leaves the scenario passing", () => {
+  it("a passing grader leaves the scenario passing", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("agent greets the customer"),
+      r.fullName.startsWith("a passing grader leaves the scenario passing"),
     );
     expect(result?.status).toBe("passed");
   });
 });
 
-describe("guardrails: failure", () => {
+describe("guardrails: failure semantics", () => {
   let run: FixtureRun;
 
   beforeAll(async () => {
-    run = await runFixture("guardrails-fail.test.ts");
+    run = await runFixture("guardrails-failure.test.ts");
   }, 30_000);
 
   it("a guardrail returning pass:false fails the scenario", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("agent answers within policy"),
+      r.fullName.startsWith("guardrail rejection fails the scenario"),
     );
     expect(result?.status).toBe("failed");
   });
 
-  it("the failure message names the guardrail and includes the reason", () => {
+  it("the failure message names the guardrail and includes its reason", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("agent answers within policy"),
+      r.fullName.startsWith("guardrail rejection fails the scenario"),
     );
     const message = result?.failureMessages.join("\n") ?? "";
     expect(message).toContain("policy check");
     expect(message).toContain("violates content policy");
+  });
+
+  it("when several guardrails fail, every name and reason surfaces", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("every failing guardrail surfaces"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("tone check");
+    expect(message).toContain("tone too curt");
+    expect(message).toContain("policy check");
+    expect(message).toContain("violates content policy");
+  });
+});
+
+describe("guardrails: composition", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-composition.test.ts");
+  }, 30_000);
+
+  it("chained .guardrails calls accumulate — downstream sees every registration", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("chained .guardrails calls accumulate"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("tone check");
+    expect(message).toContain("policy check");
+  });
+
+  it(".guardrails({}) registers nothing and lets the eval run", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith(".guardrails({}) registers nothing"),
+    );
+    expect(result?.status).toBe("passed");
+  });
+});
+
+describe("guardrails: modifier composition", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-modifier.test.ts");
+  }, 30_000);
+
+  it("modifiers preserve registered guardrails through composition", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith(
+        "focused eval still runs every registered guardrail",
+      ),
+    );
+    expect(result?.status).toBe("failed");
+    expect(result?.failureMessages.join("\n") ?? "").toContain("policy check");
   });
 });
 
@@ -280,73 +333,6 @@ describe("guardrails: scenarios form", () => {
     const aliceMessage = alice?.failureMessages.join("\n") ?? "";
     expect(aliceMessage).toContain("policy check");
     expect(aliceMessage).toContain("violates content policy");
-  });
-});
-
-describe("guardrails: modifier composition", () => {
-  let run: FixtureRun;
-
-  beforeAll(async () => {
-    run = await runFixture("guardrails-only.test.ts");
-  }, 30_000);
-
-  it("modifiers preserve registered guardrails through composition", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("focused eval still runs guardrails"),
-    );
-    expect(result?.status).toBe("failed");
-    expect(result?.failureMessages.join("\n") ?? "").toContain("policy check");
-  });
-});
-
-describe("guardrails: empty registration", () => {
-  let run: FixtureRun;
-
-  beforeAll(async () => {
-    run = await runFixture("guardrails-empty.test.ts");
-  }, 30_000);
-
-  it("registering no guardrails leaves the eval body unconstrained and the scenario passing", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("eval with no registered guardrails"),
-    );
-    expect(result?.status).toBe("passed");
-  });
-});
-
-describe("guardrails: chained registration", () => {
-  let run: FixtureRun;
-
-  beforeAll(async () => {
-    run = await runFixture("guardrails-chained.test.ts");
-  }, 30_000);
-
-  it("downstream evals inherit guardrails from earlier chain steps", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("agent answers within policy and on tone"),
-    );
-    const message = result?.failureMessages.join("\n") ?? "";
-    expect(message).toContain("tone check");
-    expect(message).toContain("policy check");
-  });
-});
-
-describe("guardrails: multiple", () => {
-  let run: FixtureRun;
-
-  beforeAll(async () => {
-    run = await runFixture("guardrails-multiple.test.ts");
-  }, 30_000);
-
-  it("when several guardrails fail, every name and reason surfaces", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("agent answers within policy and on tone"),
-    );
-    const message = result?.failureMessages.join("\n") ?? "";
-    expect(message).toContain("tone check");
-    expect(message).toContain("tone too curt");
-    expect(message).toContain("policy check");
-    expect(message).toContain("violates content policy");
   });
 });
 

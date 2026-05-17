@@ -7,7 +7,7 @@ const append = (s: string) => {
   if (log) appendFileSync(log, s + "\n");
 };
 
-const e = evaluate
+const guardedEval = evaluate
   .extend<{ greeting: string }>(async (use) => {
     await use({ greeting: "hello" });
   })
@@ -18,6 +18,12 @@ const e = evaluate
     },
   });
 
-e("agent greets the customer", async ({ greeting }) => {
-  return greeting;
-});
+guardedEval(
+  "grader is invoked with the body's return value",
+  async ({ greeting }) => greeting,
+);
+
+guardedEval(
+  "a passing grader leaves the scenario passing",
+  async ({ greeting }) => greeting,
+);
