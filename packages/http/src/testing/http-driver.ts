@@ -69,13 +69,10 @@ function buildRequestInit(method: string, options?: BodyOptions): RequestInit {
  *     const res = await this.post("/orders", { json: input });
  *     return res.json();
  *   }
- *   async cleanup() {}
  * }
  *
  * const driver = new OrderDriver({ baseUrl: "http://localhost:3000" });
- * await driver.init();
  * await driver.placeOrder({ customerId: "cust_1" });
- * await driver.cleanup();
  * ```
  */
 export abstract class BaseHttpDriver extends BaseDriver {

@@ -30,7 +30,6 @@ type InferCommands<T> = T extends Cli<any, infer C> ? C : never;
  *   async placeOrder(input: { customerId: string }) {
  *     return this.client.exec("orders:create", input);
  *   }
- *   async cleanup() {}
  * }
  * ```
  */

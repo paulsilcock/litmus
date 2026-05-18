@@ -27,7 +27,6 @@ interface HonoDriverOptions {
  *     const res = await this.client.orders.$post({ json: input });
  *     return res.json();
  *   }
- *   async cleanup() {}
  * }
  * ```
  */

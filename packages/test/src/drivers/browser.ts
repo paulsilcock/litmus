@@ -20,7 +20,8 @@ interface BrowserDriverOptions {
  *
  * Subclasses use `this.page` for navigation and queries. Construct
  * synchronously, then call `await driver.init()` to launch the
- * browser before use, and `await driver.cleanup()` to release it.
+ * browser before use. Scope the driver's lifetime with `await using`
+ * so the browser is released when the block exits.
  *
  * **Prefer semantic locators** like `page.getByRole("button", { name: "Submit" })`
  * over CSS or XPath selectors. They're resilient to markup changes,
@@ -50,10 +51,10 @@ interface BrowserDriverOptions {
  *   }
  * }
  *
- * const driver = new OrderDriver({ baseUrl: "http://localhost:3000" });
+ * await using driver = new OrderDriver({ baseUrl: "http://localhost:3000" });
  * await driver.init();
  * await driver.placeOrder("cust_1");
- * await driver.cleanup();
+ * // driver disposed when the block exits — browser closed automatically
  * ```
  */
 export abstract class BaseBrowserDriver extends BaseDriver {
@@ -91,7 +92,7 @@ export abstract class BaseBrowserDriver extends BaseDriver {
     this.#page = await this.#context.newPage();
   }
 
-  async cleanup(): Promise<void> {
+  async [Symbol.asyncDispose](): Promise<void> {
     await this.#browser?.close();
   }
 }

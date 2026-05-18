@@ -78,13 +78,6 @@ export class BookshopHttpDriver
     return this.#currentCustomerEmail;
   }
 
-  async cleanup(): Promise<void> {
-    // Required by BaseDriver. No persistent resources to release —
-    // the fetch-based Hono client doesn't hold connections, and
-    // protocol state (#currentCustomerEmail, #lastSearchResults)
-    // resets when the driver is reconstructed in beforeEach.
-  }
-
   async putBookOnSale(input: {
     title: string;
     author: string;
