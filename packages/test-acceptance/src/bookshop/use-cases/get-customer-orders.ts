@@ -2,9 +2,14 @@ import { QueryHandler } from "@litmus/core";
 import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
 import { eq } from "drizzle-orm";
 import { injectable } from "tsyringe";
+import { z } from "zod";
 
 import { orders } from "../infra/db/schema.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
+
+export const GetCustomerOrdersSchema = z.object({
+  customerEmail: z.string().email(),
+});
 
 interface GetCustomerOrdersQuery extends Record<string, unknown> {
   customerEmail: string;

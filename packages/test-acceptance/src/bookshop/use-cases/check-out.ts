@@ -1,5 +1,6 @@
 import { CommandHandler } from "@litmus/core";
 import { inject, injectable } from "tsyringe";
+import { z } from "zod";
 
 import { NoOpenCart } from "../domain/cart.ts";
 import { Order } from "../domain/order.ts";
@@ -10,6 +11,10 @@ import {
 import { CartRepository } from "../infra/repositories/cart-repository.ts";
 import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
 import { OrderRepository } from "../infra/repositories/order-repository.ts";
+
+export const CheckOutSchema = z.object({
+  customerEmail: z.string().email(),
+});
 
 interface CheckOutCommand extends Record<string, unknown> {
   customerEmail: string;

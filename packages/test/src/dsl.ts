@@ -1,7 +1,7 @@
 /**
  * Aliasing context shared across a Dsl and its sub-DSLs.
  *
- * Each `DslContext` instance holds a unique suffix scoped to the current
+ * Each `DslContext` instance holds a unique prefix scoped to the current
  * test worker. Pass `context.alias(value)` through identifier params that
  * the SUT enforces uniqueness on (emails, ids, etc.) so concurrent tests
  * and repeated runs against a shared SUT don't collide.
@@ -15,13 +15,13 @@
  */
 export class DslContext {
   static readonly #counters = new Map<string, number>();
-  readonly #suffix: string;
+  readonly #prefix: string;
 
   constructor() {
-    this.#suffix = DslContext.#nextSuffix();
+    this.#prefix = DslContext.#nextPrefix();
   }
 
-  static #nextSuffix(): string {
+  static #nextPrefix(): string {
     const key = process.env["VITEST_POOL_ID"] ?? `pid${process.pid}`;
     const next = (DslContext.#counters.get(key) ?? 0) + 1;
     DslContext.#counters.set(key, next);
@@ -29,7 +29,7 @@ export class DslContext {
   }
 
   alias(value: string): string {
-    return `${this.#suffix}${value}`;
+    return `${this.#prefix}${value}`;
   }
 }
 
@@ -38,7 +38,7 @@ export class DslContext {
  *
  * Holds a `DslContext` for identifier aliasing. A root DSL constructs a
  * fresh context if none is provided; sub-DSLs accept the root's context
- * so all aliases within one test share the same suffix.
+ * so all aliases within one test share the same prefix.
  *
  * Stateless. A DSL must not hold domain state — no "current customer",
  * no "last order ID". State belongs in the driver (protocol state) or

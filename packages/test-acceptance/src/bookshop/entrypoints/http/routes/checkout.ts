@@ -1,12 +1,7 @@
 import { routeHandler } from "@litmus/http";
 import { Hono } from "hono";
-import { z } from "zod";
 
-import { CheckOut } from "../../../use-cases/check-out.ts";
-
-const CheckOutSchema = z.object({
-  customerEmail: z.string().email(),
-});
+import { CheckOut, CheckOutSchema } from "../../../use-cases/check-out.ts";
 
 export const checkoutRoutes = new Hono().post(
   "/",
