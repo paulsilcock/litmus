@@ -53,6 +53,21 @@ describe("bookshop", () => {
   });
 
   it("customer is emailed a confirmation after purchase", async () => {
-    throw new Error("not yet refactored to the new DSL shape");
+    await dsl.books.hasOnSale({
+      title: "The Fellowship of the Ring",
+      author: "Tolkien",
+      price: 14.99,
+    });
+    await dsl.customers.hasAccount({
+      name: "Bob",
+      email: "bob@example.com",
+    });
+
+    await dsl.customers.logIn({ email: "bob@example.com" });
+    await dsl.books.searchBy({ author: "Tolkien" });
+    await dsl.cart.addBook({ title: "The Fellowship of the Ring" });
+    await dsl.cart.checkOut();
+
+    await dsl.emails.confirmOrderConfirmationSent({ to: "bob@example.com" });
   });
 });
