@@ -1,4 +1,4 @@
-import { BaseDriver } from "@litmus/test";
+import { Driver } from "@litmus/test";
 
 type CommonHeader =
   | "Accept"
@@ -53,18 +53,18 @@ function buildRequestInit(method: string, options?: BodyOptions): RequestInit {
 }
 
 /**
- * Base driver for acceptance tests that interact with an HTTP API.
+ * Driver for acceptance tests that interact with an HTTP API.
  * Subclasses add domain-specific methods that call `this.get`,
  * `this.post`, etc.
  *
- * For Hono apps, use {@link BaseHonoDriver} instead to get fully
+ * For Hono apps, use {@link HonoDriver} instead to get fully
  * typed request and response bodies via the `hc` client.
  *
  * @param options.baseUrl - Root URL that all paths are resolved against.
  *
  * @example
  * ```typescript
- * class OrderDriver extends BaseHttpDriver {
+ * class OrderDriver extends HttpDriver {
  *   async placeOrder(input: { customerId: string }) {
  *     const res = await this.post("/orders", { json: input });
  *     return res.json();
@@ -75,7 +75,7 @@ function buildRequestInit(method: string, options?: BodyOptions): RequestInit {
  * await driver.placeOrder({ customerId: "cust_1" });
  * ```
  */
-export abstract class BaseHttpDriver extends BaseDriver {
+export abstract class HttpDriver extends Driver {
   readonly #baseUrl: string;
 
   constructor(options: HttpDriverOptions) {

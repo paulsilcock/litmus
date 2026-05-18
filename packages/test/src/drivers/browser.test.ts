@@ -2,13 +2,13 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { BaseBrowserDriver } from "#litmus-test/drivers/browser.ts";
+import { BrowserDriver } from "#litmus-test/drivers/browser.ts";
 
 const app = new Hono().get("/", (c) =>
   c.html("<h1 id='greeting'>Hello, world</h1>"),
 );
 
-class TestDriver extends BaseBrowserDriver {
+class TestDriver extends BrowserDriver {
   async greeting() {
     await this.page.goto("/");
     return this.page.locator("#greeting").textContent();
@@ -19,7 +19,7 @@ class TestDriver extends BaseBrowserDriver {
   }
 }
 
-describe("BaseBrowserDriver", () => {
+describe("BrowserDriver", () => {
   it("subclasses can navigate and query the page", async () => {
     const server = serve({ fetch: app.fetch, port: 0 });
     const address = server.address();

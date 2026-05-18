@@ -1,4 +1,4 @@
-import { BaseHonoDriver } from "@litmus/http/testing";
+import { HonoDriver } from "@litmus/http/testing";
 
 import type { BookshopApp } from "#bookshop/entrypoints/http/app.ts";
 import type { BookshopDriverApi } from "#bookshop/test-acceptance/driver.ts";
@@ -55,7 +55,7 @@ function isOrderSummaryArray(value: unknown): value is OrderSummary[] {
 }
 
 export class BookshopHttpDriver
-  extends BaseHonoDriver<BookshopApp>
+  extends HonoDriver<BookshopApp>
   implements BookshopDriverApi
 {
   readonly #emailStub: EmailStubClient;

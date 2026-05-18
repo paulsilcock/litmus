@@ -5,7 +5,7 @@ import {
   type Page,
 } from "playwright";
 
-import { BaseDriver } from "#litmus-test/drivers/base.ts";
+import { Driver } from "#litmus-test/drivers/base.ts";
 
 interface BrowserDriverOptions {
   baseUrl: string;
@@ -13,7 +13,7 @@ interface BrowserDriverOptions {
 }
 
 /**
- * Base driver for acceptance tests that interact with a web app
+ * Driver for acceptance tests that interact with a web app
  * through a real browser via Playwright. Each driver instance gets
  * its own browser context with isolated cookies and storage —
  * safe for concurrent test runs.
@@ -43,7 +43,7 @@ interface BrowserDriverOptions {
  *
  * @example
  * ```typescript
- * class OrderDriver extends BaseBrowserDriver {
+ * class OrderDriver extends BrowserDriver {
  *   async placeOrder(customerId: string) {
  *     await this.page.goto("/orders/new");
  *     await this.page.getByLabel("Customer").fill(customerId);
@@ -57,7 +57,7 @@ interface BrowserDriverOptions {
  * // driver disposed when the block exits — browser closed automatically
  * ```
  */
-export abstract class BaseBrowserDriver extends BaseDriver {
+export abstract class BrowserDriver extends Driver {
   readonly #options: BrowserDriverOptions;
   #browser?: Browser;
   #context?: BrowserContext;
@@ -70,14 +70,14 @@ export abstract class BaseBrowserDriver extends BaseDriver {
 
   protected get page(): Page {
     if (!this.#page) {
-      throw new Error("BaseBrowserDriver: call init() before using page");
+      throw new Error("BrowserDriver: call init() before using page");
     }
     return this.#page;
   }
 
   protected get context(): BrowserContext {
     if (!this.#context) {
-      throw new Error("BaseBrowserDriver: call init() before using context");
+      throw new Error("BrowserDriver: call init() before using context");
     }
     return this.#context;
   }

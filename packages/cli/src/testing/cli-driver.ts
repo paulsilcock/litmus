@@ -1,4 +1,4 @@
-import { BaseDriver } from "@litmus/test";
+import { Driver } from "@litmus/test";
 
 import type { Cli, CliClient } from "#litmus-cli/index.ts";
 import { cliClient } from "#litmus-cli/index.ts";
@@ -10,7 +10,7 @@ interface LitmusCliDriverOptions {
 type InferCommands<T> = T extends Cli<any, infer C> ? C : never;
 
 /**
- * Base driver for acceptance tests that interact with a Litmus CLI
+ * Driver for acceptance tests that interact with a Litmus CLI
  * over its unix socket transport. Subclasses get a typed `cliClient`
  * via `this.client`, with autocomplete on command names and typed
  * inputs and outputs.
@@ -26,16 +26,14 @@ type InferCommands<T> = T extends Cli<any, infer C> ? C : never;
  * ```typescript
  * import type cli from "./cli";
  *
- * class OrderDriver extends BaseLitmusCliDriver<typeof cli> {
+ * class OrderDriver extends LitmusCliDriver<typeof cli> {
  *   async placeOrder(input: { customerId: string }) {
  *     return this.client.exec("orders:create", input);
  *   }
  * }
  * ```
  */
-export abstract class BaseLitmusCliDriver<
-  T extends Cli<any, any>,
-> extends BaseDriver {
+export abstract class LitmusCliDriver<T extends Cli<any, any>> extends Driver {
   protected readonly client: CliClient<InferCommands<T>>;
 
   constructor(options: LitmusCliDriverOptions) {

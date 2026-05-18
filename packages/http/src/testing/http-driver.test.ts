@@ -2,9 +2,9 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { BaseHttpDriver } from "#litmus-http/testing/http-driver.ts";
+import { HttpDriver } from "#litmus-http/testing/http-driver.ts";
 
-class TestDriver extends BaseHttpDriver {
+class TestDriver extends HttpDriver {
   async cleanup() {}
 }
 
@@ -39,7 +39,7 @@ const app = new Hono()
     return c.json({ received: text, contentType: type });
   });
 
-describe("BaseHttpDriver", () => {
+describe("HttpDriver", () => {
   let server: ReturnType<typeof serve>;
   let driver: TestDriver;
 

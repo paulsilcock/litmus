@@ -1,5 +1,5 @@
 /**
- * Lifecycle interface for driver base classes.
+ * Lifecycle interface for driver classes.
  *
  * `init()` performs async setup (e.g. launching a browser) that
  * cannot run in the constructor. For drivers that don't need async
@@ -18,6 +18,6 @@
  * Drivers without resources to release leave `[Symbol.asyncDispose]`
  * unimplemented — there's nothing to clean up.
  */
-export abstract class BaseDriver {
+export abstract class Driver {
   async init(): Promise<void> {}
 }

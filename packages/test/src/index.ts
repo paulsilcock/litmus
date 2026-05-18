@@ -1,6 +1,6 @@
 export { acceptance } from "#litmus-test/acceptance.ts";
-export { BaseDriver } from "#litmus-test/drivers/base.ts";
-export { BaseBrowserDriver } from "#litmus-test/drivers/browser.ts";
+export { Driver } from "#litmus-test/drivers/base.ts";
+export { BrowserDriver } from "#litmus-test/drivers/browser.ts";
 export { Dsl, DslContext } from "#litmus-test/dsl.ts";
 export {
   type Grader,
