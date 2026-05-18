@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, beforeEach, describe, it } from "vite-plus/test";
+import { acceptance } from "@litmus/test";
+import { afterAll, beforeAll, describe } from "vite-plus/test";
 
 import { bootstrapBookshop, type RunningBookshop } from "../bookshop.ts";
 import { createBookshopDriver } from "./driver.ts";
@@ -6,7 +7,6 @@ import { BookshopDsl } from "./dsl.ts";
 
 describe("bookshop", () => {
   let bookshop: RunningBookshop;
-  let dsl: BookshopDsl;
 
   beforeAll(async () => {
     bookshop = await bootstrapBookshop();
@@ -16,11 +16,11 @@ describe("bookshop", () => {
     await bookshop.stop();
   });
 
-  beforeEach(() => {
-    dsl = new BookshopDsl(createBookshopDriver(bookshop));
-  });
+  const { it } = acceptance(
+    () => new BookshopDsl(createBookshopDriver(bookshop)),
+  );
 
-  it("customer can purchase a book", async () => {
+  it("customer can purchase a book", async ({ dsl }) => {
     await dsl.books.hasOnSale({
       title: "The Hobbit",
       author: "Tolkien",
@@ -39,7 +39,7 @@ describe("bookshop", () => {
     await dsl.orders.confirmPurchased({ title: "The Hobbit" });
   });
 
-  it("customer is emailed a confirmation after purchase", async () => {
+  it("customer is emailed a confirmation after purchase", async ({ dsl }) => {
     await dsl.books.hasOnSale({
       title: "The Fellowship of the Ring",
       author: "Tolkien",
