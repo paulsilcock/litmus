@@ -1,19 +1,11 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  it,
-} from "vite-plus/test";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vite-plus/test";
 
 import { bootstrapBookshop, type RunningBookshop } from "../bookshop.ts";
-import { type BookshopDriverApi, createBookshopDriver } from "./driver.ts";
+import { createBookshopDriver } from "./driver.ts";
 import { BookshopDsl } from "./dsl.ts";
 
 describe("bookshop", () => {
   let bookshop: RunningBookshop;
-  let driver: BookshopDriverApi;
   let dsl: BookshopDsl;
 
   beforeAll(async () => {
@@ -25,12 +17,7 @@ describe("bookshop", () => {
   });
 
   beforeEach(() => {
-    driver = createBookshopDriver(bookshop);
-    dsl = new BookshopDsl(driver);
-  });
-
-  afterEach(async () => {
-    await driver.cleanup();
+    dsl = new BookshopDsl(createBookshopDriver(bookshop));
   });
 
   it("customer can purchase a book", async () => {

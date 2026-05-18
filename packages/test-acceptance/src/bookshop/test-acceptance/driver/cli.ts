@@ -34,12 +34,6 @@ export class BookshopCliDriver implements BookshopDriverApi {
     return this.#currentCustomerEmail;
   }
 
-  async cleanup(): Promise<void> {
-    this.#currentCustomerEmail = undefined;
-    this.#lastSearchResults = [];
-    await this.#emailStub.clear();
-  }
-
   async putBookOnSale(input: {
     title: string;
     author: string;

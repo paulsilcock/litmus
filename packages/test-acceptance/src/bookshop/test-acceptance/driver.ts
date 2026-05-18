@@ -4,7 +4,6 @@ import { BookshopHttpDriver } from "./driver/http.ts";
 
 export interface BookshopDriverApi {
   loginAs(email: string): void;
-  cleanup(): Promise<void>;
   putBookOnSale(input: {
     title: string;
     author: string;
