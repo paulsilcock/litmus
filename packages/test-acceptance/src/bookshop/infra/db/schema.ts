@@ -7,10 +7,10 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import type { BookId } from "../../domain/book.ts";
-import type { CartId, CartStatus } from "../../domain/cart.ts";
-import type { CustomerId } from "../../domain/customer.ts";
-import type { OrderId, OrderStatus } from "../../domain/order.ts";
+import type { BookId } from "#bookshop/domain/book.ts";
+import type { CartId, CartStatus } from "#bookshop/domain/cart.ts";
+import type { CustomerId } from "#bookshop/domain/customer.ts";
+import type { OrderId, OrderStatus } from "#bookshop/domain/order.ts";
 
 export const books = pgTable("books", {
   id: varchar("id").primaryKey().$type<BookId>(),

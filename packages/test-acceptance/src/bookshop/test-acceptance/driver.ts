@@ -1,4 +1,5 @@
-import type { RunningBookshop } from "../bookshop.ts";
+import type { RunningBookshop } from "#bookshop/bookshop.ts";
+
 import { BookshopCliDriver } from "./driver/cli.ts";
 import { BookshopHttpDriver } from "./driver/http.ts";
 

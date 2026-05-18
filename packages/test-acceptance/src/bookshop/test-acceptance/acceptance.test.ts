@@ -1,7 +1,8 @@
 import { acceptance } from "@litmus/test";
 import { afterAll, beforeAll, describe } from "vite-plus/test";
 
-import { bootstrapBookshop, type RunningBookshop } from "../bookshop.ts";
+import { bootstrapBookshop, type RunningBookshop } from "#bookshop/bookshop.ts";
+
 import { createBookshopDriver } from "./driver.ts";
 import { BookshopDsl } from "./dsl.ts";
 

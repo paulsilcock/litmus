@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { injectable } from "tsyringe";
 import { z } from "zod";
 
-import { orders } from "../infra/db/schema.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
+import { orders } from "#bookshop/infra/db/schema.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
 
 export const GetCustomerOrdersSchema = z.object({
   customerEmail: z.string().email(),

@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { injectable } from "tsyringe";
 import { z } from "zod";
 
-import { books } from "../infra/db/schema.ts";
+import { books } from "#bookshop/infra/db/schema.ts";
 
 export const SearchBooksByAuthorSchema = z.object({
   author: z.string(),

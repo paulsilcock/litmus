@@ -4,11 +4,11 @@ import { Hono } from "hono";
 import {
   PutBookOnSale,
   PutBookOnSaleSchema,
-} from "../../../use-cases/put-book-on-sale.ts";
+} from "#bookshop/use-cases/put-book-on-sale.ts";
 import {
   SearchBooksByAuthor,
   SearchBooksByAuthorSchema,
-} from "../../../use-cases/search-books-by-author.ts";
+} from "#bookshop/use-cases/search-books-by-author.ts";
 
 export const booksRoutes = new Hono()
   .post("/", ...routeHandler(PutBookOnSale, PutBookOnSaleSchema))

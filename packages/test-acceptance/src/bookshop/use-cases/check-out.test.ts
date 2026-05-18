@@ -2,13 +2,14 @@ import { prefixedUlid } from "@litmus/core/id";
 import { container } from "tsyringe";
 import { describe, expect, it } from "vite-plus/test";
 
-import { Cart } from "../domain/cart.ts";
-import { Customer } from "../domain/customer.ts";
-import { PAYMENT_GATEWAY } from "../infra/payments/payment-gateway.ts";
-import { StubPaymentGateway } from "../infra/payments/stub-payment-gateway.ts";
-import { CartRepository } from "../infra/repositories/cart-repository.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
-import { setupBookshopTest } from "../test-support/init-test-container.ts";
+import { Cart } from "#bookshop/domain/cart.ts";
+import { Customer } from "#bookshop/domain/customer.ts";
+import { PAYMENT_GATEWAY } from "#bookshop/infra/payments/payment-gateway.ts";
+import { StubPaymentGateway } from "#bookshop/infra/payments/stub-payment-gateway.ts";
+import { CartRepository } from "#bookshop/infra/repositories/cart-repository.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
+import { setupBookshopTest } from "#bookshop/test-support/init-test-container.ts";
+
 import { CheckOut } from "./check-out.ts";
 import { GetCustomerOrders } from "./get-customer-orders.ts";
 

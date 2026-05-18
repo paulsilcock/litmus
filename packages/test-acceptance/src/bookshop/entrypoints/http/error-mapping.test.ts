@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { bootstrapBookshop, type RunningBookshop } from "../../bookshop.ts";
+import { bootstrapBookshop, type RunningBookshop } from "#bookshop/bookshop.ts";
 
 describe("bookshop HTTP error mapping", () => {
   let bookshop: RunningBookshop;

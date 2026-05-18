@@ -1,12 +1,13 @@
 import { container } from "tsyringe";
 import { describe, expect, it } from "vite-plus/test";
 
-import { Book } from "../domain/book.ts";
-import { Customer } from "../domain/customer.ts";
-import { BookRepository } from "../infra/repositories/book-repository.ts";
-import { CartRepository } from "../infra/repositories/cart-repository.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
-import { setupBookshopTest } from "../test-support/init-test-container.ts";
+import { Book } from "#bookshop/domain/book.ts";
+import { Customer } from "#bookshop/domain/customer.ts";
+import { BookRepository } from "#bookshop/infra/repositories/book-repository.ts";
+import { CartRepository } from "#bookshop/infra/repositories/cart-repository.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
+import { setupBookshopTest } from "#bookshop/test-support/init-test-container.ts";
+
 import { AddBookToCart } from "./add-book-to-cart.ts";
 
 describe("AddBookToCart", () => {

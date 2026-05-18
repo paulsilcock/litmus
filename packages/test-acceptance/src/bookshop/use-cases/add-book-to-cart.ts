@@ -2,10 +2,10 @@ import { CommandHandler } from "@litmus/core";
 import { injectable } from "tsyringe";
 import { z } from "zod";
 
-import { Cart } from "../domain/cart.ts";
-import { BookRepository } from "../infra/repositories/book-repository.ts";
-import { CartRepository } from "../infra/repositories/cart-repository.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
+import { Cart } from "#bookshop/domain/cart.ts";
+import { BookRepository } from "#bookshop/infra/repositories/book-repository.ts";
+import { CartRepository } from "#bookshop/infra/repositories/cart-repository.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
 
 export const AddBookToCartSchema = z.object({
   customerEmail: z.string().email(),

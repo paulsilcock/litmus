@@ -2,15 +2,15 @@ import { CommandHandler } from "@litmus/core";
 import { inject, injectable } from "tsyringe";
 import { z } from "zod";
 
-import { NoOpenCart } from "../domain/cart.ts";
-import { Order } from "../domain/order.ts";
+import { NoOpenCart } from "#bookshop/domain/cart.ts";
+import { Order } from "#bookshop/domain/order.ts";
 import {
   PAYMENT_GATEWAY,
   type PaymentGateway,
-} from "../infra/payments/payment-gateway.ts";
-import { CartRepository } from "../infra/repositories/cart-repository.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
-import { OrderRepository } from "../infra/repositories/order-repository.ts";
+} from "#bookshop/infra/payments/payment-gateway.ts";
+import { CartRepository } from "#bookshop/infra/repositories/cart-repository.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
+import { OrderRepository } from "#bookshop/infra/repositories/order-repository.ts";
 
 export const CheckOutSchema = z.object({
   customerEmail: z.string().email(),

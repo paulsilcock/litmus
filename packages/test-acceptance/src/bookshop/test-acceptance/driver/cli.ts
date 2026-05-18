@@ -1,8 +1,8 @@
 import { cliClient } from "@litmus/cli";
 
-import type { BookshopCli } from "../../entrypoints/cli/app.ts";
-import type { BookshopDriverApi } from "../driver.ts";
-import { EmailStubClient } from "../email-stub-client.ts";
+import type { BookshopCli } from "#bookshop/entrypoints/cli/app.ts";
+import type { BookshopDriverApi } from "#bookshop/test-acceptance/driver.ts";
+import { EmailStubClient } from "#bookshop/test-acceptance/email-stub-client.ts";
 
 type BookshopCliClient = ReturnType<typeof cliClient<BookshopCli>>;
 

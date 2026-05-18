@@ -1,8 +1,8 @@
 import { BaseHonoDriver } from "@litmus/http/testing";
 
-import type { BookshopApp } from "../../entrypoints/http/app.ts";
-import type { BookshopDriverApi } from "../driver.ts";
-import { EmailStubClient } from "../email-stub-client.ts";
+import type { BookshopApp } from "#bookshop/entrypoints/http/app.ts";
+import type { BookshopDriverApi } from "#bookshop/test-acceptance/driver.ts";
+import { EmailStubClient } from "#bookshop/test-acceptance/email-stub-client.ts";
 
 interface BookSearchResult {
   title: string;

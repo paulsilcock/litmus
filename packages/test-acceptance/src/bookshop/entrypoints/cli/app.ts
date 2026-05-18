@@ -3,24 +3,24 @@ import { Cli } from "@litmus/cli";
 import {
   AddBookToCart,
   AddBookToCartSchema,
-} from "../../use-cases/add-book-to-cart.ts";
-import { CheckOut, CheckOutSchema } from "../../use-cases/check-out.ts";
+} from "#bookshop/use-cases/add-book-to-cart.ts";
+import { CheckOut, CheckOutSchema } from "#bookshop/use-cases/check-out.ts";
 import {
   GetCustomerOrders,
   GetCustomerOrdersSchema,
-} from "../../use-cases/get-customer-orders.ts";
+} from "#bookshop/use-cases/get-customer-orders.ts";
 import {
   PutBookOnSale,
   PutBookOnSaleSchema,
-} from "../../use-cases/put-book-on-sale.ts";
+} from "#bookshop/use-cases/put-book-on-sale.ts";
 import {
   RegisterCustomer,
   RegisterCustomerSchema,
-} from "../../use-cases/register-customer.ts";
+} from "#bookshop/use-cases/register-customer.ts";
 import {
   SearchBooksByAuthor,
   SearchBooksByAuthorSchema,
-} from "../../use-cases/search-books-by-author.ts";
+} from "#bookshop/use-cases/search-books-by-author.ts";
 
 export function createBookshopCli() {
   const booksCli = new Cli()

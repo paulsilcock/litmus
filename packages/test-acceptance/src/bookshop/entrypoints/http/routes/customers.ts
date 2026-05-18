@@ -4,11 +4,11 @@ import { Hono } from "hono";
 import {
   GetCustomerOrders,
   GetCustomerOrdersSchema,
-} from "../../../use-cases/get-customer-orders.ts";
+} from "#bookshop/use-cases/get-customer-orders.ts";
 import {
   RegisterCustomer,
   RegisterCustomerSchema,
-} from "../../../use-cases/register-customer.ts";
+} from "#bookshop/use-cases/register-customer.ts";
 
 export const customersRoutes = new Hono()
   .post("/", ...routeHandler(RegisterCustomer, RegisterCustomerSchema))

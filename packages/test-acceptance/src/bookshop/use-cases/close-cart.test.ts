@@ -2,11 +2,12 @@ import { prefixedUlid } from "@litmus/core/id";
 import { container } from "tsyringe";
 import { describe, expect, it } from "vite-plus/test";
 
-import { Cart } from "../domain/cart.ts";
-import { Customer } from "../domain/customer.ts";
-import { CartRepository } from "../infra/repositories/cart-repository.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
-import { setupBookshopTest } from "../test-support/init-test-container.ts";
+import { Cart } from "#bookshop/domain/cart.ts";
+import { Customer } from "#bookshop/domain/customer.ts";
+import { CartRepository } from "#bookshop/infra/repositories/cart-repository.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
+import { setupBookshopTest } from "#bookshop/test-support/init-test-container.ts";
+
 import { CloseCart } from "./close-cart.ts";
 
 describe("CloseCart", () => {
