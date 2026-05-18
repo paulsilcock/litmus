@@ -56,6 +56,6 @@ describe("bookshop", () => {
     await dsl.cart.addBook({ title: "The Fellowship of the Ring" });
     await dsl.cart.checkOut();
 
-    await dsl.emails.confirmOrderConfirmationSent({ to: "bob@example.com" });
+    await dsl.orders.confirmConfirmationSent({ to: "bob@example.com" });
   });
 });

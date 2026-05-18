@@ -13,4 +13,8 @@ export class OrdersDsl extends Dsl {
   async confirmPurchased(input: { title: string }): Promise<void> {
     await this.driver.assertBookPurchased(this.context.alias(input.title));
   }
+
+  async confirmConfirmationSent(input: { to: string }): Promise<void> {
+    await this.driver.assertConfirmationEmailSent(this.context.alias(input.to));
+  }
 }
