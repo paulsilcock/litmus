@@ -8,10 +8,12 @@ import {
 } from "vite-plus/test";
 
 import { bootstrapBookshop, type RunningBookshop } from "../bookshop.ts";
+import { BookshopDriver } from "./driver.ts";
 import { BookshopDsl } from "./dsl.ts";
 
 describe("bookshop", () => {
   let bookshop: RunningBookshop;
+  let driver: BookshopDriver;
   let dsl: BookshopDsl;
 
   beforeAll(async () => {
@@ -23,11 +25,12 @@ describe("bookshop", () => {
   });
 
   beforeEach(() => {
-    dsl = new BookshopDsl(bookshop.baseUrl, bookshop.emailStubBaseUrl);
+    driver = new BookshopDriver(bookshop.baseUrl, bookshop.emailStubBaseUrl);
+    dsl = new BookshopDsl(driver);
   });
 
   afterEach(async () => {
-    await dsl.cleanup();
+    await driver.cleanup();
   });
 
   it("customer can purchase a book", async () => {

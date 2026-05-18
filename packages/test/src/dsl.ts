@@ -1,64 +1,77 @@
 /**
- * Base class for acceptance-test DSLs. A DSL translates business
- * vocabulary into driver calls — `dsl.placeOrder("cust_1")` instead
- * of clicking buttons or sending HTTP requests directly.
+ * Aliasing context shared across a Dsl and its sub-DSLs.
  *
- * **Stateless.** A DSL must NOT hold domain state — no "current
- * customer", no "last order ID". State belongs in the driver
- * (protocol state) or the test itself (test fixtures). DSLs that
- * accumulate state become tightly coupled to test ordering and
- * impossible to reason about.
- *
- * **Composable.** Larger applications often split a DSL into
- * smaller domain-specific DSLs:
- *
- * ```typescript
- * class AppDsl extends Dsl {
- *   readonly customers = new CustomerDsl(this.driver);
- *   readonly orders = new OrderDsl(this.driver);
- *
- *   constructor(private driver: WebDriver) { super(); }
- *
- *   async init() { await this.driver.init(); }
- *   async cleanup() { await this.driver.cleanup(); }
- * }
- *
- * class CustomerDsl extends Dsl {
- *   constructor(private driver: WebDriver) { super(); }
- *
- *   async createCustomer(name: string) {
- *     await this.driver.createCustomer(name);
- *   }
- * }
- * ```
- *
- * **Lifecycle ownership.** The DSL that constructs a driver is
- * responsible for cleaning it up. Child DSLs share the parent's
- * driver and do NOT call `cleanup()` on it. The default `init()`
- * and `cleanup()` are no-ops — override them only in the DSL that
- * owns the underlying resources.
+ * Each `DslContext` instance holds a unique suffix scoped to the current
+ * test worker. Pass `context.alias(value)` through identifier params that
+ * the SUT enforces uniqueness on (emails, ids, etc.) so concurrent tests
+ * and repeated runs against a shared SUT don't collide.
  *
  * @example
  * ```typescript
- * const dsl = new AppDsl(driver);
- * await dsl.init();
+ * const ctx = new DslContext();
+ * ctx.alias("alice@example.com"); // "3alice@example.com"
+ * ctx.alias("alice@example.com"); // "3alice@example.com" — deterministic per instance
+ * ```
+ */
+export class DslContext {
+  static readonly #counters = new Map<string, number>();
+  readonly #suffix: string;
+
+  constructor() {
+    this.#suffix = DslContext.#nextSuffix();
+  }
+
+  static #nextSuffix(): string {
+    const key = process.env["VITEST_POOL_ID"] ?? `pid${process.pid}`;
+    const next = (DslContext.#counters.get(key) ?? 0) + 1;
+    DslContext.#counters.set(key, next);
+    return String(next);
+  }
+
+  alias(value: string): string {
+    return `${this.#suffix}${value}`;
+  }
+}
+
+/**
+ * Base class for acceptance-test DSLs and their sub-DSLs.
  *
- * await dsl.customers.createCustomer("Alice");
- * await dsl.orders.placeOrder({ customerId: "cust_1" });
+ * Holds a `DslContext` for identifier aliasing. A root DSL constructs a
+ * fresh context if none is provided; sub-DSLs accept the root's context
+ * so all aliases within one test share the same suffix.
  *
- * await dsl.cleanup();
+ * Stateless. A DSL must not hold domain state — no "current customer",
+ * no "last order ID". State belongs in the driver (protocol state) or
+ * the test itself.
+ *
+ * @example
+ * ```typescript
+ * class BookshopDsl extends Dsl {
+ *   readonly customers: CustomersDsl;
+ *   readonly books: BooksDsl;
+ *
+ *   constructor(driver: BookshopDriver) {
+ *     super(); // fresh DslContext
+ *     this.customers = new CustomersDsl(driver, this.context);
+ *     this.books = new BooksDsl(driver, this.context);
+ *   }
+ * }
+ *
+ * class CustomersDsl extends Dsl {
+ *   constructor(private readonly driver: BookshopDriver, context: DslContext) {
+ *     super(context);
+ *   }
+ *
+ *   async hasAccount({ email }: { email: string }) {
+ *     await this.driver.registerCustomer({ email: this.context.alias(email) });
+ *   }
+ * }
  * ```
  */
 export abstract class Dsl {
-  /**
-   * Async setup. Override to launch resources (e.g. `await driver.init()`).
-   * Default is a no-op for child DSLs that share a parent's resources.
-   */
-  async init(): Promise<void> {}
+  protected readonly context: DslContext;
 
-  /**
-   * Async teardown. Override to release resources (e.g. `await driver.cleanup()`).
-   * Default is a no-op for child DSLs.
-   */
-  async cleanup(): Promise<void> {}
+  constructor(context?: DslContext) {
+    this.context = context ?? new DslContext();
+  }
 }
