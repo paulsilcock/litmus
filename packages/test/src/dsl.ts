@@ -9,8 +9,12 @@
  * @example
  * ```typescript
  * const ctx = new DslContext();
- * ctx.alias("alice@example.com"); // "3alice@example.com"
- * ctx.alias("alice@example.com"); // "3alice@example.com" — deterministic per instance
+ * const a = ctx.alias("alice@example.com");
+ * const b = ctx.alias("alice@example.com");
+ * // a === b — every call on the same instance returns the same alias.
+ *
+ * const other = new DslContext();
+ * other.alias("alice@example.com") !== a; // distinct instances → distinct aliases.
  * ```
  */
 export class DslContext {

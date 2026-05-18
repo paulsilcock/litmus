@@ -4,7 +4,7 @@ import { acceptance } from "#litmus-test/acceptance.ts";
 import { Dsl } from "#litmus-test/dsl.ts";
 
 describe("acceptance", () => {
-  describe("it", () => {
+  describe("synchronous factory", () => {
     let constructed = 0;
     let disposed = 0;
 
@@ -31,6 +31,49 @@ describe("acceptance", () => {
     });
   });
 
+  describe("asynchronous factory", () => {
+    class AsyncTestDsl extends Dsl {
+      readonly resolvedAt: number;
+      constructor(resolvedAt: number) {
+        super();
+        this.resolvedAt = resolvedAt;
+      }
+    }
+
+    const { it: acceptIt } = acceptance(async () => {
+      await Promise.resolve();
+      return new AsyncTestDsl(Date.now());
+    });
+
+    acceptIt("awaits the factory before injecting the dsl", ({ dsl }) => {
+      expect(dsl).toBeInstanceOf(AsyncTestDsl);
+      expect(dsl.resolvedAt).toBeGreaterThan(0);
+    });
+  });
+
+  describe("disposal on failure", () => {
+    let disposed = false;
+
+    class FailingTestDsl extends Dsl {
+      async [Symbol.asyncDispose](): Promise<void> {
+        disposed = true;
+      }
+    }
+
+    const { it: acceptIt } = acceptance(() => new FailingTestDsl());
+
+    acceptIt.fails(
+      "the test body throws — dispose still runs",
+      ({ dsl: _dsl }) => {
+        throw new Error("boom");
+      },
+    );
+
+    it("dispose ran even though the previous test threw", () => {
+      expect(disposed).toBe(true);
+    });
+  });
+
   describe("dsl without Symbol.asyncDispose", () => {
     class PlainTestDsl extends Dsl {}
 
@@ -38,17 +81,6 @@ describe("acceptance", () => {
 
     acceptIt("does not throw when the dsl has no disposer", ({ dsl }) => {
       expect(dsl).toBeInstanceOf(PlainTestDsl);
-    });
-  });
-
-  describe("test alias", () => {
-    class PlainTestDsl extends Dsl {}
-    const { it: acceptIt, test: acceptTest } = acceptance(
-      () => new PlainTestDsl(),
-    );
-
-    it("exposes test as an alias for it", () => {
-      expect(acceptTest).toBe(acceptIt);
     });
   });
 });
