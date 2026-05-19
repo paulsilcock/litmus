@@ -13,7 +13,7 @@ const invocationEval = evaluate
   .extend<{ greeting: string }>(async (use) => {
     await use({ greeting: "hello" });
   })
-  .guardrails({
+  .withGuardrails({
     "input recorder": async (input) => {
       append(`single:${input}`);
       return { pass: true, reason: "" };
@@ -22,30 +22,45 @@ const invocationEval = evaluate
 
 invocationEval(
   "passing grader records each input it receives",
-  async ({ greeting }) => greeting,
+  async ({ greeting, guardrails }) => {
+    await guardrails(greeting);
+  },
 );
 
 // No guardrails registered: the eval should run cleanly with an
-// unconstrained body return type.
-const unguardedEval = evaluate
-  .extend<{ x: number }>(async (use) => {
-    await use({ x: 1 });
-  })
-  .guardrails({});
+// unconstrained body and no injected guardrails fixture.
+const unguardedEval = evaluate.extend<{ x: number }>(async (use) => {
+  await use({ x: 1 });
+});
 
-unguardedEval("eval registered with .guardrails({})", async ({ x }) => {
+unguardedEval("eval without .withGuardrails", async ({ x }) => {
   void x;
 });
 
-// Scenarios form: same recording grader, but exercised across multiple
-// scenarios and samples to verify per-run invocation.
+// Empty map: still injects the fixture, but invoking it is harmless
+// because no graders are registered.
+const emptyGuardedEval = evaluate
+  .extend<{ x: number }>(async (use) => {
+    await use({ x: 1 });
+  })
+  .withGuardrails({});
+
+emptyGuardedEval(
+  "eval registered with .withGuardrails({})",
+  async ({ x, guardrails }) => {
+    await guardrails(String(x));
+  },
+);
+
+// Scenarios form: same recording grader, exercised across scenarios
+// and samples to verify per-run invocation.
 const customers = [{ name: "alice" }, { name: "bob" }];
 
 const scenariosEval = evaluate
   .extend<{ greeting: string }>(async (use) => {
     await use({ greeting: "hello" });
   })
-  .guardrails({
+  .withGuardrails({
     "input recorder": async (input) => {
       append(`scenario:${input}`);
       return { pass: true, reason: "" };
@@ -54,5 +69,7 @@ const scenariosEval = evaluate
 
 scenariosEval.scenarios(customers, { labelBy: (c) => c.name, samples: 2 })(
   "passing grader records input for each (scenario, sample)",
-  async (scenario, { greeting }) => `${greeting} ${scenario.name}`,
+  async (scenario, { greeting, guardrails }) => {
+    await guardrails(`${greeting} ${scenario.name}`);
+  },
 );

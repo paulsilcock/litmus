@@ -58,14 +58,11 @@ export type SetupFn<TFixtures> = (
 export type GuardrailMap = Record<string, Grader<string>>;
 
 /**
- * Body return type required by the eval. With no guardrails registered
- * (`K = never`), the body may return anything. Once a guardrail is
- * registered, the body must return a string-typed value to feed each
- * grader.
+ * Fixture injected by `.withGuardrails(...)`. The eval body calls it
+ * with the value to grade; the fixture runs every registered grader
+ * and throws an aggregated error on any rejection.
  */
-export type BodyReturn<K extends string> = [K] extends [never]
-  ? unknown
-  : string | Promise<string>;
+export type GuardrailsFixture = (input: string) => Promise<void>;
 
 /**
  * An evaluate-shaped namespace whose registered evals run through a
@@ -73,7 +70,7 @@ export type BodyReturn<K extends string> = [K] extends [never]
  * repeat. Returned by `evaluate.extend(setup)`.
  *
  * The second type parameter is the union of guardrail names already
- * registered via `.guardrails(...)`. It defaults to `never` (no
+ * registered via `.withGuardrails(...)`. It defaults to `never` (no
  * guardrails) and accumulates with each chained call, enabling a
  * compile-time check against duplicate registrations.
  */
@@ -85,7 +82,7 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
    */
   (
     name: string,
-    fn: (fixtures: TFixtures) => BodyReturn<K>,
+    fn: (fixtures: TFixtures) => unknown,
     opts?: EvaluateOptions,
   ): void;
   /**
@@ -98,25 +95,26 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
     opts?: ScenariosFnOptions<TScenario>,
   ): (
     name: string,
-    fn: (scenario: TScenario, fixtures: TFixtures) => BodyReturn<K>,
+    fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   ) => void;
   /**
-   * Register a set of guardrails on this extended evaluate. Every
-   * registered eval body returns the value to grade; each guardrail's
-   * grader is invoked with that value after the body completes. A
-   * grader returning `pass: false` fails the sample, counting against
-   * the configured pass rate. All graders run before the failure is
-   * reported, so reasons from multiple failing guardrails surface
-   * together in the failure message.
+   * Register a set of guardrails on this extended evaluate. The
+   * returned evaluate injects a `guardrails` fixture into every eval
+   * body — calling `guardrails(input)` runs each registered grader
+   * against `input` and throws an aggregated error if any reject.
+   * Forgetting to call `guardrails(...)` fails the sample with a
+   * message naming every registered grader.
    *
    * Chained calls accumulate — the returned extended evaluate sees
    * every guardrail registered on the chain so far. Re-registering an
-   * existing name is a compile-time error. An empty map is a no-op
-   * and leaves the body return type unconstrained.
+   * existing name is a compile-time error. An empty map is a no-op.
    */
-  guardrails<G extends { [P in keyof G]: Grader<string> }>(
+  withGuardrails<G extends { [P in keyof G]: Grader<string> }>(
     map: G & { [P in keyof G & K]: never },
-  ): ExtendedEvaluate<TFixtures, K | (keyof G & string)>;
+  ): ExtendedEvaluate<
+    TFixtures & { guardrails: GuardrailsFixture },
+    K | (keyof G & string)
+  >;
   /** Skip variant — registered evals are reported as skipped. */
   skip: ExtendedEvaluate<TFixtures, K>;
   /** Focus variant — only this eval and other `.only` evals run. */
@@ -223,17 +221,17 @@ function sampleTasks(
 }
 
 /**
- * Run every registered guardrail's grader against the body's return
- * value, accumulating per-guardrail failure reasons. Throws once with
- * all reasons concatenated if any grader returned `pass: false`.
+ * Run every registered grader against `input`, accumulating per-
+ * guardrail failure reasons. Throws once with all reasons concatenated
+ * if any grader returned `pass: false`.
  */
 async function runGuardrails(
-  output: unknown,
+  input: string,
   guardrails: GuardrailMap,
 ): Promise<void> {
   const failures: string[] = [];
   for (const [name, grade] of Object.entries(guardrails)) {
-    const verdict = await grade(String(output));
+    const verdict = await grade(input);
     if (!verdict.pass) {
       failures.push(`guardrail "${name}" failed: ${verdict.reason}`);
     }
@@ -243,6 +241,33 @@ async function runGuardrails(
   }
 }
 
+/**
+ * Build the `guardrails` fixture handed to eval bodies. Returns the
+ * fixture plus an `assertInvoked()` callback the run wrapper calls
+ * after a successful body, which throws if guardrails were registered
+ * but never invoked.
+ */
+function buildGuardrailsFixture(guardrails: GuardrailMap): {
+  fixture: GuardrailsFixture;
+  assertInvoked: () => void;
+} {
+  let called = false;
+  const fixture: GuardrailsFixture = async (input) => {
+    called = true;
+    await runGuardrails(input, guardrails);
+  };
+  const assertInvoked = (): void => {
+    const names = Object.keys(guardrails);
+    if (names.length > 0 && !called) {
+      throw new Error(
+        `guardrails [${names.join(", ")}] registered but never invoked — ` +
+          `call the \`guardrails\` fixture with the value to grade.`,
+      );
+    }
+  };
+  return { fixture, assertInvoked };
+}
+
 function withFixturesRun<TFixtures>(
   fn: (fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
@@ -250,8 +275,10 @@ function withFixturesRun<TFixtures>(
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      const output = await fn(fixtures);
-      await runGuardrails(output, guardrails);
+      const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      await fn({ ...fixtures, guardrails: fixture } as TFixtures);
+      assertInvoked();
     });
 }
 
@@ -263,8 +290,10 @@ function scenarioWithFixturesRun<TScenario, TFixtures>(
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      const output = await fn(scenario, fixtures);
-      await runGuardrails(output, guardrails);
+      const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      await fn(scenario, { ...fixtures, guardrails: fixture } as TFixtures);
+      assertInvoked();
     });
 }
 
@@ -472,7 +501,7 @@ function makeExtended<TFixtures, K extends string = never>(
   ) {
     return (
       name: string,
-      fn: (scenario: TScenario, fixtures: TFixtures) => BodyReturn<K>,
+      fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
     ): void =>
       registerScenarios(
         cases,
@@ -485,13 +514,24 @@ function makeExtended<TFixtures, K extends string = never>(
 
   const target = Object.assign(evaluateOne, {
     scenarios,
-    guardrails: <G extends { [P in keyof G]: Grader<string> }>(
+    withGuardrails: <G extends { [P in keyof G]: Grader<string> }>(
       map: G & { [P in keyof G & K]: never },
-    ): ExtendedEvaluate<TFixtures, K | (keyof G & string)> =>
-      makeExtended<TFixtures, K | (keyof G & string)>(setup, mode, {
-        ...guardrails,
-        ...map,
-      }),
+    ): ExtendedEvaluate<
+      TFixtures & { guardrails: GuardrailsFixture },
+      K | (keyof G & string)
+    > =>
+      makeExtended<
+        TFixtures & { guardrails: GuardrailsFixture },
+        K | (keyof G & string)
+      >(
+        // The user's setup produces TFixtures; the run wrapper layers
+        // the guardrails fixture on top before invoking the body, so
+        // the runtime shape matches the widened TFixtures.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        setup as SetupFn<TFixtures & { guardrails: GuardrailsFixture }>,
+        mode,
+        { ...guardrails, ...map },
+      ),
     skipIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
       withMode(condition ? "skip" : mode),
     runIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>

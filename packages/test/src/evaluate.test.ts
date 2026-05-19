@@ -236,9 +236,9 @@ describe("guardrails", () => {
     expect(result?.status).toBe("passed");
   });
 
-  it(".guardrails({}) registers nothing and lets the eval run", () => {
+  it(".withGuardrails({}) injects the fixture but no graders run", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("eval registered with .guardrails({})"),
+      r.fullName.startsWith("eval registered with .withGuardrails({})"),
     );
     expect(result?.status).toBe("passed");
   });
@@ -287,13 +287,23 @@ describe("guardrails: failure", () => {
     expect(message).toContain("violates content policy");
   });
 
-  it("chained .guardrails calls accumulate — downstream sees every registration", () => {
+  it("chained .withGuardrails calls accumulate — downstream sees every registration", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
       r.fullName.startsWith("first grader registered, then second appended"),
     );
     const message = result?.failureMessages.join("\n") ?? "";
     expect(message).toContain("tone check");
     expect(message).toContain("policy check");
+  });
+
+  it("forgetting to invoke the guardrails fixture fails the sample", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("guardrails registered but body never calls them"),
+    );
+    expect(result?.status).toBe("failed");
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("policy check");
+    expect(message).toContain("never invoked");
   });
 });
 

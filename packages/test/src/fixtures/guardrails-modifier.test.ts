@@ -7,7 +7,7 @@ const guardedEval = evaluate
   .extend<{ answer: string }>(async (use) => {
     await use({ answer: "any response" });
   })
-  .guardrails({
+  .withGuardrails({
     "policy check": async () => ({
       pass: false,
       reason: "violates content policy",
@@ -16,5 +16,7 @@ const guardedEval = evaluate
 
 guardedEval.only(
   "rejecting grader registered, then .only applied",
-  async ({ answer }) => answer,
+  async ({ answer, guardrails }) => {
+    await guardrails(answer);
+  },
 );

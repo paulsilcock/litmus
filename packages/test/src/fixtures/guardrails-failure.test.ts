@@ -1,12 +1,12 @@
 import { evaluate } from "@litmus/test";
 
-// One grader, always rejects. The eval body returns successfully; the
-// grader's verdict is what should fail the scenario.
+// One grader, always rejects. The body calls guardrails(...) with
+// a value the grader will reject.
 const singleRejection = evaluate
   .extend<{ answer: string }>(async (use) => {
     await use({ answer: "any response" });
   })
-  .guardrails({
+  .withGuardrails({
     "policy check": async () => ({
       pass: false,
       reason: "violates content policy",
@@ -15,7 +15,9 @@ const singleRejection = evaluate
 
 singleRejection(
   "grader rejects with 'violates content policy'",
-  async ({ answer }) => answer,
+  async ({ answer, guardrails }) => {
+    await guardrails(answer);
+  },
 );
 
 // Two graders, both rejecting with distinct names and reasons. Verifies
@@ -24,7 +26,7 @@ const twoRejections = evaluate
   .extend<{ answer: string }>(async (use) => {
     await use({ answer: "any response" });
   })
-  .guardrails({
+  .withGuardrails({
     "tone check": async () => ({ pass: false, reason: "tone too curt" }),
     "policy check": async () => ({
       pass: false,
@@ -34,21 +36,23 @@ const twoRejections = evaluate
 
 twoRejections(
   "two graders reject with distinct names and reasons",
-  async ({ answer }) => answer,
+  async ({ answer, guardrails }) => {
+    await guardrails(answer);
+  },
 );
 
 // Same two-rejection effect, but the second grader is registered via a
-// chained .guardrails call rather than alongside the first. Both names
-// in the failure message proves the chain accumulated.
+// chained .withGuardrails call rather than alongside the first. Both
+// names in the failure message proves the chain accumulated.
 const baseChain = evaluate
   .extend<{ answer: string }>(async (use) => {
     await use({ answer: "any response" });
   })
-  .guardrails({
+  .withGuardrails({
     "tone check": async () => ({ pass: false, reason: "tone too curt" }),
   });
 
-const chainedEval = baseChain.guardrails({
+const chainedEval = baseChain.withGuardrails({
   "policy check": async () => ({
     pass: false,
     reason: "violates content policy",
@@ -56,6 +60,25 @@ const chainedEval = baseChain.guardrails({
 });
 
 chainedEval(
-  "first grader registered, then second appended via chained .guardrails",
-  async ({ answer }) => answer,
+  "first grader registered, then second appended via chained .withGuardrails",
+  async ({ answer, guardrails }) => {
+    await guardrails(answer);
+  },
+);
+
+// Guardrails registered but the body never calls the fixture. The
+// run wrapper's teardown check should fail this sample.
+const forgottenEval = evaluate
+  .extend<{ answer: string }>(async (use) => {
+    await use({ answer: "any response" });
+  })
+  .withGuardrails({
+    "policy check": async () => ({ pass: true, reason: "" }),
+  });
+
+forgottenEval(
+  "guardrails registered but body never calls them",
+  async ({ answer }) => {
+    void answer;
+  },
 );
