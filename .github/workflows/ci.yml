@@ -50,6 +50,7 @@ jobs:
         driver: [http, cli]
     env:
       BOOKSHOP_DRIVER: ${{ matrix.driver }}
+      LITMUS_MATRIX: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: voidzero-dev/setup-vp@v1
