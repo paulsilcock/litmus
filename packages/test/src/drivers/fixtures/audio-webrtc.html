@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      (async () => {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        osc.frequency.value = 1100;
+        const sourceDest = ctx.createMediaStreamDestination();
+        osc.connect(sourceDest);
+        osc.start();
+
+        const pcA = new RTCPeerConnection();
+        const pcB = new RTCPeerConnection();
+        pcA.onicecandidate = (e) =>
+          e.candidate && pcB.addIceCandidate(e.candidate);
+        pcB.onicecandidate = (e) =>
+          e.candidate && pcA.addIceCandidate(e.candidate);
+
+        for (const track of sourceDest.stream.getTracks()) {
+          pcA.addTrack(track, sourceDest.stream);
+        }
+
+        const offer = await pcA.createOffer();
+        await pcA.setLocalDescription(offer);
+        await pcB.setRemoteDescription(offer);
+        const answer = await pcB.createAnswer();
+        await pcB.setLocalDescription(answer);
+        await pcA.setRemoteDescription(answer);
+      })();
+    </script>
+  </body>
+</html>

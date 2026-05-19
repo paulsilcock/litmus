@@ -25,6 +25,15 @@ type OnMessageCallback = (message: string) => Promise<MessageResponse>;
 interface RunInput {
   /** Optional first message. If omitted, the LLM generates one from the persona and goal. */
   opening?: string;
+  /**
+   * Async callback that resolves once the SUT has emitted its first
+   * message. The returned string is recorded as the assistant's
+   * opening turn and included in the prompt context for the user's
+   * first reply. Use this when the SUT initiates the conversation —
+   * typically wired through a DSL/driver method that knows how to
+   * detect the SUT's first response.
+   */
+  awaitOpening?: () => Promise<string>;
   /** Called each time the simulated user sends a message. Return a string to continue, or `{ done, reason }` to end the conversation. */
   onMessage: OnMessageCallback;
 }
@@ -119,6 +128,11 @@ export class UserSimulator {
    */
   async run(input: RunInput): Promise<Conversation> {
     const turns: Turn[] = [];
+
+    if (input.awaitOpening) {
+      const opening = await input.awaitOpening();
+      turns.push({ role: "assistant", content: opening });
+    }
 
     for (let i = 0; i < this.#maxTurns; i++) {
       let userMessage: string;

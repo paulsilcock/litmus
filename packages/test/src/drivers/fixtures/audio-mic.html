@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      window.__observedFreq__ = 0;
+      window.__observedPeak__ = 0;
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        const ctx = new AudioContext();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 4096;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        (function loop() {
+          analyser.getByteFrequencyData(data);
+          let maxMag = 0;
+          let maxIdx = 0;
+          for (let i = 0; i < data.length; i++) {
+            if (data[i] > maxMag) {
+              maxMag = data[i];
+              maxIdx = i;
+            }
+          }
+          if (maxMag > window.__observedPeak__) {
+            window.__observedPeak__ = maxMag;
+            window.__observedFreq__ =
+              (maxIdx * ctx.sampleRate) / analyser.fftSize;
+          }
+          requestAnimationFrame(loop);
+        })();
+      });
+    </script>
+  </body>
+</html>

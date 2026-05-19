@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      osc.frequency.value = 880;
+      const streamDest = ctx.createMediaStreamDestination();
+      osc.connect(streamDest);
+      osc.start();
+      const audio = document.createElement("audio");
+      audio.srcObject = streamDest.stream;
+      audio.autoplay = true;
+      document.body.appendChild(audio);
+    </script>
+  </body>
+</html>

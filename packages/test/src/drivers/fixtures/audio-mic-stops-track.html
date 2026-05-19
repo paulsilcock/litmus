@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      // Reproduces the minimal failure mode found in the live convai
+      // widget: a consumer requests the mic, then calls `track.stop()`
+      // on it during setup or teardown. A real (non-synthetic) mic
+      // track in 'ended' state produces silence permanently, breaking
+      // all subsequent injection. The driver must guarantee its
+      // synthetic tracks can't be killed this way.
+      window.__readyForAudio__ = false;
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        const track = stream.getAudioTracks()[0];
+        track.stop();
+        window.__readyForAudio__ = true;
+      });
+    </script>
+  </body>
+</html>
