@@ -4,10 +4,10 @@ import { Dsl } from "#litmus-test/dsl.ts";
 import { evaluate as baseEvaluate } from "#litmus-test/evaluate/index.ts";
 
 async function runWithDsl<TDsl extends Dsl>(
-  factory: () => Promise<TDsl> | TDsl,
+  createDsl: () => Promise<TDsl> | TDsl,
   body: (dsl: TDsl) => Promise<void>,
 ): Promise<void> {
-  await using dsl = await factory();
+  await using dsl = await createDsl();
   await body(dsl);
 }
 
@@ -17,7 +17,7 @@ async function runWithDsl<TDsl extends Dsl>(
  * test completes (via `[Symbol.asyncDispose]()`). Test authors never
  * construct or dispose a dsl themselves.
  *
- * @param factory - Called per-test. Closes over whatever the project
+ * @param createDsl - Called per-test. Closes over whatever the project
  *   set up in `beforeAll` (running SUT, config, etc.) and returns a
  *   fresh dsl. Sync or async.
  *
@@ -50,15 +50,15 @@ async function runWithDsl<TDsl extends Dsl>(
  * ```
  */
 export function acceptance<TDsl extends Dsl>(
-  factory: () => Promise<TDsl> | TDsl,
+  createDsl: () => Promise<TDsl> | TDsl,
 ) {
   const extendedTest = baseTest.extend<{ dsl: TDsl }>({
     // oxlint-disable-next-line no-empty-pattern -- vitest fixture parser requires object destructuring
-    dsl: async ({}, use) => runWithDsl(factory, use),
+    dsl: async ({}, use) => runWithDsl(createDsl, use),
   });
 
   const extendedEvaluate = baseEvaluate.extend<{ dsl: TDsl }>((use) =>
-    runWithDsl(factory, (dsl) => use({ dsl })),
+    runWithDsl(createDsl, (dsl) => use({ dsl })),
   );
 
   return {
