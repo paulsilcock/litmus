@@ -48,6 +48,25 @@ async function runWithDsl<TDsl extends Dsl>(
  *   );
  * });
  * ```
+ *
+ * @example
+ * Layer shared guardrails on top of an acceptance evaluate:
+ * ```typescript
+ * const { evaluate } = acceptance(() => new TelcoDsl(driver));
+ *
+ * const guarded = evaluate.withGuardrails({
+ *   "no PII leakage": noPiiGrader,
+ *   "no upsell after refusal": noUpsellGrader,
+ * });
+ *
+ * guarded.scenarios(scenarios)(
+ *   "agent upsells without pressure",
+ *   async (scenario, { dsl, guardrails }) => {
+ *     const conversation = await dsl.customerCallsSupport(scenario);
+ *     await guardrails(renderTranscript(conversation));
+ *   },
+ * );
+ * ```
  */
 export function acceptance<TDsl extends Dsl>(
   createDsl: () => Promise<TDsl> | TDsl,

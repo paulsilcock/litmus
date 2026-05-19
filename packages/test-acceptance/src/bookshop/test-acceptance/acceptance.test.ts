@@ -1,5 +1,5 @@
 import { acceptance } from "@litmus/test";
-import { afterAll, beforeAll, describe, TestRunner } from "vite-plus/test";
+import { afterAll, beforeAll, describe } from "vite-plus/test";
 
 import { bootstrapBookshop, type RunningBookshop } from "#bookshop/bookshop.ts";
 
@@ -10,7 +10,6 @@ describe("bookshop", { tags: ["bookshop-acceptance"] }, () => {
   let bookshop: RunningBookshop;
 
   beforeAll(async () => {
-    if (!TestRunner.matchesTags(["bookshop-acceptance"])) return;
     bookshop = await bootstrapBookshop();
   });
 

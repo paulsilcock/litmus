@@ -1,5 +1,6 @@
 import { test } from "vite-plus/test";
 
+import { type Grader } from "#litmus-test/grader.ts";
 import {
   readCachedScenariosSync,
   resolveMode,
@@ -53,12 +54,27 @@ export type SetupFn<TFixtures> = (
   use: (fixtures: TFixtures) => Promise<void>,
 ) => Promise<void>;
 
+/** Map of guardrail registration key → grader. */
+export type GuardrailMap = Record<string, Grader<string>>;
+
+/**
+ * Fixture injected by `.withGuardrails(...)`. The eval body calls it
+ * with the value to grade; the fixture runs every registered grader
+ * and throws an aggregated error on any rejection.
+ */
+export type GuardrailsFixture = (input: string) => Promise<void>;
+
 /**
  * An evaluate-shaped namespace whose registered evals run through a
  * `setup` function that builds and tears down a fresh fixtures bag per
  * repeat. Returned by `evaluate.extend(setup)`.
+ *
+ * The second type parameter is the union of guardrail names already
+ * registered via `.withGuardrails(...)`. It defaults to `never` (no
+ * guardrails) and accumulates with each chained call, enabling a
+ * compile-time check against duplicate registrations.
  */
-export interface ExtendedEvaluate<TFixtures> {
+export interface ExtendedEvaluate<TFixtures, K extends string = never> {
   /**
    * Registers a single vitest test that runs the body once (or
    * `samples` times if specified), with `fixtures` injected from
@@ -66,7 +82,7 @@ export interface ExtendedEvaluate<TFixtures> {
    */
   (
     name: string,
-    fn: (fixtures: TFixtures) => void | Promise<void>,
+    fn: (fixtures: TFixtures) => unknown,
     opts?: EvaluateOptions,
   ): void;
   /**
@@ -79,16 +95,60 @@ export interface ExtendedEvaluate<TFixtures> {
     opts?: ScenariosFnOptions<TScenario>,
   ): (
     name: string,
-    fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
+    fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   ) => void;
+  /**
+   * Register a set of guardrails on this extended evaluate. The
+   * returned evaluate injects a `guardrails` fixture into every eval
+   * body — calling `guardrails(input)` runs each registered grader
+   * against `input` and throws an aggregated error if any reject.
+   * Forgetting to call `guardrails(...)` fails the sample with a
+   * message naming every registered grader.
+   *
+   * Chained calls accumulate — the returned extended evaluate sees
+   * every guardrail registered on the chain so far. Re-registering an
+   * existing name is a compile-time error. An empty map is a no-op.
+   *
+   * **Intended for acceptance-level evals**, where the same cross-
+   * cutting checks (PII leakage, disclaimer presence, vulnerable-user
+   * tone) apply across many scenarios driven through a DSL. Compose
+   * with `acceptance(createDsl).evaluate.withGuardrails({...})` to get
+   * both the `dsl` and `guardrails` fixtures on every body.
+   *
+   * For component-level evals (testing a single agent or prompt),
+   * prefer calling shared `Grader<string>` functions directly rather
+   * than reaching for this — the wrapper's value is in sharing checks
+   * across many evals, which component tests rarely do.
+   *
+   * @example
+   * ```typescript
+   * const { evaluate } = acceptance(() => new TelcoDsl(driver));
+   *
+   * const guarded = evaluate.withGuardrails({
+   *   "no PII leakage": noPiiGrader,
+   *   "no upsell after refusal": noUpsellGrader,
+   * });
+   *
+   * guarded("agent stays on policy", async ({ dsl, guardrails }) => {
+   *   const conversation = await dsl.customerCallsSupport({ ... });
+   *   await guardrails(renderTranscript(conversation));
+   * });
+   * ```
+   */
+  withGuardrails<G extends { [P in keyof G]: Grader<string> }>(
+    map: G & { [P in keyof G & K]: never },
+  ): ExtendedEvaluate<
+    TFixtures & { guardrails: GuardrailsFixture },
+    K | (keyof G & string)
+  >;
   /** Skip variant — registered evals are reported as skipped. */
-  skip: ExtendedEvaluate<TFixtures>;
+  skip: ExtendedEvaluate<TFixtures, K>;
   /** Focus variant — only this eval and other `.only` evals run. */
-  only: ExtendedEvaluate<TFixtures>;
+  only: ExtendedEvaluate<TFixtures, K>;
   /** Skip when `condition` is true; otherwise behave like the base. */
-  skipIf: (condition: boolean) => ExtendedEvaluate<TFixtures>;
+  skipIf: (condition: boolean) => ExtendedEvaluate<TFixtures, K>;
   /** Run only when `condition` is true; otherwise skip. */
-  runIf: (condition: boolean) => ExtendedEvaluate<TFixtures>;
+  runIf: (condition: boolean) => ExtendedEvaluate<TFixtures, K>;
 }
 
 /**
@@ -186,24 +246,80 @@ function sampleTasks(
   }));
 }
 
+/**
+ * Run every registered grader against `input`, accumulating per-
+ * guardrail failure reasons. Throws once with all reasons concatenated
+ * if any grader returned `pass: false`.
+ */
+async function runGuardrails(
+  input: string,
+  guardrails: GuardrailMap,
+): Promise<void> {
+  const failures: string[] = [];
+  for (const [name, grade] of Object.entries(guardrails)) {
+    const verdict = await grade(input);
+    if (!verdict.pass) {
+      failures.push(`guardrail "${name}" failed: ${verdict.reason}`);
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(failures.join("; "));
+  }
+}
+
+/**
+ * Build the `guardrails` fixture handed to eval bodies. Returns the
+ * fixture plus an `assertInvoked()` callback the run wrapper calls
+ * after a successful body, which throws if guardrails were registered
+ * but never invoked.
+ */
+function buildGuardrailsFixture(guardrails: GuardrailMap): {
+  fixture: GuardrailsFixture;
+  assertInvoked: () => void;
+} {
+  let called = false;
+  const fixture: GuardrailsFixture = async (input) => {
+    called = true;
+    await runGuardrails(input, guardrails);
+  };
+  const assertInvoked = (): void => {
+    const names = Object.keys(guardrails);
+    if (names.length > 0 && !called) {
+      throw new Error(
+        `guardrails [${names.join(", ")}] registered but never invoked — ` +
+          `call the \`guardrails\` fixture with the value to grade.`,
+      );
+    }
+  };
+  return { fixture, assertInvoked };
+}
+
 function withFixturesRun<TFixtures>(
-  fn: (fixtures: TFixtures) => void | Promise<void>,
+  fn: (fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
+  guardrails: GuardrailMap = {},
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      await fn(fixtures);
+      const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      await fn({ ...fixtures, guardrails: fixture } as TFixtures);
+      assertInvoked();
     });
 }
 
 function scenarioWithFixturesRun<TScenario, TFixtures>(
-  fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
+  fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
   scenario: TScenario,
+  guardrails: GuardrailMap = {},
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      await fn(scenario, fixtures);
+      const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      await fn(scenario, { ...fixtures, guardrails: fixture } as TFixtures);
+      assertInvoked();
     });
 }
 
@@ -384,16 +500,25 @@ function makeEvaluate(mode: RunMode): Evaluate {
   return target as Evaluate;
 }
 
-function makeExtended<TFixtures>(
+function makeExtended<TFixtures, K extends string = never>(
   setup: SetupFn<TFixtures>,
   mode: RunMode,
-): ExtendedEvaluate<TFixtures> {
+  guardrails: GuardrailMap = {},
+): ExtendedEvaluate<TFixtures, K> {
+  const withMode = (m: RunMode): ExtendedEvaluate<TFixtures, K> =>
+    makeExtended<TFixtures, K>(setup, m, guardrails);
+
   function evaluateOne(
     name: string,
-    fn: (fixtures: TFixtures) => void | Promise<void>,
+    fn: (fixtures: TFixtures) => unknown,
     opts: EvaluateOptions = {},
   ): void {
-    registerSingle(name, () => withFixturesRun(fn, setup), opts, mode);
+    registerSingle(
+      name,
+      () => withFixturesRun(fn, setup, guardrails),
+      opts,
+      mode,
+    );
   }
 
   function scenarios<TScenario>(
@@ -402,36 +527,54 @@ function makeExtended<TFixtures>(
   ) {
     return (
       name: string,
-      fn: (scenario: TScenario, fixtures: TFixtures) => void | Promise<void>,
+      fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
     ): void =>
       registerScenarios(
         cases,
         opts,
         name,
-        (scenario) => scenarioWithFixturesRun(fn, setup, scenario),
+        (scenario) => scenarioWithFixturesRun(fn, setup, scenario, guardrails),
         mode,
       );
   }
 
   const target = Object.assign(evaluateOne, {
     scenarios,
-    skipIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
-      makeExtended(setup, condition ? "skip" : mode),
-    runIf: (condition: boolean): ExtendedEvaluate<TFixtures> =>
-      makeExtended(setup, condition ? mode : "skip"),
+    withGuardrails: <G extends { [P in keyof G]: Grader<string> }>(
+      map: G & { [P in keyof G & K]: never },
+    ): ExtendedEvaluate<
+      TFixtures & { guardrails: GuardrailsFixture },
+      K | (keyof G & string)
+    > =>
+      makeExtended<
+        TFixtures & { guardrails: GuardrailsFixture },
+        K | (keyof G & string)
+      >(
+        // The user's setup produces TFixtures; the run wrapper layers
+        // the guardrails fixture on top before invoking the body, so
+        // the runtime shape matches the widened TFixtures.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        setup as SetupFn<TFixtures & { guardrails: GuardrailsFixture }>,
+        mode,
+        { ...guardrails, ...map },
+      ),
+    skipIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
+      withMode(condition ? "skip" : mode),
+    runIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
+      withMode(condition ? mode : "skip"),
   });
 
   Object.defineProperty(target, "skip", {
-    get: () => makeExtended(setup, "skip"),
+    get: () => withMode("skip"),
     enumerable: true,
   });
   Object.defineProperty(target, "only", {
-    get: () => makeExtended(setup, "only"),
+    get: () => withMode("only"),
     enumerable: true,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  return target as ExtendedEvaluate<TFixtures>;
+  return target as ExtendedEvaluate<TFixtures, K>;
 }
 
 /**

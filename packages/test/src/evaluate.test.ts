@@ -218,6 +218,111 @@ describe("modifiers", () => {
   });
 });
 
+describe("guardrails", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails.test.ts");
+  }, 30_000);
+
+  it("a passing grader is invoked with the body's return value", () => {
+    expect(run.logLines).toContain("single:hello");
+  });
+
+  it("a passing grader leaves the scenario passing", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("passing grader records each input"),
+    );
+    expect(result?.status).toBe("passed");
+  });
+
+  it(".withGuardrails({}) injects the fixture but no graders run", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("eval registered with .withGuardrails({})"),
+    );
+    expect(result?.status).toBe("passed");
+  });
+
+  it("scenarios-form invokes the grader once per (scenario, sample) with that run's body output", () => {
+    const recorded = run.logLines.filter((l) => l.startsWith("scenario:"));
+    expect(recorded).toHaveLength(4);
+    expect(recorded.filter((l) => l === "scenario:hello alice")).toHaveLength(
+      2,
+    );
+    expect(recorded.filter((l) => l === "scenario:hello bob")).toHaveLength(2);
+  });
+});
+
+describe("guardrails: failure", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-failure.test.ts");
+  }, 30_000);
+
+  it("a rejecting grader fails the scenario", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("grader rejects with 'violates content policy'"),
+    );
+    expect(result?.status).toBe("failed");
+  });
+
+  it("the failure message names the grader and includes its reason", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("grader rejects with 'violates content policy'"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("policy check");
+    expect(message).toContain("violates content policy");
+  });
+
+  it("every failing grader's reason surfaces in one message", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("two graders reject with distinct"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("tone check");
+    expect(message).toContain("tone too curt");
+    expect(message).toContain("policy check");
+    expect(message).toContain("violates content policy");
+  });
+
+  it("chained .withGuardrails calls accumulate — downstream sees every registration", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("first grader registered, then second appended"),
+    );
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("tone check");
+    expect(message).toContain("policy check");
+  });
+
+  it("forgetting to invoke the guardrails fixture fails the sample", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("guardrails registered but body never calls them"),
+    );
+    expect(result?.status).toBe("failed");
+    const message = result?.failureMessages.join("\n") ?? "";
+    expect(message).toContain("policy check");
+    expect(message).toContain("never invoked");
+  });
+});
+
+describe("guardrails: modifier composition", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("guardrails-modifier.test.ts");
+  }, 30_000);
+
+  it("modifiers preserve registered guardrails through composition", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("rejecting grader registered, then .only applied"),
+    );
+    expect(result?.status).toBe("failed");
+    expect(result?.failureMessages.join("\n") ?? "").toContain("policy check");
+  });
+});
+
 describe("only mode", () => {
   let run: FixtureRun;
 
