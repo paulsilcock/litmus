@@ -11,10 +11,13 @@ import {
 } from "#bookshop/use-cases/register-customer.ts";
 
 export const customersRoutes = new Hono()
-  .post("/", ...routeHandler(RegisterCustomer, RegisterCustomerSchema))
+  .post(
+    "/",
+    ...routeHandler.noContent(RegisterCustomer, RegisterCustomerSchema),
+  )
   .get(
     "/:customerEmail/orders",
-    ...routeHandler(GetCustomerOrders, GetCustomerOrdersSchema, {
+    ...routeHandler.json(GetCustomerOrders, GetCustomerOrdersSchema, {
       target: "param",
     }),
   );

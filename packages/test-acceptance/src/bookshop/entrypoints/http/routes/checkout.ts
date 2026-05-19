@@ -5,5 +5,5 @@ import { CheckOut, CheckOutSchema } from "#bookshop/use-cases/check-out.ts";
 
 export const checkoutRoutes = new Hono().post(
   "/",
-  ...routeHandler(CheckOut, CheckOutSchema),
+  ...routeHandler.noContent(CheckOut, CheckOutSchema),
 );

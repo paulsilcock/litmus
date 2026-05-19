@@ -4,63 +4,13 @@ import type { BookshopApp } from "#bookshop/entrypoints/http/app.ts";
 import type { BookshopDriverApi } from "#bookshop/test-acceptance/driver.ts";
 import { EmailStubClient } from "#bookshop/test-acceptance/email-stub-client.ts";
 
-interface BookSearchResult {
-  title: string;
-  author: string;
-  price: number;
-}
-
-interface OrderSummary {
-  id: string;
-  status: string;
-  total: number;
-  lines: Array<{ title: string; price: number }>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isBookSearchResult(value: unknown): value is BookSearchResult {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value["title"] === "string" &&
-    typeof value["author"] === "string" &&
-    typeof value["price"] === "number"
-  );
-}
-
-function isOrderLine(
-  value: unknown,
-): value is { title: string; price: number } {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value["title"] === "string" && typeof value["price"] === "number"
-  );
-}
-
-function isOrderSummary(value: unknown): value is OrderSummary {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value["id"] === "string" &&
-    typeof value["status"] === "string" &&
-    typeof value["total"] === "number" &&
-    Array.isArray(value["lines"]) &&
-    value["lines"].every(isOrderLine)
-  );
-}
-
-function isOrderSummaryArray(value: unknown): value is OrderSummary[] {
-  return Array.isArray(value) && value.every(isOrderSummary);
-}
-
 export class BookshopHttpDriver
   extends HonoDriver<BookshopApp>
   implements BookshopDriverApi
 {
   readonly #emailStub: EmailStubClient;
   #currentCustomerEmail?: string;
-  #lastSearchResults: BookSearchResult[] = [];
+  #lastSearchResults: Array<{ title: string }> = [];
 
   constructor(baseUrl: string, emailStubBaseUrl: string) {
     super({ baseUrl });
@@ -115,8 +65,8 @@ export class BookshopHttpDriver
     if (!res.ok) {
       throw new Error(`searchBooksByAuthor failed: ${res.status}`);
     }
-    const body: unknown = await res.json();
-    if (!Array.isArray(body) || !body.every(isBookSearchResult)) {
+    const body = await res.json();
+    if (!Array.isArray(body)) {
       throw new Error("searchBooksByAuthor: unexpected response shape");
     }
     this.#lastSearchResults = body;
@@ -153,11 +103,11 @@ export class BookshopHttpDriver
     if (!res.ok) {
       throw new Error(`order history fetch failed: ${res.status}`);
     }
-    const orders: unknown = await res.json();
-    if (!isOrderSummaryArray(orders)) {
+    const orders = await res.json();
+    if (!Array.isArray(orders)) {
       throw new Error("order history: unexpected response shape");
     }
-    const found = orders.some((order) =>
+    const found = orders.some((order: { lines: Array<{ title: string }> }) =>
       order.lines.some((line) => line.title === title),
     );
     if (!found) {

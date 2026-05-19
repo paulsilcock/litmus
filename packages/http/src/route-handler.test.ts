@@ -50,10 +50,10 @@ class GetOrder extends QueryHandler<
 // If type inference breaks, these property accesses will fail the type check.
 {
   const app = new Hono()
-    .post("/orders", ...routeHandler(PlaceOrder, PlaceOrderSchema))
+    .post("/orders", ...routeHandler.json(PlaceOrder, PlaceOrderSchema))
     .get(
       "/items/:id",
-      ...routeHandler(GetOrder, GetOrderSchema, { target: "param" }),
+      ...routeHandler.json(GetOrder, GetOrderSchema, { target: "param" }),
     );
 
   type AppRoutes = typeof app;
@@ -67,7 +67,7 @@ describe("routeHandler", () => {
   it("valid input is validated and passed to the handler", async () => {
     const app = new Hono().post(
       "/orders",
-      ...routeHandler(PlaceOrder, PlaceOrderSchema),
+      ...routeHandler.json(PlaceOrder, PlaceOrderSchema),
     );
 
     const res = await app.request("/orders", {
@@ -87,7 +87,7 @@ describe("routeHandler", () => {
   it("invalid input returns 422 with validation errors", async () => {
     const app = new Hono().post(
       "/orders",
-      ...routeHandler(PlaceOrder, PlaceOrderSchema),
+      ...routeHandler.json(PlaceOrder, PlaceOrderSchema),
     );
 
     const res = await app.request("/orders", {
@@ -118,7 +118,7 @@ describe("routeHandler", () => {
 
     const app = new Hono().post(
       "/orders/ship",
-      ...routeHandler(ShipOrder, ShipOrderSchema),
+      ...routeHandler.noContent(ShipOrder, ShipOrderSchema),
     );
 
     const res = await app.request("/orders/ship", {
@@ -143,7 +143,7 @@ describe("routeHandler", () => {
     }
 
     it("POST defaults to 201", async () => {
-      const app = new Hono().post("/x", ...routeHandler(Noop, NoopSchema));
+      const app = new Hono().post("/x", ...routeHandler.json(Noop, NoopSchema));
       const res = await app.request("/x", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,14 +155,14 @@ describe("routeHandler", () => {
     it("GET defaults to 200", async () => {
       const app = new Hono().get(
         "/x",
-        ...routeHandler(Noop, NoopSchema, { target: "query" }),
+        ...routeHandler.json(Noop, NoopSchema, { target: "query" }),
       );
       const res = await app.request("/x");
       expect(res.status).toBe(200);
     });
 
     it("PUT defaults to 200", async () => {
-      const app = new Hono().put("/x", ...routeHandler(Noop, NoopSchema));
+      const app = new Hono().put("/x", ...routeHandler.json(Noop, NoopSchema));
       const res = await app.request("/x", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -172,7 +172,10 @@ describe("routeHandler", () => {
     });
 
     it("PATCH defaults to 200", async () => {
-      const app = new Hono().patch("/x", ...routeHandler(Noop, NoopSchema));
+      const app = new Hono().patch(
+        "/x",
+        ...routeHandler.json(Noop, NoopSchema),
+      );
       const res = await app.request("/x", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -184,7 +187,7 @@ describe("routeHandler", () => {
     it("DELETE defaults to 200 when handler returns a body", async () => {
       const app = new Hono().delete(
         "/x",
-        ...routeHandler(Noop, NoopSchema, { target: "query" }),
+        ...routeHandler.json(Noop, NoopSchema, { target: "query" }),
       );
       const res = await app.request("/x", { method: "DELETE" });
       expect(res.status).toBe(200);
@@ -211,7 +214,7 @@ describe("routeHandler", () => {
       .onError(domainErrorHandler({ OrderNotFound: 404 }))
       .get(
         "/orders/:id",
-        ...routeHandler(FindOrder, FindOrderSchema, { target: "param" }),
+        ...routeHandler.json(FindOrder, FindOrderSchema, { target: "param" }),
       );
 
     const res = await app.request("/orders/order_missing");
@@ -242,7 +245,7 @@ describe("routeHandler", () => {
 
     const app = new Hono()
       .onError(domainErrorHandler({}))
-      .post("/x", ...routeHandler(FailingHandler, NoopSchema));
+      .post("/x", ...routeHandler.noContent(FailingHandler, NoopSchema));
 
     const res = await app.request("/x", {
       method: "POST",
@@ -270,7 +273,7 @@ describe("routeHandler", () => {
 
     const app = new Hono()
       .onError(domainErrorHandler({}))
-      .post("/x", ...routeHandler(CrashingHandler, NoopSchema));
+      .post("/x", ...routeHandler.noContent(CrashingHandler, NoopSchema));
 
     const res = await app.request("/x", {
       method: "POST",
@@ -295,7 +298,7 @@ describe("routeHandler", () => {
 
     const app = new Hono().post(
       "/stream",
-      ...routeHandler(StreamTokens, StreamSchema),
+      ...routeHandler.stream(StreamTokens, StreamSchema),
     );
 
     const res = await app.request("/stream", {
@@ -313,7 +316,7 @@ describe("routeHandler", () => {
     expect(body).toContain('data: {"token":"tok_2"}');
   });
 
-  it("respond callback overrides default response handling", async () => {
+  it("custom respond callback builds the response from the use case result", async () => {
     const StreamSchema = z.object({ count: z.number() });
     type StreamInput = z.infer<typeof StreamSchema>;
 
@@ -327,18 +330,16 @@ describe("routeHandler", () => {
 
     const app = new Hono().post(
       "/stream",
-      ...routeHandler(StreamTokens, StreamSchema, {
-        respond: async (result, c) => {
-          const chunks: string[] = [];
-          if (isAsyncIterable<{ token: string }>(result)) {
-            for await (const chunk of result) {
-              chunks.push(JSON.stringify(chunk));
-            }
+      ...routeHandler.custom(StreamTokens, StreamSchema, async (result, c) => {
+        const chunks: string[] = [];
+        if (isAsyncIterable<{ token: string }>(result)) {
+          for await (const chunk of result) {
+            chunks.push(JSON.stringify(chunk));
           }
-          return c.body(chunks.join("\n"), 200, {
-            "Content-Type": "application/x-ndjson",
-          });
-        },
+        }
+        return c.body(chunks.join("\n"), 200, {
+          "Content-Type": "application/x-ndjson",
+        });
       }),
     );
 
@@ -357,7 +358,7 @@ describe("routeHandler", () => {
   it("explicit status option overrides the default", async () => {
     const app = new Hono().post(
       "/orders",
-      ...routeHandler(PlaceOrder, PlaceOrderSchema, { status: 202 }),
+      ...routeHandler.json(PlaceOrder, PlaceOrderSchema, { status: 202 }),
     );
 
     const res = await app.request("/orders", {
@@ -403,7 +404,9 @@ describe("routeHandler", () => {
 
     const app = new Hono().get(
       "/orders/:id",
-      ...routeHandler(GetOrderWithDeps, GetOrderSchema, { target: "param" }),
+      ...routeHandler.json(GetOrderWithDeps, GetOrderSchema, {
+        target: "param",
+      }),
     );
 
     const res = await app.request("/orders/order_1");
@@ -440,7 +443,7 @@ describe("routeHandler", () => {
       })
       .post(
         "/orders",
-        ...typedRouteHandler(
+        ...typedRouteHandler.json(
           CreateOrder,
           CreateOrderSchema.omit({ userId: true }),
           {
@@ -488,12 +491,16 @@ describe("routeHandler", () => {
       })
       .post(
         "/orders",
-        ...routeHandler(CreateOrder, CreateOrderSchema.omit({ userId: true }), {
-          input: (validated, c) => ({
-            ...validated,
-            userId: c.get("userId"),
-          }),
-        }),
+        ...routeHandler.json(
+          CreateOrder,
+          CreateOrderSchema.omit({ userId: true }),
+          {
+            input: (validated, c) => ({
+              ...validated,
+              userId: c.get("userId"),
+            }),
+          },
+        ),
       );
 
     const res = await app.request("/orders", {
@@ -510,7 +517,7 @@ describe("routeHandler", () => {
   it("invalid path params return 422 with validation errors", async () => {
     const app = new Hono().get(
       "/orders/:id",
-      ...routeHandler(GetOrder, GetOrderSchema, { target: "param" }),
+      ...routeHandler.json(GetOrder, GetOrderSchema, { target: "param" }),
     );
 
     const res = await app.request("/orders/bad-id");

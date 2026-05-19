@@ -8,5 +8,5 @@ import {
 
 export const cartRoutes = new Hono().post(
   "/items",
-  ...routeHandler(AddBookToCart, AddBookToCartSchema),
+  ...routeHandler.noContent(AddBookToCart, AddBookToCartSchema),
 );

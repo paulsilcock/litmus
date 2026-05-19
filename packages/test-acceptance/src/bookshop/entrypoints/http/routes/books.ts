@@ -11,10 +11,10 @@ import {
 } from "#bookshop/use-cases/search-books-by-author.ts";
 
 export const booksRoutes = new Hono()
-  .post("/", ...routeHandler(PutBookOnSale, PutBookOnSaleSchema))
+  .post("/", ...routeHandler.noContent(PutBookOnSale, PutBookOnSaleSchema))
   .get(
     "/search",
-    ...routeHandler(SearchBooksByAuthor, SearchBooksByAuthorSchema, {
+    ...routeHandler.json(SearchBooksByAuthor, SearchBooksByAuthorSchema, {
       target: "query",
     }),
   );
