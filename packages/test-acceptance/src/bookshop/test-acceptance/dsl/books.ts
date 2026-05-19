@@ -1,14 +1,12 @@
-import { Dsl, type DslContext } from "@litmus/test";
+import type { DslContext } from "@litmus/test";
 
 import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 
-export class BooksDsl extends Dsl {
+export class BooksDsl {
   constructor(
     private readonly driver: BookshopDriver,
-    context: DslContext,
-  ) {
-    super(context);
-  }
+    private readonly context: DslContext,
+  ) {}
 
   async hasOnSale(input: {
     title: string;

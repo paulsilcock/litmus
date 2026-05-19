@@ -38,33 +38,53 @@ export class DslContext {
 }
 
 /**
- * Base class for acceptance-test DSLs and their sub-DSLs.
+ * Base class for the root DSL of an acceptance test suite.
  *
- * Holds a `DslContext` for identifier aliasing. A root DSL constructs a
- * fresh context if none is provided; sub-DSLs accept the root's context
- * so all aliases within one test share the same prefix.
+ * A root DSL owns the driver and the aliasing context. Disposing the
+ * DSL (via `await using` or the `acceptance()` fixture) disposes the
+ * driver — subclasses don't need to override `[Symbol.asyncDispose]`
+ * unless they hold additional resources.
  *
  * Stateless. A DSL must not hold domain state — no "current customer",
  * no "last order ID". State belongs in the driver (protocol state) or
  * the test itself.
  *
- * @example
+ * ## When to split into sub-DSLs
+ *
+ * If the root DSL grows past ~5 methods or starts grouping by concept
+ * (`registerCustomer` / `logInAs` / ... vs `putBookOnSale` / `searchBy` / ...),
+ * split each concept into a sub-DSL. Sub-DSLs are plain classes — they
+ * don't extend `Dsl`. They receive the same driver and context from the
+ * root so aliases stay coherent within a single test.
+ *
+ * @example Single-class DSL
  * ```typescript
- * class BookshopDsl extends Dsl {
+ * class TodoDsl extends Dsl<TodoDriver> {
+ *   async hasItem(input: { title: string }) {
+ *     await this.driver.addItem(this.context.alias(input.title));
+ *   }
+ * }
+ * ```
+ *
+ * @example Composed root + sub-DSLs
+ * ```typescript
+ * class BookshopDsl extends Dsl<BookshopDriver> {
  *   readonly customers: CustomersDsl;
  *   readonly books: BooksDsl;
  *
  *   constructor(driver: BookshopDriver) {
- *     super(); // fresh DslContext
+ *     super(driver);
  *     this.customers = new CustomersDsl(driver, this.context);
  *     this.books = new BooksDsl(driver, this.context);
  *   }
  * }
  *
- * class CustomersDsl extends Dsl {
- *   constructor(private readonly driver: BookshopDriver, context: DslContext) {
- *     super(context);
- *   }
+ * // Sub-DSL: plain class, no inheritance.
+ * class CustomersDsl {
+ *   constructor(
+ *     private readonly driver: BookshopDriver,
+ *     private readonly context: DslContext,
+ *   ) {}
  *
  *   async hasAccount({ email }: { email: string }) {
  *     await this.driver.registerCustomer({ email: this.context.alias(email) });
@@ -72,18 +92,18 @@ export class DslContext {
  * }
  * ```
  */
-export abstract class Dsl {
+export abstract class Dsl<
+  TDriver extends AsyncDisposable = AsyncDisposable,
+> implements AsyncDisposable {
+  protected readonly driver: TDriver;
   protected readonly context: DslContext;
 
-  constructor(context?: DslContext) {
+  constructor(driver: TDriver, context?: DslContext) {
+    this.driver = driver;
     this.context = context ?? new DslContext();
   }
 
-  /**
-   * Default dispose hook is a no-op. Override to release resources
-   * (close a browser, tear down a connection, etc.). Test fixtures
-   * scope the dsl's lifetime with `await using`, so this runs after
-   * the test body even on throw.
-   */
-  async [Symbol.asyncDispose](): Promise<void> {}
+  async [Symbol.asyncDispose](): Promise<void> {
+    await this.driver[Symbol.asyncDispose]();
+  }
 }

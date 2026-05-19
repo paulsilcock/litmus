@@ -3,7 +3,7 @@ import type { RunningBookshop } from "#bookshop/bookshop.ts";
 import { BookshopCliDriver } from "./driver/cli.ts";
 import { BookshopHttpDriver } from "./driver/http.ts";
 
-export interface BookshopDriver {
+export interface BookshopDriver extends AsyncDisposable {
   loginAs(email: string): void;
   putBookOnSale(input: {
     title: string;

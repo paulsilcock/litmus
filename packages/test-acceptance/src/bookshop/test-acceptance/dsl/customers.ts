@@ -1,14 +1,12 @@
-import { Dsl, type DslContext } from "@litmus/test";
+import type { DslContext } from "@litmus/test";
 
 import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 
-export class CustomersDsl extends Dsl {
+export class CustomersDsl {
   constructor(
     private readonly driver: BookshopDriver,
-    context: DslContext,
-  ) {
-    super(context);
-  }
+    private readonly context: DslContext,
+  ) {}
 
   async hasAccount(input: { name: string; email: string }): Promise<void> {
     await this.driver.registerCustomer(

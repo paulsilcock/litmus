@@ -1,14 +1,12 @@
-import { Dsl, type DslContext } from "@litmus/test";
+import type { DslContext } from "@litmus/test";
 
 import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 
-export class CartDsl extends Dsl {
+export class CartDsl {
   constructor(
     private readonly driver: BookshopDriver,
-    context: DslContext,
-  ) {
-    super(context);
-  }
+    private readonly context: DslContext,
+  ) {}
 
   async addBook(input: { title: string }): Promise<void> {
     await this.driver.addBookToCart(this.context.alias(input.title));
