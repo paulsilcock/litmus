@@ -6,7 +6,10 @@ import { bootstrapBookshop, type RunningBookshop } from "#bookshop/bookshop.ts";
 import { createBookshopDriver } from "./driver.ts";
 import { BookshopDsl } from "./dsl.ts";
 
-describe("bookshop", () => {
+// Cross-driver suite: only runs when BOOKSHOP_DRIVER is set, which the CI
+// matrix job does explicitly. Skipped in the regular `vp test` run so the
+// same scenarios aren't exercised twice per CI build.
+describe.runIf(process.env["BOOKSHOP_DRIVER"])("bookshop", () => {
   let bookshop: RunningBookshop;
 
   beforeAll(async () => {
