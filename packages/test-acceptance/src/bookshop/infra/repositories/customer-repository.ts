@@ -6,9 +6,9 @@ import {
 import { eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
-import type { CustomerId } from "../../domain/customer.ts";
-import { Customer, CustomerNotFound } from "../../domain/customer.ts";
-import { customers } from "../db/schema.ts";
+import type { CustomerId } from "#bookshop/domain/customer.ts";
+import { Customer, CustomerNotFound } from "#bookshop/domain/customer.ts";
+import { customers } from "#bookshop/infra/db/schema.ts";
 
 @singleton()
 export class CustomerRepository extends DrizzlePostgresRepository<

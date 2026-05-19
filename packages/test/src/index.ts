@@ -1,9 +1,10 @@
-export { BaseDriver } from "#litmus-test/drivers/base.ts";
+export { acceptance } from "#litmus-test/acceptance.ts";
+export { Driver } from "#litmus-test/drivers/base.ts";
 export {
   type AudioStream,
-  BaseBrowserDriver,
+  BrowserDriver,
 } from "#litmus-test/drivers/browser.ts";
-export { Dsl } from "#litmus-test/dsl.ts";
+export { Dsl, DslContext } from "#litmus-test/dsl.ts";
 export {
   type Grader,
   llmJudge,

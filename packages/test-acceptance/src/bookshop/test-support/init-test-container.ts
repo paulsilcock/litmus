@@ -4,13 +4,13 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import { beforeEach } from "vite-plus/test";
 
-import { schema } from "../infra/db/schema.ts";
+import { schema } from "#bookshop/infra/db/schema.ts";
 import {
   EMAIL_SERVICE,
   type EmailService,
-} from "../infra/email/email-service.ts";
-import { PAYMENT_GATEWAY } from "../infra/payments/payment-gateway.ts";
-import { StubPaymentGateway } from "../infra/payments/stub-payment-gateway.ts";
+} from "#bookshop/infra/email/email-service.ts";
+import { PAYMENT_GATEWAY } from "#bookshop/infra/payments/payment-gateway.ts";
+import { StubPaymentGateway } from "#bookshop/infra/payments/stub-payment-gateway.ts";
 
 /**
  * Records sent emails in memory. Lets use case tests assert on

@@ -4,6 +4,9 @@
   "private": true,
   "description": "Cross-package acceptance tests for the Litmus framework. Not published.",
   "type": "module",
+  "imports": {
+    "#bookshop/*": "./src/bookshop/*"
+  },
   "scripts": {
     "test": "vp test",
     "check": "vp check"

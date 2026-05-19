@@ -5,7 +5,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { BaseBrowserDriver } from "#litmus-test/drivers/browser.ts";
+import { BrowserDriver } from "#litmus-test/drivers/browser.ts";
 
 const fixture = (name: string): string =>
   readFileSync(
@@ -46,7 +46,7 @@ function detectFrequency(samples: number[], sampleRate: number): number {
   return (crossings * sampleRate) / (2 * samples.length);
 }
 
-class TestDriver extends BaseBrowserDriver {
+class TestDriver extends BrowserDriver {
   async openMic() {
     await this.page.goto("/audio-mic");
   }
@@ -117,7 +117,7 @@ class TestDriver extends BaseBrowserDriver {
   }
 }
 
-describe("BaseBrowserDriver", () => {
+describe("BrowserDriver", () => {
   let baseUrl: string;
 
   beforeAll(() => {
@@ -137,7 +137,7 @@ describe("BaseBrowserDriver", () => {
     // touch userAgentData. The driver must keep both consistent or
     // sites that read userAgentData will see the underlying engine
     // (Chromium) and refuse to render their Chrome-only paths.
-    const d = new TestDriver({
+    await using d = new TestDriver({
       baseUrl,
       userAgent:
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
@@ -145,29 +145,21 @@ describe("BaseBrowserDriver", () => {
         "Chrome/131.0.0.0 Safari/537.36",
     });
     await d.init();
-    try {
-      const reported = await d.navigatorIdentity();
-      expect(reported.userAgent).toContain("Chrome/131");
-      expect(reported.brands).toContain("Google Chrome");
-    } finally {
-      await d.cleanup();
-    }
+    const reported = await d.navigatorIdentity();
+    expect(reported.userAgent).toContain("Chrome/131");
+    expect(reported.brands).toContain("Google Chrome");
   });
 
   it("audio sent to the page's mic is received by client code", async () => {
-    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
-    try {
-      await audioDriver.openMic();
-      const sampleRate = 48000;
-      const pcm = sineWavePcm(440, sampleRate, 500);
-      await audioDriver.sendTone(pcm, sampleRate);
-      const observed = await audioDriver.observedFrequency();
-      expect(observed).toBeGreaterThan(340);
-      expect(observed).toBeLessThan(540);
-    } finally {
-      await audioDriver.cleanup();
-    }
+    await audioDriver.openMic();
+    const sampleRate = 48000;
+    const pcm = sineWavePcm(440, sampleRate, 500);
+    await audioDriver.sendTone(pcm, sampleRate);
+    const observed = await audioDriver.observedFrequency();
+    expect(observed).toBeGreaterThan(340);
+    expect(observed).toBeLessThan(540);
   });
 
   it("audio injection survives a consumer calling track.stop() on the mic track", async () => {
@@ -176,65 +168,49 @@ describe("BaseBrowserDriver", () => {
     // terminal — it produces silence permanently and breaks all
     // subsequent injection. The driver must guarantee its synthetic
     // tracks survive this.
-    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
-    try {
-      await audioDriver.openMicStopsTrack();
-      await audioDriver.micProbeReset();
+    await audioDriver.openMicStopsTrack();
+    await audioDriver.micProbeReset();
 
-      const sampleRate = 48000;
-      const pcm = sineWavePcm(440, sampleRate, 500);
-      await audioDriver.sendTone(pcm, sampleRate);
-      await new Promise((r) => setTimeout(r, 200));
+    const sampleRate = 48000;
+    const pcm = sineWavePcm(440, sampleRate, 500);
+    await audioDriver.sendTone(pcm, sampleRate);
+    await new Promise((r) => setTimeout(r, 200));
 
-      const probe = await audioDriver.micProbeSnapshot();
-      expect(probe.peak).toBeGreaterThan(0.5);
-    } finally {
-      await audioDriver.cleanup();
-    }
+    const probe = await audioDriver.micProbeSnapshot();
+    expect(probe.peak).toBeGreaterThan(0.5);
   });
 
   it("audio played by the page is captured by the test", async () => {
-    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
-    try {
-      await audioDriver.openSpeaker();
-      const { samples, sampleRate } = await audioDriver.captureTone(500);
-      const observed = detectFrequency(samples, sampleRate);
-      expect(observed).toBeGreaterThan(560);
-      expect(observed).toBeLessThan(760);
-    } finally {
-      await audioDriver.cleanup();
-    }
+    await audioDriver.openSpeaker();
+    const { samples, sampleRate } = await audioDriver.captureTone(500);
+    const observed = detectFrequency(samples, sampleRate);
+    expect(observed).toBeGreaterThan(560);
+    expect(observed).toBeLessThan(760);
   });
 
   it("audio attached to a media element is captured by the test", async () => {
-    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
-    try {
-      await audioDriver.openMediaElement();
-      const { samples, sampleRate } = await audioDriver.captureTone(500);
-      const observed = detectFrequency(samples, sampleRate);
-      expect(observed).toBeGreaterThan(780);
-      expect(observed).toBeLessThan(980);
-    } finally {
-      await audioDriver.cleanup();
-    }
+    await audioDriver.openMediaElement();
+    const { samples, sampleRate } = await audioDriver.captureTone(500);
+    const observed = detectFrequency(samples, sampleRate);
+    expect(observed).toBeGreaterThan(780);
+    expect(observed).toBeLessThan(980);
   });
 
   it("audio received via a peer connection is captured by the test", async () => {
-    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
-    try {
-      await audioDriver.openWebRtc();
-      await new Promise((r) => setTimeout(r, 3000));
-      const { samples, sampleRate } = await audioDriver.captureTone(1000);
-      const observed = detectFrequency(samples, sampleRate);
-      expect(observed).toBeGreaterThan(1000);
-      expect(observed).toBeLessThan(1200);
-    } finally {
-      await audioDriver.cleanup();
-    }
+    await audioDriver.openWebRtc();
+    await new Promise((r) => setTimeout(r, 3000));
+    const { samples, sampleRate } = await audioDriver.captureTone(1000);
+    const observed = detectFrequency(samples, sampleRate);
+    expect(observed).toBeGreaterThan(1000);
+    expect(observed).toBeLessThan(1200);
   });
 
   it("audio played by the page can be drained progressively while it's still playing", async () => {
@@ -242,31 +218,27 @@ describe("BaseBrowserDriver", () => {
     // far without waiting for it to stop. A stream handle should
     // return samples accumulated since the last read, not block on a
     // fixed duration.
-    const audioDriver = new TestDriver({ baseUrl, audio: true });
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
+    await audioDriver.openSpeaker();
+    const stream = await audioDriver.captureToneStream();
     try {
-      await audioDriver.openSpeaker();
-      const stream = await audioDriver.captureToneStream();
-      try {
-        await new Promise((r) => setTimeout(r, 300));
-        const first = await stream.read();
-        await new Promise((r) => setTimeout(r, 300));
-        const second = await stream.read();
+      await new Promise((r) => setTimeout(r, 300));
+      const first = await stream.read();
+      await new Promise((r) => setTimeout(r, 300));
+      const second = await stream.read();
 
-        expect(first.samples.length).toBeGreaterThan(0);
-        expect(second.samples.length).toBeGreaterThan(0);
-        // Second read must not re-include samples from the first.
-        const overlap = first.samples.length + second.samples.length;
-        expect(overlap).toBeGreaterThan(first.samples.length);
+      expect(first.samples.length).toBeGreaterThan(0);
+      expect(second.samples.length).toBeGreaterThan(0);
+      // Second read must not re-include samples from the first.
+      const overlap = first.samples.length + second.samples.length;
+      expect(overlap).toBeGreaterThan(first.samples.length);
 
-        const observed = detectFrequency(second.samples, second.sampleRate);
-        expect(observed).toBeGreaterThan(560);
-        expect(observed).toBeLessThan(760);
-      } finally {
-        await stream.close();
-      }
+      const observed = detectFrequency(second.samples, second.sampleRate);
+      expect(observed).toBeGreaterThan(560);
+      expect(observed).toBeLessThan(760);
     } finally {
-      await audioDriver.cleanup();
+      await stream.close();
     }
   });
 });

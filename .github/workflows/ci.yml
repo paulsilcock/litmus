@@ -35,8 +35,28 @@ jobs:
       - run: vp check
       - name: Run changed tests (PR)
         if: github.event_name == 'pull_request'
-        run: vp test --changed ${{ github.event.pull_request.base.sha }}
+        run: vp test --changed ${{ github.event.pull_request.base.sha }} --tags-filter='!bookshop-acceptance' --passWithNoTests
       - name: Run full test suite (push to main)
         if: github.event_name == 'push'
-        run: vp test
+        run: vp test --tags-filter='!bookshop-acceptance'
       - run: vp run -r build
+
+  bookshop-acceptance:
+    name: bookshop-acceptance (${{ matrix.driver }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        driver: [http, cli]
+    env:
+      BOOKSHOP_DRIVER: ${{ matrix.driver }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          version: "0.1.15"
+          node-version: "24"
+          cache: true
+      - run: vp install
+      - name: Run bookshop acceptance tests
+        run: vp test --run --tags-filter=bookshop-acceptance

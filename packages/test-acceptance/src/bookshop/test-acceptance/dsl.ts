@@ -1,57 +1,22 @@
 import { Dsl } from "@litmus/test";
 
-import { BookshopDriver } from "./driver.ts";
+import type { BookshopDriver } from "./driver.ts";
+import { BooksDsl } from "./dsl/books.ts";
+import { CartDsl } from "./dsl/cart.ts";
+import { CustomersDsl } from "./dsl/customers.ts";
+import { OrdersDsl } from "./dsl/orders.ts";
 
-interface BookDetails {
-  title: string;
-  author: string;
-  price: number;
-}
+export class BookshopDsl extends Dsl<BookshopDriver> {
+  readonly customers: CustomersDsl;
+  readonly books: BooksDsl;
+  readonly cart: CartDsl;
+  readonly orders: OrdersDsl;
 
-export class BookshopDsl extends Dsl {
-  readonly #driver: BookshopDriver;
-
-  constructor(baseUrl: string, emailStubBaseUrl: string) {
-    super();
-    this.#driver = new BookshopDriver(baseUrl, emailStubBaseUrl);
-  }
-
-  async cleanup(): Promise<void> {
-    await this.#driver.cleanup();
-  }
-
-  async ensureBookIsInStock(details: BookDetails): Promise<void> {
-    await this.#driver.putBookOnSale(details);
-  }
-
-  async ensureCustomerIsRegistered(details: {
-    name: string;
-    email: string;
-  }): Promise<void> {
-    await this.#driver.registerCustomer(details.name, details.email);
-  }
-
-  async loginAsCustomer(details: { email: string }): Promise<void> {
-    this.#driver.loginAs(details.email);
-  }
-
-  async searchForBook(criteria: { author: string }): Promise<void> {
-    await this.#driver.searchBooksByAuthor(criteria.author);
-  }
-
-  async addBookToCart(selection: { title: string }): Promise<void> {
-    await this.#driver.addBookToCart(selection.title);
-  }
-
-  async checkOut(): Promise<void> {
-    await this.#driver.checkOut();
-  }
-
-  async assertBookPurchased(expected: { title: string }): Promise<void> {
-    await this.#driver.assertBookPurchased(expected.title);
-  }
-
-  async assertOrderConfirmationEmailSentTo(address: string): Promise<void> {
-    await this.#driver.assertConfirmationEmailSent(address);
+  constructor(driver: BookshopDriver) {
+    super(driver);
+    this.customers = new CustomersDsl(driver, this.context);
+    this.books = new BooksDsl(driver, this.context);
+    this.cart = new CartDsl(driver, this.context);
+    this.orders = new OrdersDsl(driver, this.context);
   }
 }

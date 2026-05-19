@@ -5,8 +5,8 @@ import {
 } from "@litmus/db/drizzle/postgres";
 import { singleton } from "tsyringe";
 
-import { Order } from "../../domain/order.ts";
-import { orders } from "../db/schema.ts";
+import { Order } from "#bookshop/domain/order.ts";
+import { orders } from "#bookshop/infra/db/schema.ts";
 
 @singleton()
 export class OrderRepository extends DrizzlePostgresRepository<

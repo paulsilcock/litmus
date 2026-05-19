@@ -2,13 +2,14 @@ import { prefixedUlid } from "@litmus/core/id";
 import { container } from "tsyringe";
 import { describe, expect, it } from "vite-plus/test";
 
-import { Customer } from "../domain/customer.ts";
-import { EMAIL_SERVICE } from "../infra/email/email-service.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
+import { Customer } from "#bookshop/domain/customer.ts";
+import { EMAIL_SERVICE } from "#bookshop/infra/email/email-service.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
 import {
   FakeEmailService,
   setupBookshopTest,
-} from "../test-support/init-test-container.ts";
+} from "#bookshop/test-support/init-test-container.ts";
+
 import { SendOrderConfirmation } from "./send-order-confirmation.ts";
 
 describe("SendOrderConfirmation", () => {

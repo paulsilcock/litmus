@@ -1,70 +1,62 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  it,
-} from "vite-plus/test";
+import { acceptance } from "@litmus/test";
+import { afterAll, beforeAll, describe, TestRunner } from "vite-plus/test";
 
-import { bootstrapBookshop, type RunningBookshop } from "../bookshop.ts";
+import { bootstrapBookshop, type RunningBookshop } from "#bookshop/bookshop.ts";
+
+import { createBookshopDriver } from "./driver.ts";
 import { BookshopDsl } from "./dsl.ts";
 
-describe("bookshop", () => {
+describe("bookshop", { tags: ["bookshop-acceptance"] }, () => {
   let bookshop: RunningBookshop;
-  let dsl: BookshopDsl;
 
   beforeAll(async () => {
+    if (!TestRunner.matchesTags(["bookshop-acceptance"])) return;
     bookshop = await bootstrapBookshop();
   });
 
   afterAll(async () => {
-    await bookshop.stop();
+    await bookshop?.stop();
   });
 
-  beforeEach(() => {
-    dsl = new BookshopDsl(bookshop.baseUrl, bookshop.emailStubBaseUrl);
-  });
+  const { it } = acceptance(
+    () => new BookshopDsl(createBookshopDriver(bookshop)),
+  );
 
-  afterEach(async () => {
-    await dsl.cleanup();
-  });
-
-  it("customer can purchase a book", async () => {
-    await dsl.ensureBookIsInStock({
+  it("customer can purchase a book", async ({ dsl }) => {
+    await dsl.books.hasOnSale({
       title: "The Hobbit",
       author: "Tolkien",
       price: 12.99,
     });
-    await dsl.ensureCustomerIsRegistered({
+    await dsl.customers.hasAccount({
       name: "Alice",
       email: "alice@example.com",
     });
 
-    await dsl.loginAsCustomer({ email: "alice@example.com" });
-    await dsl.searchForBook({ author: "Tolkien" });
-    await dsl.addBookToCart({ title: "The Hobbit" });
-    await dsl.checkOut();
+    await dsl.customers.logIn({ email: "alice@example.com" });
+    await dsl.books.searchBy({ author: "Tolkien" });
+    await dsl.cart.addBook({ title: "The Hobbit" });
+    await dsl.cart.checkOut();
 
-    await dsl.assertBookPurchased({ title: "The Hobbit" });
+    await dsl.orders.confirmPurchased({ title: "The Hobbit" });
   });
 
-  it("customer is emailed a confirmation after purchase", async () => {
-    await dsl.ensureBookIsInStock({
+  it("customer is emailed a confirmation after purchase", async ({ dsl }) => {
+    await dsl.books.hasOnSale({
       title: "The Fellowship of the Ring",
       author: "Tolkien",
       price: 14.99,
     });
-    await dsl.ensureCustomerIsRegistered({
+    await dsl.customers.hasAccount({
       name: "Bob",
       email: "bob@example.com",
     });
 
-    await dsl.loginAsCustomer({ email: "bob@example.com" });
-    await dsl.searchForBook({ author: "Tolkien" });
-    await dsl.addBookToCart({ title: "The Fellowship of the Ring" });
-    await dsl.checkOut();
+    await dsl.customers.logIn({ email: "bob@example.com" });
+    await dsl.books.searchBy({ author: "Tolkien" });
+    await dsl.cart.addBook({ title: "The Fellowship of the Ring" });
+    await dsl.cart.checkOut();
 
-    await dsl.assertOrderConfirmationEmailSentTo("bob@example.com");
+    await dsl.orders.confirmConfirmationSent({ to: "bob@example.com" });
   });
 });

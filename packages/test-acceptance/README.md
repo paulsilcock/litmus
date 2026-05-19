@@ -17,7 +17,7 @@ Concretely, the bookshop demonstrates:
 - **Repositories** — `DrizzlePostgresRepository` against PGlite (in-memory Postgres)
 - **Event-driven reactions** — `OrderPlaced` → `CloseCart` + `SendOrderConfirmation`, wired via `registerDomainEventHandlers([...])`
 - **HTTP entrypoints** — Hono routes via `@litmus/http` `routeHandler`, with structured `DomainError` → status mapping
-- **Acceptance testing** — `BaseHttpDriver` + DSL, booting the real app on a free port and interacting only through HTTP
+- **Acceptance testing** — `HttpDriver` + DSL, booting the real app on a free port and interacting only through HTTP
 
 Acceptance tests live in [src/bookshop/test-acceptance/](src/bookshop/test-acceptance/) and treat the system as a black box: no container access, no direct DB writes.
 

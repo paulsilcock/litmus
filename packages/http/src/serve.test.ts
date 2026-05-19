@@ -28,7 +28,7 @@ describe("serve", () => {
 
     const app = new Hono().post(
       "/orders/find",
-      ...routeHandler(FindOrder, FindOrderSchema),
+      ...routeHandler.noContent(FindOrder, FindOrderSchema),
     );
 
     const server = await serve(app, {
@@ -211,7 +211,7 @@ describe("serve tracing", () => {
 
     const app = new Hono().post(
       "/orders",
-      ...routeHandler(PlaceOrder, z.object({})),
+      ...routeHandler.noContent(PlaceOrder, z.object({})),
     );
 
     const server = await serve(app, { port: 0 });
@@ -296,7 +296,7 @@ describe("serve tracing", () => {
 
     const app = new Hono().post(
       "/orders/find",
-      ...routeHandler(FindOrder, z.object({})),
+      ...routeHandler.noContent(FindOrder, z.object({})),
     );
 
     const server = await serve(app, {

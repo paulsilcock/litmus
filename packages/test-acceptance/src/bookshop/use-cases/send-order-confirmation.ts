@@ -1,13 +1,13 @@
 import { CommandHandler } from "@litmus/core";
 import { inject, injectable } from "tsyringe";
 
-import type { CustomerId } from "../domain/customer.ts";
-import type { OrderLine } from "../domain/order.ts";
+import type { CustomerId } from "#bookshop/domain/customer.ts";
+import type { OrderLine } from "#bookshop/domain/order.ts";
 import {
   EMAIL_SERVICE,
   type EmailService,
-} from "../infra/email/email-service.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
+} from "#bookshop/infra/email/email-service.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
 
 interface SendOrderConfirmationCommand extends Record<string, unknown> {
   customerId: CustomerId;
