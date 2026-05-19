@@ -108,6 +108,32 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
    * Chained calls accumulate — the returned extended evaluate sees
    * every guardrail registered on the chain so far. Re-registering an
    * existing name is a compile-time error. An empty map is a no-op.
+   *
+   * **Intended for acceptance-level evals**, where the same cross-
+   * cutting checks (PII leakage, disclaimer presence, vulnerable-user
+   * tone) apply across many scenarios driven through a DSL. Compose
+   * with `acceptance(createDsl).evaluate.withGuardrails({...})` to get
+   * both the `dsl` and `guardrails` fixtures on every body.
+   *
+   * For component-level evals (testing a single agent or prompt),
+   * prefer calling shared `Grader<string>` functions directly rather
+   * than reaching for this — the wrapper's value is in sharing checks
+   * across many evals, which component tests rarely do.
+   *
+   * @example
+   * ```typescript
+   * const { evaluate } = acceptance(() => new TelcoDsl(driver));
+   *
+   * const guarded = evaluate.withGuardrails({
+   *   "no PII leakage": noPiiGrader,
+   *   "no upsell after refusal": noUpsellGrader,
+   * });
+   *
+   * guarded("agent stays on policy", async ({ dsl, guardrails }) => {
+   *   const conversation = await dsl.customerCallsSupport({ ... });
+   *   await guardrails(renderTranscript(conversation));
+   * });
+   * ```
    */
   withGuardrails<G extends { [P in keyof G]: Grader<string> }>(
     map: G & { [P in keyof G & K]: never },
