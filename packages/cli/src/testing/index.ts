@@ -1,1 +1,1 @@
-export { LitmusCliDriver } from "#litmus-cli/testing/cli-driver.ts";
+export { CliDriver } from "#litmus-cli/testing/cli-driver.ts";

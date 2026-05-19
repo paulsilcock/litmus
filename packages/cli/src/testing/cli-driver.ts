@@ -3,7 +3,7 @@ import { Driver } from "@litmus/test";
 import type { Cli, CliClient } from "#litmus-cli/index.ts";
 import { cliClient } from "#litmus-cli/index.ts";
 
-interface LitmusCliDriverOptions {
+interface CliDriverOptions {
   socket: string;
 }
 
@@ -26,17 +26,17 @@ type InferCommands<T> = T extends Cli<any, infer C> ? C : never;
  * ```typescript
  * import type cli from "./cli";
  *
- * class OrderDriver extends LitmusCliDriver<typeof cli> {
+ * class OrderDriver extends CliDriver<typeof cli> {
  *   async placeOrder(input: { customerId: string }) {
  *     return this.client.exec("orders:create", input);
  *   }
  * }
  * ```
  */
-export abstract class LitmusCliDriver<T extends Cli<any, any>> extends Driver {
+export abstract class CliDriver<T extends Cli<any, any>> extends Driver {
   protected readonly client: CliClient<InferCommands<T>>;
 
-  constructor(options: LitmusCliDriverOptions) {
+  constructor(options: CliDriverOptions) {
     super();
     this.client = cliClient<T>(options.socket);
   }
