@@ -1,12 +1,12 @@
 import { HonoDriver } from "@litmus/http/testing";
 
 import type { BookshopApp } from "#bookshop/entrypoints/http/app.ts";
-import type { BookshopDriverApi } from "#bookshop/test-acceptance/driver.ts";
+import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 import { EmailStubClient } from "#bookshop/test-acceptance/email-stub-client.ts";
 
 export class BookshopHttpDriver
   extends HonoDriver<BookshopApp>
-  implements BookshopDriverApi
+  implements BookshopDriver
 {
   readonly #emailStub: EmailStubClient;
   #currentCustomerEmail?: string;

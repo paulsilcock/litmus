@@ -1,6 +1,6 @@
 import { Dsl } from "@litmus/test";
 
-import type { BookshopDriverApi } from "./driver.ts";
+import type { BookshopDriver } from "./driver.ts";
 import { BooksDsl } from "./dsl/books.ts";
 import { CartDsl } from "./dsl/cart.ts";
 import { CustomersDsl } from "./dsl/customers.ts";
@@ -12,7 +12,7 @@ export class BookshopDsl extends Dsl {
   readonly cart: CartDsl;
   readonly orders: OrdersDsl;
 
-  constructor(driver: BookshopDriverApi) {
+  constructor(driver: BookshopDriver) {
     super();
     this.customers = new CustomersDsl(driver, this.context);
     this.books = new BooksDsl(driver, this.context);

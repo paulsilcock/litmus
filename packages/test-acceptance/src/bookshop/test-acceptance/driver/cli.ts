@@ -1,7 +1,7 @@
 import { cliClient } from "@litmus/cli";
 
 import type { BookshopCli } from "#bookshop/entrypoints/cli/app.ts";
-import type { BookshopDriverApi } from "#bookshop/test-acceptance/driver.ts";
+import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 import { EmailStubClient } from "#bookshop/test-acceptance/email-stub-client.ts";
 
 type BookshopCliClient = ReturnType<typeof cliClient<BookshopCli>>;
@@ -12,7 +12,7 @@ interface BookSearchResult {
   price: number;
 }
 
-export class BookshopCliDriver implements BookshopDriverApi {
+export class BookshopCliDriver implements BookshopDriver {
   readonly #client: BookshopCliClient;
   readonly #emailStub: EmailStubClient;
   #currentCustomerEmail?: string;

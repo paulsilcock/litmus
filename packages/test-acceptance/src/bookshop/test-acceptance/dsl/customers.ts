@@ -1,10 +1,10 @@
 import { Dsl, type DslContext } from "@litmus/test";
 
-import type { BookshopDriverApi } from "#bookshop/test-acceptance/driver.ts";
+import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 
 export class CustomersDsl extends Dsl {
   constructor(
-    private readonly driver: BookshopDriverApi,
+    private readonly driver: BookshopDriver,
     context: DslContext,
   ) {
     super(context);

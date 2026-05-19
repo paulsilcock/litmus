@@ -3,7 +3,7 @@ import type { RunningBookshop } from "#bookshop/bookshop.ts";
 import { BookshopCliDriver } from "./driver/cli.ts";
 import { BookshopHttpDriver } from "./driver/http.ts";
 
-export interface BookshopDriverApi {
+export interface BookshopDriver {
   loginAs(email: string): void;
   putBookOnSale(input: {
     title: string;
@@ -20,7 +20,7 @@ export interface BookshopDriverApi {
 
 export function createBookshopDriver(
   bookshop: RunningBookshop,
-): BookshopDriverApi {
+): BookshopDriver {
   const protocol = process.env["BOOKSHOP_DRIVER"] ?? "http";
   switch (protocol) {
     case "http":
