@@ -1,10 +1,8 @@
-import { cliClient } from "@litmus/cli";
+import { CliDriver } from "@litmus/cli/testing";
 
 import type { BookshopCli } from "#bookshop/entrypoints/cli/app.ts";
 import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 import { EmailStubClient } from "#bookshop/test-acceptance/email-stub-client.ts";
-
-type BookshopCliClient = ReturnType<typeof cliClient<BookshopCli>>;
 
 interface BookSearchResult {
   title: string;
@@ -12,14 +10,16 @@ interface BookSearchResult {
   price: number;
 }
 
-export class BookshopCliDriver implements BookshopDriver {
-  readonly #client: BookshopCliClient;
+export class BookshopCliDriver
+  extends CliDriver<BookshopCli>
+  implements BookshopDriver
+{
   readonly #emailStub: EmailStubClient;
   #currentCustomerEmail?: string;
   #lastSearchResults: BookSearchResult[] = [];
 
   constructor(socketPath: string, emailStubBaseUrl: string) {
-    this.#client = cliClient<BookshopCli>(socketPath);
+    super({ socket: socketPath });
     this.#emailStub = new EmailStubClient(emailStubBaseUrl);
   }
 
@@ -39,11 +39,11 @@ export class BookshopCliDriver implements BookshopDriver {
     author: string;
     price: number;
   }): Promise<void> {
-    await this.#client.exec("books:put-on-sale", input);
+    await this.client.exec("books:put-on-sale", input);
   }
 
   async registerCustomer(name: string, email: string): Promise<void> {
-    await this.#client.exec("customers:register", { name, email });
+    await this.client.exec("customers:register", { name, email });
   }
 
   async assertConfirmationEmailSent(to: string): Promise<void> {
@@ -59,7 +59,7 @@ export class BookshopCliDriver implements BookshopDriver {
   }
 
   async searchBooksByAuthor(author: string): Promise<void> {
-    this.#lastSearchResults = await this.#client.exec("books:search", {
+    this.#lastSearchResults = await this.client.exec("books:search", {
       author,
     });
   }
@@ -71,20 +71,20 @@ export class BookshopCliDriver implements BookshopDriver {
         `Book "${title}" is not among the current search results`,
       );
     }
-    await this.#client.exec("cart:add-book", {
+    await this.client.exec("cart:add-book", {
       customerEmail: this.#customerEmail,
       title,
     });
   }
 
   async checkOut(): Promise<void> {
-    await this.#client.exec("cart:check-out", {
+    await this.client.exec("cart:check-out", {
       customerEmail: this.#customerEmail,
     });
   }
 
   async assertBookPurchased(title: string): Promise<void> {
-    const orders = await this.#client.exec("orders:list", {
+    const orders = await this.client.exec("orders:list", {
       customerEmail: this.#customerEmail,
     });
     const found = orders.some((order) =>
