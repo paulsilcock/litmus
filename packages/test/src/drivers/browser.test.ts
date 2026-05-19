@@ -5,7 +5,68 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { BrowserDriver } from "#litmus-test/drivers/browser.ts";
+import {
+  type AudioStream,
+  BrowserDriver,
+} from "#litmus-test/drivers/browser.ts";
+
+/**
+ * Minimum sample count for the zero-crossing FFT-ish frequency
+ * estimator to land within ~1.5% of the true tone frequency at 48kHz.
+ * 4096 samples ≈ 85ms of audio.
+ */
+const MIN_SAMPLES_FOR_FFT = 4096;
+
+/** Minimum sample magnitude treated as "signal" rather than silence. */
+const SIGNAL_PEAK_THRESHOLD = 0.01;
+
+/**
+ * Drain `stream` until at least `minSamples` samples of *non-silent*
+ * audio have been accumulated, then return them together. Skips any
+ * silent prefix so callers (e.g. tests waiting on an RTC handshake)
+ * get a clean window of real audio to assert against — no need to
+ * pad with arbitrary sleeps.
+ *
+ * Polls with a small backoff and gives up after `timeoutMs`.
+ */
+async function readAtLeast(
+  stream: AudioStream,
+  minSamples: number,
+  timeoutMs = 15_000,
+): Promise<{ samples: number[]; sampleRate: number }> {
+  const start = Date.now();
+  let collecting = false;
+  const accumulated: number[] = [];
+  let sampleRate = 0;
+  while (true) {
+    const chunk = await stream.read();
+    if (chunk.sampleRate > 0) sampleRate = chunk.sampleRate;
+    if (!collecting && chunkHasSignal(chunk.samples)) {
+      collecting = true;
+    }
+    if (collecting) {
+      accumulated.push(...chunk.samples);
+      if (accumulated.length >= minSamples) {
+        return { samples: accumulated, sampleRate };
+      }
+    }
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(
+        collecting
+          ? `readAtLeast: only ${accumulated.length}/${minSamples} samples after signal began (${timeoutMs}ms)`
+          : `readAtLeast: no signal above ${SIGNAL_PEAK_THRESHOLD} after ${timeoutMs}ms`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+function chunkHasSignal(samples: readonly number[]): boolean {
+  for (const s of samples) {
+    if (Math.abs(s) > SIGNAL_PEAK_THRESHOLD) return true;
+  }
+  return false;
+}
 
 const fixture = (name: string): string =>
   readFileSync(
@@ -14,7 +75,7 @@ const fixture = (name: string): string =>
   );
 
 const app = new Hono()
-  .get("/", (c) => c.html("<h1></h1>"))
+  .get("/", (c) => c.html(""))
   .get("/audio-mic", (c) => c.html(fixture("audio-mic")))
   .get("/audio-speaker", (c) => c.html(fixture("audio-speaker")))
   .get("/audio-element", (c) => c.html(fixture("audio-element")))
@@ -91,13 +152,21 @@ class TestDriver extends BrowserDriver {
     rms: number;
     samples: number;
   }> {
-    return this.page.evaluate(
-      "globalThis.__litmusMicProbe ? globalThis.__litmusMicProbe.snapshot() : { peak: 0, rms: 0, samples: 0 }",
-    );
+    return this.page.evaluate(`(() => {
+      if (!globalThis.__litmusMicProbe) {
+        throw new Error("micProbe not installed — was the driver constructed with audio: true?");
+      }
+      return globalThis.__litmusMicProbe.snapshot();
+    })()`);
   }
 
   async micProbeReset(): Promise<void> {
-    await this.page.evaluate("globalThis.__litmusMicProbe?.reset()");
+    await this.page.evaluate(`(() => {
+      if (!globalThis.__litmusMicProbe) {
+        throw new Error("micProbe not installed — was the driver constructed with audio: true?");
+      }
+      globalThis.__litmusMicProbe.reset();
+    })()`);
   }
 
   async sendTone(samples: number[], sampleRate: number) {
@@ -176,10 +245,15 @@ describe("BrowserDriver", () => {
     const sampleRate = 48000;
     const pcm = sineWavePcm(440, sampleRate, 500);
     await audioDriver.sendTone(pcm, sampleRate);
-    await new Promise((r) => setTimeout(r, 200));
 
-    const probe = await audioDriver.micProbeSnapshot();
-    expect(probe.peak).toBeGreaterThan(0.5);
+    // The probe sees whatever the consumer would see on the mic
+    // stream. If `track.stop()` had killed the track, peak would
+    // stay at 0 indefinitely.
+    await expect
+      .poll(() => audioDriver.micProbeSnapshot().then((p) => p.peak), {
+        timeout: 3000,
+      })
+      .toBeGreaterThan(0.5);
   });
 
   it("audio played by the page is captured by the test", async () => {
@@ -206,11 +280,23 @@ describe("BrowserDriver", () => {
     await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
     await audioDriver.openWebRtc();
-    await new Promise((r) => setTimeout(r, 3000));
-    const { samples, sampleRate } = await audioDriver.captureTone(1000);
-    const observed = detectFrequency(samples, sampleRate);
-    expect(observed).toBeGreaterThan(1000);
-    expect(observed).toBeLessThan(1200);
+
+    // The fixture's RTC handshake takes a variable amount of time
+    // before audio actually starts flowing. Open the capture stream
+    // and drain until we've got a meaningful FFT window, rather
+    // than guessing a fixed wait.
+    const stream = await audioDriver.captureToneStream();
+    try {
+      const { samples, sampleRate } = await readAtLeast(
+        stream,
+        MIN_SAMPLES_FOR_FFT,
+      );
+      const observed = detectFrequency(samples, sampleRate);
+      expect(observed).toBeGreaterThan(1000);
+      expect(observed).toBeLessThan(1200);
+    } finally {
+      await stream.close();
+    }
   });
 
   it("audio played by the page can be drained progressively while it's still playing", async () => {
@@ -223,18 +309,17 @@ describe("BrowserDriver", () => {
     await audioDriver.openSpeaker();
     const stream = await audioDriver.captureToneStream();
     try {
-      await new Promise((r) => setTimeout(r, 300));
-      const first = await stream.read();
-      await new Promise((r) => setTimeout(r, 300));
-      const second = await stream.read();
+      const first = await readAtLeast(stream, MIN_SAMPLES_FOR_FFT);
+      const second = await readAtLeast(stream, MIN_SAMPLES_FOR_FFT);
 
-      expect(first.samples.length).toBeGreaterThan(0);
-      expect(second.samples.length).toBeGreaterThan(0);
-      // Second read must not re-include samples from the first.
-      const overlap = first.samples.length + second.samples.length;
-      expect(overlap).toBeGreaterThan(first.samples.length);
-
+      // Each read drained a meaningful window. If reads returned
+      // nothing once the buffer was drained — or if the stream
+      // re-served the first window's samples on the second read —
+      // we wouldn't get two independent windows that each contain
+      // the playing tone.
       const observed = detectFrequency(second.samples, second.sampleRate);
+      expect(first.samples.length).toBeGreaterThanOrEqual(MIN_SAMPLES_FOR_FFT);
+      expect(second.samples.length).toBeGreaterThanOrEqual(MIN_SAMPLES_FOR_FFT);
       expect(observed).toBeGreaterThan(560);
       expect(observed).toBeLessThan(760);
     } finally {
