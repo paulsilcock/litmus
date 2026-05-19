@@ -5,7 +5,7 @@ import {
   type Page,
 } from "playwright";
 
-import { BaseDriver } from "#litmus-test/drivers/base.ts";
+import { Driver } from "#litmus-test/drivers/base.ts";
 
 interface BrowserDriverOptions {
   baseUrl: string;
@@ -13,14 +13,15 @@ interface BrowserDriverOptions {
 }
 
 /**
- * Base driver for acceptance tests that interact with a web app
+ * Driver for acceptance tests that interact with a web app
  * through a real browser via Playwright. Each driver instance gets
  * its own browser context with isolated cookies and storage —
  * safe for concurrent test runs.
  *
  * Subclasses use `this.page` for navigation and queries. Construct
  * synchronously, then call `await driver.init()` to launch the
- * browser before use, and `await driver.cleanup()` to release it.
+ * browser before use. Scope the driver's lifetime with `await using`
+ * so the browser is released when the block exits.
  *
  * **Prefer semantic locators** like `page.getByRole("button", { name: "Submit" })`
  * over CSS or XPath selectors. They're resilient to markup changes,
@@ -42,7 +43,7 @@ interface BrowserDriverOptions {
  *
  * @example
  * ```typescript
- * class OrderDriver extends BaseBrowserDriver {
+ * class OrderDriver extends BrowserDriver {
  *   async placeOrder(customerId: string) {
  *     await this.page.goto("/orders/new");
  *     await this.page.getByLabel("Customer").fill(customerId);
@@ -50,13 +51,13 @@ interface BrowserDriverOptions {
  *   }
  * }
  *
- * const driver = new OrderDriver({ baseUrl: "http://localhost:3000" });
+ * await using driver = new OrderDriver({ baseUrl: "http://localhost:3000" });
  * await driver.init();
  * await driver.placeOrder("cust_1");
- * await driver.cleanup();
+ * // driver disposed when the block exits — browser closed automatically
  * ```
  */
-export abstract class BaseBrowserDriver extends BaseDriver {
+export abstract class BrowserDriver extends Driver {
   readonly #options: BrowserDriverOptions;
   #browser?: Browser;
   #context?: BrowserContext;
@@ -69,14 +70,14 @@ export abstract class BaseBrowserDriver extends BaseDriver {
 
   protected get page(): Page {
     if (!this.#page) {
-      throw new Error("BaseBrowserDriver: call init() before using page");
+      throw new Error("BrowserDriver: call init() before using page");
     }
     return this.#page;
   }
 
   protected get context(): BrowserContext {
     if (!this.#context) {
-      throw new Error("BaseBrowserDriver: call init() before using context");
+      throw new Error("BrowserDriver: call init() before using context");
     }
     return this.#context;
   }
@@ -91,7 +92,7 @@ export abstract class BaseBrowserDriver extends BaseDriver {
     this.#page = await this.#context.newPage();
   }
 
-  async cleanup(): Promise<void> {
+  async [Symbol.asyncDispose](): Promise<void> {
     await this.#browser?.close();
   }
 }

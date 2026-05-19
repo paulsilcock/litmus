@@ -6,8 +6,8 @@ import {
 import { eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
-import { Book, BookNotFound } from "../../domain/book.ts";
-import { books } from "../db/schema.ts";
+import { Book, BookNotFound } from "#bookshop/domain/book.ts";
+import { books } from "#bookshop/infra/db/schema.ts";
 
 @singleton()
 export class BookRepository extends DrizzlePostgresRepository<

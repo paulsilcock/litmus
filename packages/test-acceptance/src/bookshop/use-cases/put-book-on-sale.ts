@@ -1,8 +1,15 @@
 import { CommandHandler } from "@litmus/core";
 import { injectable } from "tsyringe";
+import { z } from "zod";
 
-import { Book } from "../domain/book.ts";
-import { BookRepository } from "../infra/repositories/book-repository.ts";
+import { Book } from "#bookshop/domain/book.ts";
+import { BookRepository } from "#bookshop/infra/repositories/book-repository.ts";
+
+export const PutBookOnSaleSchema = z.object({
+  title: z.string(),
+  author: z.string(),
+  price: z.number(),
+});
 
 interface PutBookOnSaleCommand extends Record<string, unknown> {
   title: string;

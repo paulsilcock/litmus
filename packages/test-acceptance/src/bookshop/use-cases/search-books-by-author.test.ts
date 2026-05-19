@@ -1,9 +1,10 @@
 import { container } from "tsyringe";
 import { describe, expect, it } from "vite-plus/test";
 
-import { Book } from "../domain/book.ts";
-import { BookRepository } from "../infra/repositories/book-repository.ts";
-import { setupBookshopTest } from "../test-support/init-test-container.ts";
+import { Book } from "#bookshop/domain/book.ts";
+import { BookRepository } from "#bookshop/infra/repositories/book-repository.ts";
+import { setupBookshopTest } from "#bookshop/test-support/init-test-container.ts";
+
 import { SearchBooksByAuthor } from "./search-books-by-author.ts";
 
 describe("SearchBooksByAuthor", () => {

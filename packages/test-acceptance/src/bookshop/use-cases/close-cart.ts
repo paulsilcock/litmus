@@ -1,8 +1,8 @@
 import { CommandHandler } from "@litmus/core";
 import { injectable } from "tsyringe";
 
-import type { CartId } from "../domain/cart.ts";
-import { CartRepository } from "../infra/repositories/cart-repository.ts";
+import type { CartId } from "#bookshop/domain/cart.ts";
+import { CartRepository } from "#bookshop/infra/repositories/cart-repository.ts";
 
 interface CloseCartCommand extends Record<string, unknown> {
   cartId: CartId;

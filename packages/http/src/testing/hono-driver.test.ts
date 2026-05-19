@@ -2,13 +2,13 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { BaseHonoDriver } from "#litmus-http/testing/hono-driver.ts";
+import { HonoDriver } from "#litmus-http/testing/hono-driver.ts";
 
 const app = new Hono().get("/orders", (c) => c.json([{ id: "order_1" }]));
 
 type App = typeof app;
 
-class TestDriver extends BaseHonoDriver<App> {
+class TestDriver extends HonoDriver<App> {
   async listOrders() {
     const res = await this.client.orders.$get();
     return res.json();
@@ -16,7 +16,7 @@ class TestDriver extends BaseHonoDriver<App> {
   async cleanup() {}
 }
 
-describe("BaseHonoDriver", () => {
+describe("HonoDriver", () => {
   let server: ReturnType<typeof serve>;
   let driver: TestDriver;
 

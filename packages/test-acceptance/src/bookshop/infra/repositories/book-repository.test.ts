@@ -1,8 +1,9 @@
 import { container } from "tsyringe";
 import { describe, expect, it } from "vite-plus/test";
 
-import { Book, BookNotFound } from "../../domain/book.ts";
-import { setupBookshopTest } from "../../test-support/init-test-container.ts";
+import { Book, BookNotFound } from "#bookshop/domain/book.ts";
+import { setupBookshopTest } from "#bookshop/test-support/init-test-container.ts";
+
 import { BookRepository } from "./book-repository.ts";
 
 describe("BookRepository", () => {

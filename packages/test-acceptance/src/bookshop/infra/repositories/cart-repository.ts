@@ -6,10 +6,10 @@ import {
 import { and, eq } from "drizzle-orm";
 import { singleton } from "tsyringe";
 
-import type { CartId, CartLine, CartStatus } from "../../domain/cart.ts";
-import { Cart } from "../../domain/cart.ts";
-import type { CustomerId } from "../../domain/customer.ts";
-import { carts } from "../db/schema.ts";
+import type { CartId, CartLine, CartStatus } from "#bookshop/domain/cart.ts";
+import { Cart } from "#bookshop/domain/cart.ts";
+import type { CustomerId } from "#bookshop/domain/customer.ts";
+import { carts } from "#bookshop/infra/db/schema.ts";
 
 @singleton()
 export class CartRepository extends DrizzlePostgresRepository<

@@ -1,5 +1,9 @@
 import "reflect-metadata";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { PGlite } from "@electric-sql/pglite";
+import { serveCli } from "@litmus/cli";
 import {
   DomainEventDispatcher,
   registerDomainEventHandlers,
@@ -11,6 +15,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { container } from "tsyringe";
 
 import { OrderPlaced } from "./domain/order.ts";
+import { createBookshopCli } from "./entrypoints/cli/app.ts";
 import { createBookshopApp } from "./entrypoints/http/app.ts";
 import { schema } from "./infra/db/schema.ts";
 import { EMAIL_SERVICE } from "./infra/email/email-service.ts";
@@ -27,6 +32,7 @@ import { SendOrderConfirmation } from "./use-cases/send-order-confirmation.ts";
 export interface RunningBookshop {
   baseUrl: string;
   emailStubBaseUrl: string;
+  cliSocketPath: string;
   stop(): Promise<void>;
 }
 
@@ -76,10 +82,19 @@ export async function bootstrapBookshop(): Promise<RunningBookshop> {
     },
   });
 
+  const cli = createBookshopCli();
+  const cliSocketPath = join(
+    tmpdir(),
+    `bookshop-${process.pid}-${Date.now()}.sock`,
+  );
+  const cliServer = await serveCli(cli, { socket: cliSocketPath });
+
   return {
     baseUrl: `http://localhost:${server.port}`,
     emailStubBaseUrl: emailStub.baseUrl,
+    cliSocketPath,
     async stop() {
+      await cliServer.stop();
       await server.stop();
       await emailStub.stop();
       container.reset();

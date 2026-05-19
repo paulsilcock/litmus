@@ -1,8 +1,14 @@
 import { CommandHandler } from "@litmus/core";
 import { injectable } from "tsyringe";
+import { z } from "zod";
 
-import { Customer } from "../domain/customer.ts";
-import { CustomerRepository } from "../infra/repositories/customer-repository.ts";
+import { Customer } from "#bookshop/domain/customer.ts";
+import { CustomerRepository } from "#bookshop/infra/repositories/customer-repository.ts";
+
+export const RegisterCustomerSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+});
 
 interface RegisterCustomerCommand extends Record<string, unknown> {
   name: string;
