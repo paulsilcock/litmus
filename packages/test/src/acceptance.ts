@@ -3,17 +3,19 @@ import { test as baseTest } from "vite-plus/test";
 import { Dsl } from "#litmus-test/dsl.ts";
 import { evaluate as baseEvaluate } from "#litmus-test/evaluate/index.ts";
 
-function isAsyncDisposable(value: unknown): value is AsyncDisposable {
-  return (
-    typeof value === "object" && value !== null && Symbol.asyncDispose in value
-  );
+async function runWithDsl<TDsl extends Dsl>(
+  factory: () => Promise<TDsl> | TDsl,
+  body: (dsl: TDsl) => Promise<void>,
+): Promise<void> {
+  await using dsl = await factory();
+  await body(dsl);
 }
 
 /**
  * Build a customized test/eval namespace that injects a fresh `Dsl`
  * into every test via the `dsl` fixture and disposes it after the
- * test completes (via `[Symbol.asyncDispose]()` if the dsl implements
- * it). Test authors never construct or dispose a dsl themselves.
+ * test completes (via `[Symbol.asyncDispose]()`). Test authors never
+ * construct or dispose a dsl themselves.
  *
  * @param factory - Called per-test. Closes over whatever the project
  *   set up in `beforeAll` (running SUT, config, etc.) and returns a
@@ -52,28 +54,12 @@ export function acceptance<TDsl extends Dsl>(
 ) {
   const extendedTest = baseTest.extend<{ dsl: TDsl }>({
     // oxlint-disable-next-line no-empty-pattern -- vitest fixture parser requires object destructuring
-    dsl: async ({}, use) => {
-      const dsl = await factory();
-      try {
-        await use(dsl);
-      } finally {
-        if (isAsyncDisposable(dsl)) {
-          await dsl[Symbol.asyncDispose]();
-        }
-      }
-    },
+    dsl: async ({}, use) => runWithDsl(factory, use),
   });
 
-  const extendedEvaluate = baseEvaluate.extend<{ dsl: TDsl }>(async (use) => {
-    const dsl = await factory();
-    try {
-      await use({ dsl });
-    } finally {
-      if (isAsyncDisposable(dsl)) {
-        await dsl[Symbol.asyncDispose]();
-      }
-    }
-  });
+  const extendedEvaluate = baseEvaluate.extend<{ dsl: TDsl }>((use) =>
+    runWithDsl(factory, (dsl) => use({ dsl })),
+  );
 
   return {
     it: extendedTest,

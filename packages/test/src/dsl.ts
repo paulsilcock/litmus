@@ -78,4 +78,12 @@ export abstract class Dsl {
   constructor(context?: DslContext) {
     this.context = context ?? new DslContext();
   }
+
+  /**
+   * Default dispose hook is a no-op. Override to release resources
+   * (close a browser, tear down a connection, etc.). Test fixtures
+   * scope the dsl's lifetime with `await using`, so this runs after
+   * the test body even on throw.
+   */
+  async [Symbol.asyncDispose](): Promise<void> {}
 }
