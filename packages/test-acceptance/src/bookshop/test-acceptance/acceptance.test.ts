@@ -1,23 +1,21 @@
 import { acceptance } from "@litmus/test";
-import { afterAll, beforeAll, describe } from "vite-plus/test";
+import { afterAll, beforeAll, describe, TestRunner } from "vite-plus/test";
 
 import { bootstrapBookshop, type RunningBookshop } from "#bookshop/bookshop.ts";
 
 import { createBookshopDriver } from "./driver.ts";
 import { BookshopDsl } from "./dsl.ts";
 
-// Cross-driver suite: only runs when BOOKSHOP_DRIVER is set, which the CI
-// matrix job does explicitly. Skipped in the regular `vp test` run so the
-// same scenarios aren't exercised twice per CI build.
-describe.runIf(process.env["BOOKSHOP_DRIVER"])("bookshop", () => {
+describe("bookshop", { tags: ["bookshop-acceptance"] }, () => {
   let bookshop: RunningBookshop;
 
   beforeAll(async () => {
+    if (!TestRunner.matchesTags(["bookshop-acceptance"])) return;
     bookshop = await bootstrapBookshop();
   });
 
   afterAll(async () => {
-    await bookshop.stop();
+    await bookshop?.stop();
   });
 
   const { it } = acceptance(

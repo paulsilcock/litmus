@@ -35,10 +35,10 @@ jobs:
       - run: vp check
       - name: Run changed tests (PR)
         if: github.event_name == 'pull_request'
-        run: vp test --changed ${{ github.event.pull_request.base.sha }}
+        run: vp test --changed ${{ github.event.pull_request.base.sha }} --tags-filter='!bookshop-acceptance' --passWithNoTests
       - name: Run full test suite (push to main)
         if: github.event_name == 'push'
-        run: vp test
+        run: vp test --tags-filter='!bookshop-acceptance'
       - run: vp run -r build
 
   bookshop-acceptance:
@@ -59,4 +59,4 @@ jobs:
           cache: true
       - run: vp install
       - name: Run bookshop acceptance tests
-        run: vp test --run packages/test-acceptance/src/bookshop/test-acceptance/acceptance.test.ts
+        run: vp test --run --tags-filter=bookshop-acceptance
