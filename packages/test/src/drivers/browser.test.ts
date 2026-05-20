@@ -11,11 +11,11 @@ import {
 } from "#litmus-test/drivers/browser.ts";
 
 /**
- * Minimum sample count for the zero-crossing FFT-ish frequency
- * estimator to land within ~1.5% of the true tone frequency at 48kHz.
+ * DFT window size. At 48kHz this gives ~12Hz bin spacing — plenty to
+ * distinguish the test fixtures' tones (440, 660, 880, 1100Hz).
  * 4096 samples ≈ 85ms of audio.
  */
-const MIN_SAMPLES_FOR_FFT = 4096;
+const FFT_WINDOW_SAMPLES = 4096;
 
 /** Minimum sample magnitude treated as "signal" rather than silence. */
 const SIGNAL_PEAK_THRESHOLD = 0.01;
@@ -98,16 +98,44 @@ function sineWavePcm(
   );
 }
 
-/** Estimate dominant frequency of a pure tone via zero-crossings. */
+/**
+ * Estimate the dominant frequency in a window by finding the DFT bin
+ * with maximum magnitude across the audible range. A pure tone
+ * concentrates energy in one bin; broadband noise (e.g. an Opus
+ * codec's startup transients on a WebRTC track) spreads thinly across
+ * many. The bin index gives a frequency within ±(sampleRate/2N) of
+ * the true tone — for 4096 samples at 48kHz that's ±6Hz.
+ *
+ * Naive O(N·B) DFT over B candidate bins. ~1.4M ops on a 4096-sample
+ * window — fine for the handful of calls per test run.
+ */
 function detectFrequency(samples: number[], sampleRate: number): number {
   if (samples.length < 2) return 0;
-  let crossings = 0;
-  for (let i = 1; i < samples.length; i++) {
-    const prev = samples[i - 1] ?? 0;
-    const curr = samples[i] ?? 0;
-    if ((prev < 0 && curr >= 0) || (prev >= 0 && curr < 0)) crossings++;
+  const N = samples.length;
+  const minBin = Math.max(1, Math.floor((100 * N) / sampleRate));
+  const maxBin = Math.min(
+    Math.floor(N / 2),
+    Math.ceil((4000 * N) / sampleRate),
+  );
+  let bestMag = 0;
+  let bestBin = minBin;
+  for (let k = minBin; k <= maxBin; k++) {
+    let re = 0;
+    let im = 0;
+    const w = (-2 * Math.PI * k) / N;
+    for (let n = 0; n < N; n++) {
+      const angle = w * n;
+      const s = samples[n] ?? 0;
+      re += s * Math.cos(angle);
+      im += s * Math.sin(angle);
+    }
+    const mag = re * re + im * im;
+    if (mag > bestMag) {
+      bestMag = mag;
+      bestBin = k;
+    }
   }
-  return (crossings * sampleRate) / (2 * samples.length);
+  return (bestBin * sampleRate) / N;
 }
 
 class TestDriver extends BrowserDriver {
@@ -292,7 +320,7 @@ describe("BrowserDriver", () => {
     try {
       const { samples, sampleRate } = await readAtLeast(
         stream,
-        MIN_SAMPLES_FOR_FFT,
+        FFT_WINDOW_SAMPLES,
       );
       const observed = detectFrequency(samples, sampleRate);
       expect(observed).toBeGreaterThan(1000);
@@ -312,8 +340,8 @@ describe("BrowserDriver", () => {
     await audioDriver.openSpeaker();
     const stream = await audioDriver.captureToneStream();
     try {
-      const first = await readAtLeast(stream, MIN_SAMPLES_FOR_FFT);
-      const second = await readAtLeast(stream, MIN_SAMPLES_FOR_FFT);
+      const first = await readAtLeast(stream, FFT_WINDOW_SAMPLES);
+      const second = await readAtLeast(stream, FFT_WINDOW_SAMPLES);
 
       // Each read drained a meaningful window. If reads returned
       // nothing once the buffer was drained — or if the stream
@@ -321,8 +349,8 @@ describe("BrowserDriver", () => {
       // we wouldn't get two independent windows that each contain
       // the playing tone.
       const observed = detectFrequency(second.samples, second.sampleRate);
-      expect(first.samples.length).toBeGreaterThanOrEqual(MIN_SAMPLES_FOR_FFT);
-      expect(second.samples.length).toBeGreaterThanOrEqual(MIN_SAMPLES_FOR_FFT);
+      expect(first.samples.length).toBeGreaterThanOrEqual(FFT_WINDOW_SAMPLES);
+      expect(second.samples.length).toBeGreaterThanOrEqual(FFT_WINDOW_SAMPLES);
       expect(observed).toBeGreaterThan(560);
       expect(observed).toBeLessThan(760);
     } finally {
