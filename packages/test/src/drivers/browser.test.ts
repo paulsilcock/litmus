@@ -41,14 +41,17 @@ async function readAtLeast(
   while (true) {
     const chunk = await stream.read();
     if (chunk.sampleRate > 0) sampleRate = chunk.sampleRate;
-    if (!collecting && chunkHasSignal(chunk.samples)) {
-      collecting = true;
-    }
-    if (collecting) {
-      accumulated.push(...chunk.samples);
-      if (accumulated.length >= minSamples) {
-        return { samples: accumulated, sampleRate };
+    if (!collecting) {
+      const firstSignal = firstSignalIndex(chunk.samples);
+      if (firstSignal >= 0) {
+        collecting = true;
+        accumulated.push(...chunk.samples.slice(firstSignal));
       }
+    } else {
+      accumulated.push(...chunk.samples);
+    }
+    if (collecting && accumulated.length >= minSamples) {
+      return { samples: accumulated, sampleRate };
     }
     if (Date.now() - start > timeoutMs) {
       throw new Error(
@@ -61,11 +64,11 @@ async function readAtLeast(
   }
 }
 
-function chunkHasSignal(samples: readonly number[]): boolean {
-  for (const s of samples) {
-    if (Math.abs(s) > SIGNAL_PEAK_THRESHOLD) return true;
+function firstSignalIndex(samples: readonly number[]): number {
+  for (let i = 0; i < samples.length; i++) {
+    if (Math.abs(samples[i] ?? 0) > SIGNAL_PEAK_THRESHOLD) return i;
   }
-  return false;
+  return -1;
 }
 
 const fixture = (name: string): string =>
