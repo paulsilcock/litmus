@@ -3,7 +3,7 @@ import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { UserSimulator } from "#litmus-test/simulator.ts";
+import { TextUserSimulator } from "#litmus-test/simulator.ts";
 
 const mockResult = {
   usage: {
@@ -13,7 +13,7 @@ const mockResult = {
   warnings: [],
 };
 
-describe("UserSimulator", () => {
+describe("TextUserSimulator", () => {
   it("uses the provided prompt builder as-is when given", async () => {
     let captured = "";
     const model = new MockLanguageModelV3({
@@ -32,7 +32,7 @@ describe("UserSimulator", () => {
       },
     });
 
-    const simulator = new UserSimulator({
+    const simulator = new TextUserSimulator({
       model,
       prompt: () => "custom-prompt-text",
     });
@@ -59,7 +59,7 @@ describe("UserSimulator", () => {
       }),
     });
 
-    const simulator = new UserSimulator({
+    const simulator = new TextUserSimulator({
       model,
       persona: "Customer checking their account",
       goal: "Find out my account balance",
@@ -94,7 +94,7 @@ describe("UserSimulator", () => {
       }),
     });
 
-    const simulator = new UserSimulator({
+    const simulator = new TextUserSimulator({
       model,
       persona: "Stubborn customer",
       goal: "Get a refund",
@@ -127,7 +127,7 @@ describe("UserSimulator", () => {
       }),
     });
 
-    const simulator = new UserSimulator({
+    const simulator = new TextUserSimulator({
       model,
       persona: "Abusive customer",
       goal: "Win the argument",
@@ -162,7 +162,7 @@ describe("UserSimulator", () => {
       }),
     });
 
-    const simulator = new UserSimulator({
+    const simulator = new TextUserSimulator({
       model,
       persona: "Customer",
       goal: "Get my balance",
@@ -208,7 +208,7 @@ describe("UserSimulator", () => {
       },
     });
 
-    const simulator = new UserSimulator({
+    const simulator = new TextUserSimulator({
       model,
       persona: "Customer needing to book a flight",
       goal: "Book a flight to Tokyo",
@@ -276,7 +276,7 @@ describe("UserSimulator", () => {
       }),
     });
 
-    const simulator = new UserSimulator({
+    const simulator = new TextUserSimulator({
       model,
       persona: "Bargain hunter",
       goal: "Apply discount code and check total",

@@ -7,7 +7,7 @@ import {
 } from "ai";
 import { z } from "zod";
 
-type UserSimulatorOptions =
+type TextUserSimulatorOptions =
   | {
       model: LanguageModel;
       persona: string;
@@ -92,7 +92,7 @@ Decide your next message and whether your goal has been met.`;
  *
  * @example
  * ```typescript
- * const simulator = new UserSimulator({
+ * const simulator = new TextUserSimulator({
  *   model: anthropic("claude-haiku-4-5-20251001"),
  *   persona: "Impatient customer who types in lowercase",
  *   goal: "Get a refund for a duplicate charge",
@@ -105,13 +105,13 @@ Decide your next message and whether your goal has been met.`;
  * expect(conversation.outcome).toBe("goal_met");
  * ```
  */
-export class UserSimulator {
+export class TextUserSimulator {
   readonly #model: LanguageModel;
   readonly #buildPrompt: (turns: readonly Turn[]) => string;
   readonly #maxTurns: number;
   readonly #tools: ToolSet | undefined;
 
-  constructor(options: UserSimulatorOptions) {
+  constructor(options: TextUserSimulatorOptions) {
     this.#model = options.model;
     this.#maxTurns = options.maxTurns ?? 10;
     this.#tools = options.tools;

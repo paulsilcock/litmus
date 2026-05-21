@@ -138,7 +138,7 @@ export class IssueRefund extends CommandHandler<
 When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
 
 ```ts
-import { evaluate, UserSimulator } from "@litmus/test";
+import { evaluate, TextUserSimulator } from "@litmus/test";
 
 evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
   "customer gets a replacement when their book arrived damaged",
@@ -148,7 +148,7 @@ evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
       title: complaint.title,
     });
 
-    const customer = new UserSimulator({
+    const customer = new TextUserSimulator({
       model,
       persona: complaint.persona,
       goal: "get a replacement for my damaged book",
@@ -294,7 +294,7 @@ packages/
 ├── db               Postgres support via Drizzle
 ├── log              Pino-backed structured logging with AsyncLocalStorage context propagation
 ├── ai               AI SDK bridges — currently Vercel AI SDK
-├── test             ATDD + AI eval toolkit (evaluate, synthesize, UserSimulator, llmJudge, drivers)
+├── test             ATDD + AI eval toolkit (evaluate, synthesize, TextUserSimulator, llmJudge, drivers)
 └── test-acceptance  The bookshop — realistic example app exercising everything end-to-end
 ```
 
