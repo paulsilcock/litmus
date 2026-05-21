@@ -213,4 +213,44 @@ describe("VoiceUserSimulator", () => {
     // is grounded in what the system actually said.
     expect(capturedPrompt).toContain("Hello, how can I help you today?");
   });
+
+  it("the conversation ends when the system declines to continue", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockLanguageResult,
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              message: "you're useless",
+              done: false,
+            }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      }),
+    });
+
+    const simulator = new VoiceUserSimulator({
+      model,
+      speech: encodingSpeechMock(),
+      transcription: decodingTranscriptionMock(),
+      persona: "Abusive customer",
+      goal: "Win the argument",
+    });
+
+    const conversation = await simulator.run({
+      onMessage: async () => ({
+        done: true,
+        reason: "abusive language",
+      }),
+    });
+
+    expect(conversation.outcome).toBe("terminated");
+    expect(conversation.turns).toHaveLength(1);
+    expect(conversation.turns[0]).toEqual({
+      role: "user",
+      content: "you're useless",
+    });
+  });
 });

@@ -27,6 +27,9 @@ export interface AudioMessage {
   mediaType: string;
 }
 
+/** Response from the message callback — either audio to continue with, or a termination signal. */
+type MessageResponse = AudioMessage | { done: boolean; reason: string };
+
 interface Turn {
   role: "user" | "assistant";
   content: string;
@@ -38,7 +41,7 @@ interface Conversation {
 }
 
 interface RunInput {
-  onMessage: (audio: AudioMessage) => Promise<AudioMessage>;
+  onMessage: (audio: AudioMessage) => Promise<MessageResponse>;
   awaitOpening?: () => Promise<AudioMessage>;
 }
 
@@ -118,6 +121,9 @@ export class VoiceUserSimulator {
         data: speech.audio.uint8Array,
         mediaType: speech.audio.mediaType,
       });
+      if (!("data" in reply)) {
+        return { turns, outcome: "terminated" };
+      }
       const transcription = await transcribe({
         model: this.#transcription,
         audio: reply.data,
