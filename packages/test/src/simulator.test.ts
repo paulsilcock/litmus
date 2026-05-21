@@ -1,5 +1,7 @@
+import { tool } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
 import { UserSimulator } from "#litmus-test/simulator.ts";
 
@@ -278,15 +280,20 @@ describe("UserSimulator", () => {
       model,
       persona: "Bargain hunter",
       goal: "Apply discount code and check total",
+      // Tools let the simulated user take actions against the SUT
+      // before producing the next message. In a real test the
+      // `execute` would call DSL methods (e.g.
+      // `dsl.customer.applyDiscount(code)`); here we just record
+      // the call to assert it happened.
       tools: {
-        apply_discount: {
+        apply_discount: tool({
           description: "Apply a discount code",
-          parameters: { code: { type: "string" } },
-          execute: async (args: { code: string }) => {
-            toolCalls.push(args);
+          inputSchema: z.object({ code: z.string() }),
+          execute: async ({ code }) => {
+            toolCalls.push({ code });
             return { applied: true };
           },
-        },
+        }),
       },
     });
 

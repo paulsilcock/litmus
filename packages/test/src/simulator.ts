@@ -1,4 +1,10 @@
-import { generateText, type LanguageModel, Output, stepCountIs } from "ai";
+import {
+  generateText,
+  type LanguageModel,
+  Output,
+  stepCountIs,
+  type ToolSet,
+} from "ai";
 import { z } from "zod";
 
 type UserSimulatorOptions =
@@ -7,13 +13,25 @@ type UserSimulatorOptions =
       persona: string;
       goal: string;
       maxTurns?: number;
-      tools?: Record<string, any>;
+      /**
+       * Tools the simulated user can call before producing its next
+       * message. Each tool's `execute` typically wraps a DSL or
+       * driver call so the simulator can take real actions against
+       * the SUT — clicking a button, applying a coupon, navigating —
+       * not just sending text. Define with the `tool()` helper from
+       * `ai` so the input schema is real.
+       */
+      tools?: ToolSet;
     }
   | {
       model: LanguageModel;
       prompt: (turns: readonly Turn[]) => string;
       maxTurns?: number;
-      tools?: Record<string, any>;
+      /**
+       * Tools the simulated user can call before producing its next
+       * message. See the persona/goal variant for usage.
+       */
+      tools?: ToolSet;
     };
 
 /** Response from the message callback — either a text reply or a termination signal. */
@@ -103,7 +121,7 @@ export class UserSimulator {
   readonly #model: LanguageModel;
   readonly #buildPrompt: (turns: readonly Turn[]) => string;
   readonly #maxTurns: number;
-  readonly #tools: Record<string, any> | undefined;
+  readonly #tools: ToolSet | undefined;
 
   constructor(options: UserSimulatorOptions) {
     this.#model = options.model;
