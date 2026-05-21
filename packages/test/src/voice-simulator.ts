@@ -1,7 +1,6 @@
 import {
   experimental_generateSpeech as generateSpeech,
   generateText,
-  type GeneratedAudioFile,
   type LanguageModel,
   Output,
   type SpeechModel,
@@ -19,6 +18,15 @@ interface VoiceUserSimulatorOptions {
   maxTurns?: number;
 }
 
+/**
+ * One side of an audio exchange: the bytes plus their IANA media
+ * type. Carried by `onMessage` in both directions.
+ */
+export interface AudioMessage {
+  data: Uint8Array;
+  mediaType: string;
+}
+
 interface Turn {
   role: "user" | "assistant";
   content: string;
@@ -30,7 +38,7 @@ interface Conversation {
 }
 
 interface RunInput {
-  onMessage: (audio: GeneratedAudioFile) => Promise<GeneratedAudioFile>;
+  onMessage: (audio: AudioMessage) => Promise<AudioMessage>;
 }
 
 const userResponseSchema = z.object({
@@ -96,10 +104,13 @@ export class VoiceUserSimulator {
         return { turns, outcome: "goal_met" };
       }
 
-      const reply = await input.onMessage(speech.audio);
+      const reply = await input.onMessage({
+        data: speech.audio.uint8Array,
+        mediaType: speech.audio.mediaType,
+      });
       const transcription = await transcribe({
         model: this.#transcription,
-        audio: reply.uint8Array,
+        audio: reply.data,
       });
       turns.push({ role: "assistant", content: transcription.text });
     }

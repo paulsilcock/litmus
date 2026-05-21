@@ -77,13 +77,12 @@ describe("VoiceUserSimulator", () => {
 
     const conversation = await simulator.run({
       onMessage: async (audio) => {
-        const heardFromUser = new TextDecoder().decode(audio.uint8Array);
+        const heardFromUser = new TextDecoder().decode(audio.data);
         const reply = heardFromUser.toLowerCase().includes("balance")
           ? "$1250"
           : "OK";
         return {
-          uint8Array: new TextEncoder().encode(reply),
-          base64: "",
+          data: new TextEncoder().encode(reply),
           mediaType: "audio/wav",
         };
       },
@@ -137,8 +136,7 @@ describe("VoiceUserSimulator", () => {
 
     const conversation = await simulator.run({
       onMessage: async () => ({
-        uint8Array: new TextEncoder().encode("I can't help with that"),
-        base64: "",
+        data: new TextEncoder().encode("I can't help with that"),
         mediaType: "audio/wav",
       }),
     });
