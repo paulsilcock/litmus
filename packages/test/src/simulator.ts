@@ -1,4 +1,10 @@
-import { generateText, type LanguageModel, Output, stepCountIs } from "ai";
+import {
+  generateText,
+  type LanguageModel,
+  Output,
+  stepCountIs,
+  type ToolSet,
+} from "ai";
 import { z } from "zod";
 
 type UserSimulatorOptions =
@@ -7,13 +13,13 @@ type UserSimulatorOptions =
       persona: string;
       goal: string;
       maxTurns?: number;
-      tools?: Record<string, any>;
+      tools?: ToolSet;
     }
   | {
       model: LanguageModel;
       prompt: (turns: readonly Turn[]) => string;
       maxTurns?: number;
-      tools?: Record<string, any>;
+      tools?: ToolSet;
     };
 
 /** Response from the message callback — either a text reply or a termination signal. */
@@ -103,7 +109,7 @@ export class UserSimulator {
   readonly #model: LanguageModel;
   readonly #buildPrompt: (turns: readonly Turn[]) => string;
   readonly #maxTurns: number;
-  readonly #tools: Record<string, any> | undefined;
+  readonly #tools: ToolSet | undefined;
 
   constructor(options: UserSimulatorOptions) {
     this.#model = options.model;

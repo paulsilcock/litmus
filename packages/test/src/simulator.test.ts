@@ -1,5 +1,7 @@
+import { tool } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
 import { UserSimulator } from "#litmus-test/simulator.ts";
 
@@ -279,14 +281,14 @@ describe("UserSimulator", () => {
       persona: "Bargain hunter",
       goal: "Apply discount code and check total",
       tools: {
-        apply_discount: {
+        apply_discount: tool({
           description: "Apply a discount code",
-          parameters: { code: { type: "string" } },
-          execute: async (args: { code: string }) => {
-            toolCalls.push(args);
+          inputSchema: z.object({ code: z.string() }),
+          execute: async ({ code }) => {
+            toolCalls.push({ code });
             return { applied: true };
           },
-        },
+        }),
       },
     });
 
