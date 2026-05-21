@@ -7,28 +7,20 @@ import {
 } from "ai";
 import { z } from "zod";
 
-interface BaseOptions {
-  /** Language model used to generate the simulated user's messages. */
-  model: LanguageModel;
-  /** Maximum user turns before the run terminates as `max_turns`. Defaults to 10. */
-  maxTurns?: number;
-  /** Tools the simulated user can call. Define with `tool()` from `ai`. */
-  tools?: ToolSet;
-}
-
-type UserSimulatorOptions = BaseOptions &
-  (
-    | {
-        /** Persona description used by the default per-turn prompt. */
-        persona: string;
-        /** Goal the simulated user is trying to achieve. */
-        goal: string;
-      }
-    | {
-        /** Full per-turn prompt builder. Mutually exclusive with `persona`/`goal`. */
-        prompt: (turns: readonly Turn[]) => string;
-      }
-  );
+type UserSimulatorOptions =
+  | {
+      model: LanguageModel;
+      persona: string;
+      goal: string;
+      maxTurns?: number;
+      tools?: ToolSet;
+    }
+  | {
+      model: LanguageModel;
+      prompt: (turns: readonly Turn[]) => string;
+      maxTurns?: number;
+      tools?: ToolSet;
+    };
 
 /** Response from the message callback — either a text reply or a termination signal. */
 type MessageResponse = string | { done: boolean; reason: string };
