@@ -14,7 +14,7 @@ const mockResult = {
 };
 
 describe("TextUserSimulator", () => {
-  it("uses the provided prompt builder as-is when given", async () => {
+  it("a custom prompt is used verbatim instead of the persona-and-goal default", async () => {
     let captured = "";
     const model = new MockLanguageModelV3({
       doGenerate: async ({ prompt }) => {
@@ -148,7 +148,7 @@ describe("TextUserSimulator", () => {
     });
   });
 
-  it("uses the provided opening message instead of generating one", async () => {
+  it("the simulated user can be told what to say first", async () => {
     const model = new MockLanguageModelV3({
       doGenerate: async () => ({
         ...mockResult,
