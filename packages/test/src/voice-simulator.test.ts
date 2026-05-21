@@ -96,4 +96,58 @@ describe("VoiceUserSimulator", () => {
       { role: "user", content: "Thanks!" },
     ]);
   });
+
+  it("the simulated user gives up after a configured number of turns when the goal is never reached", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockLanguageResult,
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ message: "still trying", done: false }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      }),
+    });
+
+    const speech = new MockSpeechModelV3({
+      doGenerate: async ({ text }) => ({
+        ...mockSpeechMeta,
+        audio: new TextEncoder().encode(text),
+      }),
+    });
+
+    const transcription = new MockTranscriptionModelV3({
+      doGenerate: async ({ audio }) => ({
+        ...mockTranscriptionMeta,
+        text:
+          typeof audio === "string" ? audio : new TextDecoder().decode(audio),
+      }),
+    });
+
+    const simulator = new VoiceUserSimulator({
+      model,
+      speech,
+      transcription,
+      persona: "Stubborn customer",
+      goal: "Get a refund",
+      maxTurns: 3,
+    });
+
+    const conversation = await simulator.run({
+      onMessage: async () => ({
+        uint8Array: new TextEncoder().encode("I can't help with that"),
+        base64: "",
+        mediaType: "audio/wav",
+      }),
+    });
+
+    expect(conversation.outcome).toBe("max_turns");
+    expect(conversation.turns).toHaveLength(6);
+    expect(conversation.turns.filter((t) => t.role === "user")).toHaveLength(3);
+    expect(
+      conversation.turns.filter((t) => t.role === "assistant"),
+    ).toHaveLength(3);
+  });
 });
