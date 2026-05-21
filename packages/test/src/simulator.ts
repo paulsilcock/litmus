@@ -13,24 +13,13 @@ type UserSimulatorOptions =
       persona: string;
       goal: string;
       maxTurns?: number;
-      /**
-       * Tools the simulated user can call before producing its next
-       * message. Each tool's `execute` typically wraps a DSL or
-       * driver call so the simulator can take real actions against
-       * the SUT — clicking a button, applying a coupon, navigating —
-       * not just sending text. Define with the `tool()` helper from
-       * `ai` so the input schema is real.
-       */
+      /** Tools the simulated user can call. Define with `tool()` from `ai`. */
       tools?: ToolSet;
     }
   | {
       model: LanguageModel;
       prompt: (turns: readonly Turn[]) => string;
       maxTurns?: number;
-      /**
-       * Tools the simulated user can call before producing its next
-       * message. See the persona/goal variant for usage.
-       */
       tools?: ToolSet;
     };
 

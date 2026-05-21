@@ -280,11 +280,6 @@ describe("UserSimulator", () => {
       model,
       persona: "Bargain hunter",
       goal: "Apply discount code and check total",
-      // Tools let the simulated user take actions against the SUT
-      // before producing the next message. In a real test the
-      // `execute` would call DSL methods (e.g.
-      // `dsl.customer.applyDiscount(code)`); here we just record
-      // the call to assert it happened.
       tools: {
         apply_discount: tool({
           description: "Apply a discount code",
