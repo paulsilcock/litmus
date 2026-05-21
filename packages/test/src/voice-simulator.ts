@@ -39,6 +39,7 @@ interface Conversation {
 
 interface RunInput {
   onMessage: (audio: AudioMessage) => Promise<AudioMessage>;
+  awaitOpening?: () => Promise<AudioMessage>;
 }
 
 const userResponseSchema = z.object({
@@ -84,6 +85,15 @@ export class VoiceUserSimulator {
 
   async run(input: RunInput): Promise<Conversation> {
     const turns: Turn[] = [];
+
+    if (input.awaitOpening) {
+      const opening = await input.awaitOpening();
+      const transcription = await transcribe({
+        model: this.#transcription,
+        audio: opening.data,
+      });
+      turns.push({ role: "assistant", content: transcription.text });
+    }
 
     for (let i = 0; i < this.#maxTurns; i++) {
       const result = await generateText({
