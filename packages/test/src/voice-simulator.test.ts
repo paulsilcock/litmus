@@ -155,7 +155,7 @@ describe("VoiceUserSimulator", () => {
     ).toHaveLength(3);
   });
 
-  it("when the system speaks first, the user's first reply is informed by its opening", async () => {
+  it("the simulated user can wait for a message rather than opening the conversation", async () => {
     // `awaitOpening` is how the test author tells the simulator
     // "wait for the system to greet first, then start". The system's
     // opening audio is transcribed; the resulting text is recorded
