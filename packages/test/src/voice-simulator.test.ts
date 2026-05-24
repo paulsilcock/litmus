@@ -1,9 +1,11 @@
+import { tool } from "ai";
 import {
   MockLanguageModelV3,
   MockSpeechModelV3,
   MockTranscriptionModelV3,
 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
 import { VoiceUserSimulator } from "#litmus-test/voice-simulator.ts";
 
@@ -291,6 +293,113 @@ describe("VoiceUserSimulator", () => {
       { role: "user", content: "What's my balance?" },
       { role: "assistant", content: "$1250" },
       { role: "user", content: "Thanks!" },
+    ]);
+  });
+
+  it("the simulated user can take actions via tools before producing the next utterance", async () => {
+    const toolCalls: Array<{ code: string }> = [];
+    const synthesizedTexts: string[] = [];
+
+    // Scripted LLM responses for the tool round-trip:
+    //   1. First call inside turn 1: emit a tool call.
+    //   2. Second call inside turn 1: emit the final user message.
+    //   3. Turn 2: thanks, done.
+    const responses = [
+      {
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: "call_1",
+            toolName: "apply_discount",
+            input: JSON.stringify({ code: "SAVE10" }),
+          },
+        ],
+        finishReason: { unified: "tool-calls" as const, raw: undefined },
+      },
+      {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              message: "I've applied my discount code, what's the total?",
+              done: false,
+            }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      },
+      {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ message: "Thanks!", done: true }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      },
+    ];
+    let callIndex = 0;
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockLanguageResult,
+        ...responses[callIndex++],
+      }),
+    });
+
+    // Speech mock captures which texts were synthesised — lets us
+    // assert that TTS ran on the final user messages only, not on
+    // the tool-call round.
+    const speech = new MockSpeechModelV3({
+      doGenerate: async ({ text }) => {
+        synthesizedTexts.push(text);
+        return {
+          ...mockSpeechMeta,
+          audio: new TextEncoder().encode(text),
+        };
+      },
+    });
+
+    const simulator = new VoiceUserSimulator({
+      model,
+      speech,
+      transcription: decodingTranscriptionMock(),
+      persona: "Bargain hunter",
+      goal: "Apply discount code and check total",
+      tools: {
+        apply_discount: tool({
+          description: "Apply a discount code",
+          inputSchema: z.object({ code: z.string() }),
+          execute: async ({ code }) => {
+            toolCalls.push({ code });
+            return { applied: true };
+          },
+        }),
+      },
+    });
+
+    const conversation = await simulator.run({
+      onMessage: async () => ({
+        data: new TextEncoder().encode("$45.00"),
+        mediaType: "audio/wav",
+      }),
+    });
+
+    expect(toolCalls).toEqual([{ code: "SAVE10" }]);
+    expect(conversation.outcome).toBe("goal_met");
+    expect(conversation.turns).toEqual([
+      {
+        role: "user",
+        content: "I've applied my discount code, what's the total?",
+      },
+      { role: "assistant", content: "$45.00" },
+      { role: "user", content: "Thanks!" },
+    ]);
+    // Tool calls happen "off-stage" inside generateText. Only the
+    // LLM's spoken messages reach the speech model.
+    expect(synthesizedTexts).toEqual([
+      "I've applied my discount code, what's the total?",
+      "Thanks!",
     ]);
   });
 });

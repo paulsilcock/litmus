@@ -4,6 +4,8 @@ import {
   type LanguageModel,
   Output,
   type SpeechModel,
+  stepCountIs,
+  type ToolSet,
   experimental_transcribe as transcribe,
   type TranscriptionModel,
 } from "ai";
@@ -16,6 +18,7 @@ interface VoiceUserSimulatorOptions {
   persona: string;
   goal: string;
   maxTurns?: number;
+  tools?: ToolSet;
 }
 
 /**
@@ -77,6 +80,7 @@ export class VoiceUserSimulator {
   readonly #persona: string;
   readonly #goal: string;
   readonly #maxTurns: number;
+  readonly #tools: ToolSet | undefined;
 
   constructor(options: VoiceUserSimulatorOptions) {
     this.#model = options.model;
@@ -85,6 +89,7 @@ export class VoiceUserSimulator {
     this.#persona = options.persona;
     this.#goal = options.goal;
     this.#maxTurns = options.maxTurns ?? 10;
+    this.#tools = options.tools;
   }
 
   async run(input: RunInput): Promise<Conversation> {
@@ -111,6 +116,8 @@ export class VoiceUserSimulator {
           model: this.#model,
           prompt: defaultPrompt(this.#persona, this.#goal, turns),
           output: Output.object({ schema: userResponseSchema }),
+          tools: this.#tools,
+          stopWhen: this.#tools ? stepCountIs(this.#maxTurns) : undefined,
         });
         message = result.output.message;
         done = result.output.done;
