@@ -11,15 +11,24 @@ import {
 } from "ai";
 import { z } from "zod";
 
-interface VoiceUserSimulatorOptions {
-  model: LanguageModel;
-  speech: SpeechModel;
-  transcription: TranscriptionModel;
-  persona: string;
-  goal: string;
-  maxTurns?: number;
-  tools?: ToolSet;
-}
+type VoiceUserSimulatorOptions =
+  | {
+      model: LanguageModel;
+      speech: SpeechModel;
+      transcription: TranscriptionModel;
+      persona: string;
+      goal: string;
+      maxTurns?: number;
+      tools?: ToolSet;
+    }
+  | {
+      model: LanguageModel;
+      speech: SpeechModel;
+      transcription: TranscriptionModel;
+      prompt: (turns: readonly Turn[]) => string;
+      maxTurns?: number;
+      tools?: ToolSet;
+    };
 
 /**
  * One side of an audio exchange: the bytes plus their IANA media
@@ -77,8 +86,7 @@ export class VoiceUserSimulator {
   readonly #model: LanguageModel;
   readonly #speech: SpeechModel;
   readonly #transcription: TranscriptionModel;
-  readonly #persona: string;
-  readonly #goal: string;
+  readonly #buildPrompt: (turns: readonly Turn[]) => string;
   readonly #maxTurns: number;
   readonly #tools: ToolSet | undefined;
 
@@ -86,10 +94,12 @@ export class VoiceUserSimulator {
     this.#model = options.model;
     this.#speech = options.speech;
     this.#transcription = options.transcription;
-    this.#persona = options.persona;
-    this.#goal = options.goal;
     this.#maxTurns = options.maxTurns ?? 10;
     this.#tools = options.tools;
+    this.#buildPrompt =
+      "prompt" in options
+        ? options.prompt
+        : (turns) => defaultPrompt(options.persona, options.goal, turns);
   }
 
   async run(input: RunInput): Promise<Conversation> {
@@ -114,7 +124,7 @@ export class VoiceUserSimulator {
       } else {
         const result = await generateText({
           model: this.#model,
-          prompt: defaultPrompt(this.#persona, this.#goal, turns),
+          prompt: this.#buildPrompt(turns),
           output: Output.object({ schema: userResponseSchema }),
           tools: this.#tools,
           stopWhen: this.#tools ? stepCountIs(this.#maxTurns) : undefined,

@@ -402,4 +402,39 @@ describe("VoiceUserSimulator", () => {
       "Thanks!",
     ]);
   });
+
+  it("simulated user behaviour can be configured with a free-text prompt", async () => {
+    let capturedPrompt = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async ({ prompt }) => {
+        capturedPrompt = JSON.stringify(prompt);
+        return {
+          ...mockLanguageResult,
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ message: "ok", done: true }),
+            },
+          ],
+          finishReason: { unified: "stop" as const, raw: undefined },
+        };
+      },
+    });
+
+    const simulator = new VoiceUserSimulator({
+      model,
+      speech: encodingSpeechMock(),
+      transcription: decodingTranscriptionMock(),
+      prompt: () => "custom-prompt-text",
+    });
+
+    await simulator.run({
+      onMessage: async () => ({
+        data: new TextEncoder().encode("never reached"),
+        mediaType: "audio/wav",
+      }),
+    });
+
+    expect(capturedPrompt).toContain("custom-prompt-text");
+  });
 });
