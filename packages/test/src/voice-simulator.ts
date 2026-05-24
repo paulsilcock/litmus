@@ -43,6 +43,7 @@ interface Conversation {
 interface RunInput {
   onMessage: (audio: AudioMessage) => Promise<MessageResponse>;
   awaitOpening?: () => Promise<AudioMessage>;
+  opening?: string;
 }
 
 const userResponseSchema = z.object({
@@ -99,12 +100,21 @@ export class VoiceUserSimulator {
     }
 
     for (let i = 0; i < this.#maxTurns; i++) {
-      const result = await generateText({
-        model: this.#model,
-        prompt: defaultPrompt(this.#persona, this.#goal, turns),
-        output: Output.object({ schema: userResponseSchema }),
-      });
-      const { message, done } = result.output;
+      let message: string;
+      let done: boolean;
+
+      if (i === 0 && input.opening) {
+        message = input.opening;
+        done = false;
+      } else {
+        const result = await generateText({
+          model: this.#model,
+          prompt: defaultPrompt(this.#persona, this.#goal, turns),
+          output: Output.object({ schema: userResponseSchema }),
+        });
+        message = result.output.message;
+        done = result.output.done;
+      }
 
       const speech = await generateSpeech({
         model: this.#speech,

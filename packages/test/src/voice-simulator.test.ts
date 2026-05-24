@@ -253,4 +253,44 @@ describe("VoiceUserSimulator", () => {
       content: "you're useless",
     });
   });
+
+  it("the simulated user can open the conversation with a predetermined message", async () => {
+    // Caller supplies the user's first message verbatim; the LLM is
+    // only consulted from turn 2 onwards.
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockLanguageResult,
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ message: "Thanks!", done: true }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      }),
+    });
+
+    const simulator = new VoiceUserSimulator({
+      model,
+      speech: encodingSpeechMock(),
+      transcription: decodingTranscriptionMock(),
+      persona: "Customer",
+      goal: "Find out my balance",
+    });
+
+    const conversation = await simulator.run({
+      opening: "What's my balance?",
+      onMessage: async () => ({
+        data: new TextEncoder().encode("$1250"),
+        mediaType: "audio/wav",
+      }),
+    });
+
+    expect(conversation.outcome).toBe("goal_met");
+    expect(conversation.turns).toEqual([
+      { role: "user", content: "What's my balance?" },
+      { role: "assistant", content: "$1250" },
+      { role: "user", content: "Thanks!" },
+    ]);
+  });
 });
