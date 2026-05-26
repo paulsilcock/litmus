@@ -358,6 +358,68 @@ describe("only mode", () => {
   });
 });
 
+describe("chain modifiers", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("chain-modifiers.test.ts");
+  }, 30_000);
+
+  it(".samples(n) runs the body n times", () => {
+    const samples = run.logLines.filter((l) => l === "chain-sample");
+    expect(samples).toHaveLength(3);
+  });
+
+  it(".samples(n).passRate(r) tolerates failures up to the configured threshold", () => {
+    const calls = run.logLines.filter((l) =>
+      l.startsWith("chain-passrate-call:"),
+    );
+    expect(calls).toHaveLength(5);
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("chain-passrate tolerates threshold failures"),
+    );
+    expect(result?.status).toBe("passed");
+  });
+
+  it(".timeout(ms) eval completes and is reported as passed", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("chain-timeout short-circuits long run"),
+    );
+    expect(result?.status).toBe("passed");
+    expect(run.logLines).toContain("chain-timeout-ran");
+  });
+
+  it(".concurrent(n) never exceeds the configured limit", () => {
+    const peaks = run.logLines
+      .filter((l) => l.startsWith("chain-active:"))
+      .map((l) => Number(l.slice("chain-active:".length)));
+    expect(Math.max(...peaks)).toBe(3);
+  });
+
+  it(".samples(n).scenarios(cases) runs n samples per scenario", () => {
+    const alice = run.logLines.filter((l) => l === "chain-scenario:alice");
+    const bob = run.logLines.filter((l) => l === "chain-scenario:bob");
+    expect(alice).toHaveLength(2);
+    expect(bob).toHaveLength(2);
+  });
+
+  it(".skip composed with a chain modifier skips the eval", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("chain-skip does not run body"),
+    );
+    expect(result?.status).toBe("skipped");
+    expect(run.logLines).not.toContain("chain-skip-ran");
+  });
+
+  it(".skipIf(false) with a chain modifier runs the eval", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("chain-skipif-false runs"),
+    );
+    expect(result?.status).toBe("passed");
+    expect(run.logLines).toContain("chain-skipif-false");
+  });
+});
+
 describe("failure modes", () => {
   let run: FixtureRun;
 
