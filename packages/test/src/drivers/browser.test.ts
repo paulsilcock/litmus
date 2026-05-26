@@ -409,4 +409,21 @@ describe("BrowserDriver", () => {
     // With onended, total ≈ 4000ms; with cursor scheduling, well under audio duration.
     expect(elapsed).toBeLessThan(1500);
   });
+
+  it("audio is captured at the configured sample rate", async () => {
+    await using audioDriver = new TestDriver({
+      baseUrl,
+      audio: true,
+      captureSampleRate: 24000,
+    });
+    await audioDriver.init();
+    await audioDriver.openSpeaker();
+
+    const { samples, sampleRate } = await audioDriver.captureTone(500);
+    expect(sampleRate).toBe(24000);
+    // The 660Hz tone from the speaker fixture must survive the 48→24kHz resample.
+    const observed = detectFrequency(samples, sampleRate);
+    expect(observed).toBeGreaterThan(560);
+    expect(observed).toBeLessThan(760);
+  });
 });

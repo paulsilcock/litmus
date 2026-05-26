@@ -63,6 +63,14 @@ interface BrowserDriverOptions {
    * - `string` — use the given UA string exactly.
    */
   userAgent?: string | null;
+  /**
+   * Sample rate for the capture AudioContext in Hz.
+   * Defaults to the browser's default (typically 48000). Set to match
+   * the rate expected by downstream consumers (e.g. 24000 for systems
+   * that process 24kHz audio). WebAudio's polyphase resampler handles
+   * the conversion in-page.
+   */
+  captureSampleRate?: number;
 }
 
 /**
@@ -176,7 +184,11 @@ export abstract class BrowserDriver extends Driver {
       });
     }
     if (this.#options.audio) {
-      await this.#context.addInitScript(installAudioPump);
+      const audioOpts =
+        this.#options.captureSampleRate !== undefined
+          ? { captureSampleRate: this.#options.captureSampleRate }
+          : undefined;
+      await this.#context.addInitScript(installAudioPump, audioOpts);
     }
     this.#page = await this.#context.newPage();
   }

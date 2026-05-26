@@ -23,10 +23,11 @@
  * `toString()` and injected into the page — any module-scope helpers
  * wouldn't come along.
  */
-export function installAudioPump(): void {
+export function installAudioPump(opts?: { captureSampleRate?: number }): void {
+  const captureSampleRate = opts?.captureSampleRate;
   const RealAudioContext = globalThis.AudioContext;
   const captureSinks = new Set();
-  let lastSampleRate = 48000;
+  let lastSampleRate = captureSampleRate ?? 48000;
 
   function broadcast(samples) {
     for (const sink of captureSinks) sink(samples);
@@ -39,7 +40,9 @@ export function installAudioPump(): void {
 
   function ensureCaptureRoute() {
     if (captureCtx) return;
-    captureCtx = new RealAudioContext();
+    captureCtx = new RealAudioContext(
+      captureSampleRate ? { sampleRate: captureSampleRate } : undefined,
+    );
     captureMixer = captureCtx.createGain();
     const sp = captureCtx.createScriptProcessor(4096, 1, 1);
     captureMixer.connect(sp);
