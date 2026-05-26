@@ -426,4 +426,20 @@ describe("BrowserDriver", () => {
     expect(observed).toBeGreaterThan(560);
     expect(observed).toBeLessThan(760);
   });
+
+  it("excluding a capture source prevents that tap from being captured", async () => {
+    // The speaker fixture plays audio via an AudioContext. If captureSources
+    // excludes "web-audio", the AudioContext destination tap is not installed
+    // and no samples should flow into the capture pipeline.
+    await using audioDriver = new TestDriver({
+      baseUrl,
+      audio: true,
+      captureSources: ["webrtc", "media-element"],
+    });
+    await audioDriver.init();
+    await audioDriver.openSpeaker();
+
+    const { samples } = await audioDriver.captureTone(500);
+    expect(samples.length).toBe(0);
+  });
 });

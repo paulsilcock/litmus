@@ -71,6 +71,12 @@ interface BrowserDriverOptions {
    * the conversion in-page.
    */
   captureSampleRate?: number;
+  /**
+   * Which audio sources to intercept. Defaults to all three.
+   * Exclude `"web-audio"` when the page routes the mic through an
+   * AudioContext (e.g. for level meters) to prevent a feedback loop.
+   */
+  captureSources?: ReadonlyArray<"webrtc" | "web-audio" | "media-element">;
 }
 
 /**
@@ -160,6 +166,13 @@ export abstract class BrowserDriver extends Driver {
             // approval that never comes in a headless context.
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
+            // Prevent new-headless Chromium from throttling timers and
+            // audio scheduling in background tabs (delays WebRTC ICE
+            // setup by multiple seconds, losing the first utterances).
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-features=AudioServiceOutOfProcess",
           ]
         : undefined,
     });
@@ -184,11 +197,20 @@ export abstract class BrowserDriver extends Driver {
       });
     }
     if (this.#options.audio) {
-      const audioOpts =
-        this.#options.captureSampleRate !== undefined
-          ? { captureSampleRate: this.#options.captureSampleRate }
-          : undefined;
-      await this.#context.addInitScript(installAudioPump, audioOpts);
+      const audioOpts: {
+        captureSampleRate?: number;
+        captureSources?: string[];
+      } = {};
+      if (this.#options.captureSampleRate !== undefined) {
+        audioOpts.captureSampleRate = this.#options.captureSampleRate;
+      }
+      if (this.#options.captureSources !== undefined) {
+        audioOpts.captureSources = [...this.#options.captureSources];
+      }
+      await this.#context.addInitScript(
+        installAudioPump,
+        Object.keys(audioOpts).length > 0 ? audioOpts : undefined,
+      );
     }
     this.#page = await this.#context.newPage();
   }
