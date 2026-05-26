@@ -250,6 +250,32 @@ describe("BrowserDriver", () => {
     expect(reported.brands).toContain("Google Chrome");
   });
 
+  it("the page reports a realistic Chrome UA by default when no userAgent option is given", async () => {
+    // Without an explicit UA, headless Chromium broadcasts
+    // `HeadlessChrome/...`. Many real-world sites sniff for this string
+    // and refuse to render properly. The driver must default to a
+    // realistic Chrome UA so tests exercise the same code paths a real
+    // user would hit.
+    await using d = new TestDriver({ baseUrl });
+    await d.init();
+    const reported = await d.navigatorIdentity();
+    expect(reported.userAgent).toContain("Chrome");
+    expect(reported.userAgent).not.toContain("HeadlessChrome");
+    expect(reported.brands).toContain("Google Chrome");
+  });
+
+  it("the page uses Playwright's default UA when userAgent is explicitly null", async () => {
+    // Consumers can opt out of the default Chrome UA spoofing by
+    // passing `userAgent: null`. This is the escape hatch for tests
+    // that deliberately want to exercise the raw headless UA.
+    await using d = new TestDriver({ baseUrl, userAgent: null });
+    await d.init();
+    const reported = await d.navigatorIdentity();
+    // The raw headless UA is whatever Playwright gives us — we just
+    // assert it does NOT equal the default spoofed UA.
+    expect(reported.userAgent).not.toContain("Chrome/136");
+  });
+
   it("audio sent to the page's mic is received by client code", async () => {
     await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
