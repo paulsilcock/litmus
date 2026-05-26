@@ -16,7 +16,7 @@ export async function runSequential(
   passRate: number,
   timeout?: number,
 ): Promise<void> {
-  const failures: string[] = [];
+  const failures: Error[] = [];
   for (const task of tasks) {
     const failure = await runTask(task, timeout);
     if (failure !== null) failures.push(failure);
@@ -35,7 +35,7 @@ export async function runConcurrent(
   concurrency: number,
   timeout?: number,
 ): Promise<void> {
-  const failures: string[] = [];
+  const failures: Error[] = [];
   let index = 0;
 
   async function worker() {
@@ -57,18 +57,15 @@ export async function runConcurrent(
   );
 }
 
-async function runTask(
-  task: RunTask,
-  timeout?: number,
-): Promise<string | null> {
+async function runTask(task: RunTask, timeout?: number): Promise<Error | null> {
   try {
     const p = task.run();
     await (timeout ? withTimeout(p, timeout, task.label) : p);
     return null;
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    console.warn(`Evaluate warning: ${task.label} failed — ${message}`);
-    return message;
+    const err = e instanceof Error ? e : new Error(String(e));
+    console.warn(`Evaluate warning: ${task.label} failed — ${err.message}`);
+    return err;
   }
 }
 
@@ -92,13 +89,22 @@ function assertPassRate(
   passed: number,
   total: number,
   required: number,
-  failures: string[],
+  failures: Error[],
 ): void {
   const actual = passed / total;
   if (actual < required) {
+    // When only one failure caused the eval to fail, re-throw it directly so
+    // the user sees the exact error (with its original stack trace) rather than
+    // a wrapped aggregation — this is the common samples=1 case.
+    if (failures.length === 1) {
+      throw failures[0];
+    }
+
+    // Multiple failures: build an aggregated message that includes every
+    // failure's stack trace so nothing is lost.
     const reasons =
       failures.length > 0
-        ? "\n" + failures.map((f) => `  - ${f}`).join("\n")
+        ? "\n" + failures.map((f) => `  - ${f.stack ?? f.message}`).join("\n")
         : "";
     throw new Error(
       `Evaluate failed: ${passed}/${total} passed (${(actual * 100).toFixed(0)}%), required ${(required * 100).toFixed(0)}%${reasons}`,

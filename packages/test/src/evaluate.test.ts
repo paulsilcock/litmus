@@ -358,9 +358,15 @@ describe("failure modes", () => {
       r.fullName.startsWith("exceeds timeout"),
     );
     expect(result?.status).toBe("failed");
-    expect(result?.failureMessages.join("\n")).toMatch(
-      /Evaluate failed: 0\/1 passed/,
+    expect(result?.failureMessages.join("\n")).toMatch(/timed out after 10ms/);
+  });
+
+  it("a single-sample failure surfaces the original error directly, not a wrapper", () => {
+    const result = run.report.testResults[0]!.assertionResults.find((r) =>
+      r.fullName.startsWith("exceeds timeout"),
     );
+    const msg = result?.failureMessages.join("\n") ?? "";
+    expect(msg).not.toMatch(/Evaluate failed:/);
   });
 });
 
