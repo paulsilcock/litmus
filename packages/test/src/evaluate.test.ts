@@ -323,6 +323,28 @@ describe("guardrails: modifier composition", () => {
   });
 });
 
+describe("guardrails with synthesized scenarios", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-synthesize-extended.test.ts");
+  }, 30_000);
+
+  it("the body runs once for each synthesised scenario", () => {
+    const iters = run.logLines.filter((l) => l.startsWith("iter:"));
+    expect(iters).toHaveLength(3); // 1 seed + 2 variants
+  });
+
+  it("fixtures and guardrails are both injected into the body", () => {
+    expect(run.logLines).toContain("iter:alice:ready");
+  });
+
+  it("the grader is invoked once per synthesised scenario", () => {
+    const graderCalls = run.logLines.filter((l) => l.startsWith("grader:"));
+    expect(graderCalls).toHaveLength(3);
+  });
+});
+
 describe("only mode", () => {
   let run: FixtureRun;
 

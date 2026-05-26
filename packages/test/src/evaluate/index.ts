@@ -97,6 +97,12 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
     name: string,
     fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   ) => void;
+  scenarios<TScenario>(
+    input: ScenariosSynthesizeInput<TScenario>,
+  ): (
+    name: string,
+    fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
+  ) => void;
   /**
    * Register a set of guardrails on this extended evaluate. The
    * returned evaluate injects a `guardrails` fixture into every eval
@@ -522,20 +528,57 @@ function makeExtended<TFixtures, K extends string = never>(
   }
 
   function scenarios<TScenario>(
-    cases: TScenario[],
+    casesOrInput: TScenario[] | ScenariosSynthesizeInput<TScenario>,
     opts: ScenariosFnOptions<TScenario> = {},
   ) {
+    if (Array.isArray(casesOrInput)) {
+      return (
+        name: string,
+        fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
+      ): void =>
+        registerScenarios(
+          casesOrInput,
+          opts,
+          name,
+          (scenario) =>
+            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          mode,
+        );
+    }
+    const input = casesOrInput;
     return (
       name: string,
       fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
-    ): void =>
-      registerScenarios(
-        cases,
-        opts,
-        name,
-        (scenario) => scenarioWithFixturesRun(fn, setup, scenario, guardrails),
-        mode,
-      );
+    ): void => {
+      const synthOpts = { name, ...input.synthesize };
+
+      if (resolveMode(synthOpts.mode) === "regenerate") {
+        registerSynthesizedScenarios(
+          input,
+          name,
+          (scenario) =>
+            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          mode,
+        );
+        return;
+      }
+
+      try {
+        const cached = readCachedScenariosSync<TScenario>(synthOpts);
+        registerScenarios(
+          cached,
+          input,
+          name,
+          (scenario) =>
+            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          mode,
+        );
+      } catch (err) {
+        testFor(mode)(name, () => {
+          throw err;
+        });
+      }
+    };
   }
 
   const target = Object.assign(evaluateOne, {
