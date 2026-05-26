@@ -282,9 +282,12 @@ describe("BrowserDriver", () => {
     await audioDriver.openMic();
     const sampleRate = 48000;
     const pcm = sineWavePcm(440, sampleRate, 500);
+    // sendTone schedules audio and resolves immediately; poll until the page observes the tone
     await audioDriver.sendTone(pcm, sampleRate);
+    await expect
+      .poll(() => audioDriver.observedFrequency(), { timeout: 3000 })
+      .toBeGreaterThan(340);
     const observed = await audioDriver.observedFrequency();
-    expect(observed).toBeGreaterThan(340);
     expect(observed).toBeLessThan(540);
   });
 
@@ -382,5 +385,28 @@ describe("BrowserDriver", () => {
     } finally {
       await stream.close();
     }
+  });
+
+  it("streaming many small chunks completes in real time without paying each chunk's playback duration", async () => {
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
+    await audioDriver.init();
+    await audioDriver.openMic();
+
+    const sampleRate = 48000;
+    const chunkDurationMs = 20;
+    const totalDurationMs = 4000;
+    const totalChunks = Math.floor(totalDurationMs / chunkDurationMs);
+
+    const start = Date.now();
+    for (let i = 0; i < totalChunks; i++) {
+      await audioDriver.sendTone(
+        sineWavePcm(440, sampleRate, chunkDurationMs),
+        sampleRate,
+      );
+    }
+    const elapsed = Date.now() - start;
+
+    // With onended, total ≈ 4000ms; with cursor scheduling, well under audio duration.
+    expect(elapsed).toBeLessThan(1500);
   });
 });

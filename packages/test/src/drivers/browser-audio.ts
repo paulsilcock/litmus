@@ -129,6 +129,7 @@ export function installAudioPump(): void {
 
   let micCtx;
   let micDest;
+  let micNextStart = 0;
 
   function installMicProbe(stream) {
     const probeCtx = new RealAudioContext();
@@ -168,6 +169,7 @@ export function installAudioPump(): void {
   function ensureMic() {
     if (!micCtx) {
       micCtx = new RealAudioContext();
+      micNextStart = 0;
       micDest = micCtx.createMediaStreamDestination();
       // Consumers (notably @elevenlabs/convai-widget-embed) sometimes
       // call `track.stop()` on the mic track during setup. A stopped
@@ -205,10 +207,10 @@ export function installAudioPump(): void {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(dest);
-      return new Promise((resolve) => {
-        src.onended = () => resolve();
-        src.start();
-      });
+      const when = Math.max(ctx.currentTime, micNextStart);
+      micNextStart = when + buf.duration;
+      src.start(when);
+      return Promise.resolve();
     },
     capture(durationMs) {
       const collected = [];
