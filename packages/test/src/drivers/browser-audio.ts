@@ -23,60 +23,118 @@
  * `toString()` and injected into the page — any module-scope helpers
  * wouldn't come along.
  */
-export function installAudioPump(): void {
+export function installAudioPump(opts: {
+  captureSampleRate?: number;
+  captureWebRtc?: boolean;
+  captureWebAudio?: boolean;
+  captureMediaElement?: boolean;
+}): void {
   const RealAudioContext = globalThis.AudioContext;
   const captureSinks = new Set();
-  let lastSampleRate = 48000;
+  let lastSampleRate = opts.captureSampleRate ?? 48000;
 
   function broadcast(samples) {
     for (const sink of captureSinks) sink(samples);
   }
 
+  // --- AudioWorklet processor source -------------------------------------
+  // Batches 128-sample render quanta into 4096-sample chunks before
+  // posting to the main thread — preserves the cadence of the previous
+  // ScriptProcessor implementation while running on the audio thread,
+  // immune to main-thread jank.
+
+  const WORKLET_SOURCE = `
+    class BatchingProcessor extends AudioWorkletProcessor {
+      constructor() {
+        super();
+        this.batch = new Float32Array(4096);
+        this.pos = 0;
+      }
+      process(inputs) {
+        const samples = inputs[0] && inputs[0][0];
+        if (!samples || !samples.length) return true;
+        for (let i = 0; i < samples.length; i++) {
+          this.batch[this.pos++] = samples[i];
+          if (this.pos === this.batch.length) {
+            this.port.postMessage(this.batch.slice());
+            this.pos = 0;
+          }
+        }
+        return true;
+      }
+    }
+    registerProcessor("litmus-batching", BatchingProcessor);
+  `;
+  const workletUrl = URL.createObjectURL(
+    new Blob([WORKLET_SOURCE], { type: "application/javascript" }),
+  );
+
   // --- Central capture route ----------------------------------------------
 
   let captureCtx;
   let captureMixer;
+  let captureReady = null;
 
   function ensureCaptureRoute() {
-    if (captureCtx) return;
-    captureCtx = new RealAudioContext();
+    if (captureReady) return captureReady;
+    captureCtx = opts.captureSampleRate
+      ? new RealAudioContext({ sampleRate: opts.captureSampleRate })
+      : new RealAudioContext();
     captureMixer = captureCtx.createGain();
-    const sp = captureCtx.createScriptProcessor(4096, 1, 1);
-    captureMixer.connect(sp);
-    sp.connect(captureCtx.destination);
-    sp.onaudioprocess = (event) => {
-      const inData = event.inputBuffer.getChannelData(0);
-      const outData = event.outputBuffer.getChannelData(0);
-      outData.fill(0);
-      broadcast(inData);
-    };
     lastSampleRate = captureCtx.sampleRate;
+    // Continuous silent baseline. Without this, the capture graph has
+    // no input until something piped in via pipeStreamToCapture, so
+    // the worklet produces nothing and downstream (e.g. Realtime VAD)
+    // has no buffer to apply prefix-padding against when real audio
+    // finally arrives. Mixing a zero-offset constant source is a no-op
+    // for amplitude but keeps the graph flowing.
+    const silence = captureCtx.createConstantSource();
+    silence.offset.value = 0;
+    silence.connect(captureMixer);
+    silence.start();
+    captureReady = captureCtx.audioWorklet.addModule(workletUrl).then(() => {
+      const node = new AudioWorkletNode(captureCtx, "litmus-batching");
+      node.port.onmessage = (e) => broadcast(e.data);
+      captureMixer.connect(node);
+      node.connect(captureCtx.destination);
+    });
+    return captureReady;
   }
 
   function pipeStreamToCapture(stream) {
-    ensureCaptureRoute();
-    const source = captureCtx.createMediaStreamSource(stream);
-    source.connect(captureMixer);
+    ensureCaptureRoute().then(() => {
+      const source = captureCtx.createMediaStreamSource(stream);
+      source.connect(captureMixer);
+    });
   }
+
+  // Original srcObject descriptor — both the RTC wrap and the
+  // media-element wrap need to read/write the underlying property
+  // without triggering each other.
+  const realSrcObjectDesc = Object.getOwnPropertyDescriptor(
+    HTMLMediaElement.prototype,
+    "srcObject",
+  );
 
   // --- RTCPeerConnection track tap ----------------------------------------
   // Chromium quirk: a remote WebRTC audio track only starts receiving
   // RTP packets once it's attached to an HTMLMediaElement. Attach to a
-  // hidden muted element to activate delivery; the srcObject hook
-  // below routes the audio into the capture pipeline.
+  // hidden muted element to activate delivery, then pipe the stream
+  // into the capture mixer directly.
 
   const RealRTCPeerConnection = globalThis.RTCPeerConnection;
-  if (RealRTCPeerConnection) {
+  if (opts.captureWebRtc && RealRTCPeerConnection) {
     globalThis.RTCPeerConnection = class extends RealRTCPeerConnection {
       constructor(...args) {
         super(...args);
         this.addEventListener("track", (event) => {
           if (!event.track || event.track.kind !== "audio") return;
+          const stream = event.streams[0] ?? new MediaStream([event.track]);
           const activator = document.createElement("audio");
-          activator.srcObject =
-            event.streams[0] ?? new MediaStream([event.track]);
           activator.muted = true;
+          realSrcObjectDesc.set.call(activator, stream);
           activator.play().catch(() => {});
+          pipeStreamToCapture(stream);
         });
       }
     };
@@ -86,44 +144,44 @@ export function installAudioPump(): void {
   // Any MediaStream assigned to a media element's `srcObject` has its
   // audio tracks routed into the capture pipeline.
 
-  const realSrcObjectDesc = Object.getOwnPropertyDescriptor(
-    HTMLMediaElement.prototype,
-    "srcObject",
-  );
-  Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
-    configurable: true,
-    get() {
-      return realSrcObjectDesc.get.call(this);
-    },
-    set(value) {
-      if (value instanceof MediaStream) {
-        for (const track of value.getAudioTracks()) {
-          pipeStreamToCapture(new MediaStream([track]));
+  if (opts.captureMediaElement) {
+    Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
+      configurable: true,
+      get() {
+        return realSrcObjectDesc.get.call(this);
+      },
+      set(value) {
+        if (value instanceof MediaStream) {
+          for (const track of value.getAudioTracks()) {
+            pipeStreamToCapture(new MediaStream([track]));
+          }
         }
-      }
-      realSrcObjectDesc.set.call(this, value);
-    },
-  });
+        realSrcObjectDesc.set.call(this, value);
+      },
+    });
+  }
 
   // --- AudioContext destination tap ---------------------------------------
   // Any page-created AudioContext gets its `destination` swapped for a
   // gain node that fans out to the real destination AND a capture sink.
 
-  globalThis.AudioContext = class extends RealAudioContext {
-    constructor(...args) {
-      super(...args);
-      const realDest = this.destination;
-      const tap = this.createGain();
-      tap.connect(realDest);
-      const streamDest = this.createMediaStreamDestination();
-      tap.connect(streamDest);
-      pipeStreamToCapture(streamDest.stream);
-      Object.defineProperty(this, "destination", {
-        value: tap,
-        configurable: true,
-      });
-    }
-  };
+  if (opts.captureWebAudio) {
+    globalThis.AudioContext = class extends RealAudioContext {
+      constructor(...args) {
+        super(...args);
+        const realDest = this.destination;
+        const tap = this.createGain();
+        tap.connect(realDest);
+        const streamDest = this.createMediaStreamDestination();
+        tap.connect(streamDest);
+        pipeStreamToCapture(streamDest.stream);
+        Object.defineProperty(this, "destination", {
+          value: tap,
+          configurable: true,
+        });
+      }
+    };
+  }
 
   // --- Microphone injection -----------------------------------------------
 
@@ -133,24 +191,24 @@ export function installAudioPump(): void {
   function installMicProbe(stream) {
     const probeCtx = new RealAudioContext();
     const source = probeCtx.createMediaStreamSource(stream);
-    const sp = probeCtx.createScriptProcessor(2048, 1, 1);
-    source.connect(sp);
-    sp.connect(probeCtx.destination);
     let peak = 0;
     let energy = 0;
     let processedSamples = 0;
-    sp.onaudioprocess = (event) => {
-      const data = event.inputBuffer.getChannelData(0);
-      const out = event.outputBuffer.getChannelData(0);
-      out.fill(0);
-      for (let i = 0; i < data.length; i++) {
-        const v = data[i];
-        const abs = v < 0 ? -v : v;
-        if (abs > peak) peak = abs;
-        energy += v * v;
-      }
-      processedSamples += data.length;
-    };
+    probeCtx.audioWorklet.addModule(workletUrl).then(() => {
+      const node = new AudioWorkletNode(probeCtx, "litmus-batching");
+      node.port.onmessage = (e) => {
+        const data = e.data;
+        for (let i = 0; i < data.length; i++) {
+          const v = data[i];
+          const abs = v < 0 ? -v : v;
+          if (abs > peak) peak = abs;
+          energy += v * v;
+        }
+        processedSamples += data.length;
+      };
+      source.connect(node);
+      node.connect(probeCtx.destination);
+    });
     globalThis.__litmusMicProbe = {
       snapshot() {
         const rms =
@@ -196,6 +254,13 @@ export function installAudioPump(): void {
 
   const streams = new Map();
   let nextStreamId = 0;
+  // Wall-clock-relative cursor (in micCtx.currentTime units) of the
+  // next free moment in the playback queue. Each `send` schedules its
+  // buffer to start here, then advances the cursor by the buffer's
+  // duration — gap-free, no overlap. Resolving immediately (instead
+  // of awaiting onended) means consumers can pipeline writes without
+  // each call paying the chunk's playback duration as latency.
+  let nextStart = 0;
 
   globalThis.__litmusAudio = {
     send(samples, sampleRate) {
@@ -205,10 +270,9 @@ export function installAudioPump(): void {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(dest);
-      return new Promise((resolve) => {
-        src.onended = () => resolve();
-        src.start();
-      });
+      const startAt = Math.max(ctx.currentTime, nextStart);
+      src.start(startAt);
+      nextStart = startAt + buf.duration;
     },
     capture(durationMs) {
       const collected = [];

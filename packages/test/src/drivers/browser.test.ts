@@ -211,10 +211,6 @@ class TestDriver extends BrowserDriver {
   async captureToneStream() {
     return this.captureAudioStream();
   }
-
-  async observedFrequency(): Promise<number> {
-    return this.page.evaluate("globalThis.__observedFreq__ ?? 0");
-  }
 }
 
 describe("BrowserDriver", () => {
@@ -256,10 +252,19 @@ describe("BrowserDriver", () => {
     await audioDriver.openMic();
     const sampleRate = 48000;
     const pcm = sineWavePcm(440, sampleRate, 500);
-    await audioDriver.sendTone(pcm, sampleRate);
-    const observed = await audioDriver.observedFrequency();
-    expect(observed).toBeGreaterThan(340);
-    expect(observed).toBeLessThan(540);
+    const stream = await audioDriver.captureToneStream();
+    try {
+      await audioDriver.sendTone(pcm, sampleRate);
+      const { samples, sampleRate: sr } = await readAtLeast(
+        stream,
+        FFT_WINDOW_SAMPLES,
+      );
+      const observed = detectFrequency(samples, sr);
+      expect(observed).toBeGreaterThan(340);
+      expect(observed).toBeLessThan(540);
+    } finally {
+      await stream.close();
+    }
   });
 
   it("audio injection survives a consumer calling track.stop() on the mic track", async () => {
@@ -325,6 +330,63 @@ describe("BrowserDriver", () => {
       const observed = detectFrequency(samples, sampleRate);
       expect(observed).toBeGreaterThan(1000);
       expect(observed).toBeLessThan(1200);
+    } finally {
+      await stream.close();
+    }
+  });
+
+  it("audio streamed at real-time rate plays without falling behind", async () => {
+    // Voice agents emit audio in small chunks at high rates —
+    // dozens or hundreds of writes per second. The driver must
+    // accept each write so cheaply that sustained throughput
+    // exceeds real-time; otherwise the stream falls behind, gaps
+    // appear in the page's mic, and downstream consumers hear
+    // garbled audio. Catching this requires a high-rate streaming
+    // scenario: a per-call IPC cost that's tolerable in isolation
+    // (~30ms) accumulates to seconds over a few hundred writes.
+    await using audioDriver = new TestDriver({ baseUrl, audio: true });
+    await audioDriver.init();
+    await audioDriver.openMic();
+    const sampleRate = 24000;
+    const chunkDurationMs = 20;
+    const chunk = sineWavePcm(440, sampleRate, chunkDurationMs);
+    const numChunks = 200; // 4 seconds of audio in total
+    const start = Date.now();
+    for (let i = 0; i < numChunks; i++) {
+      await audioDriver.sendTone(chunk, sampleRate);
+    }
+    const elapsed = Date.now() - start;
+    // Threshold sits well below total audio duration (4s) AND
+    // below what a per-call page.evaluate path can sustain
+    // (200 calls × ~30ms = ~6s). Only a persistent channel with
+    // microsecond-class per-write cost can pass this.
+    expect(elapsed).toBeLessThan(1500);
+  });
+
+  it("audio is captured at the configured sample rate", async () => {
+    // The browser can produce audio at any rate; downstream consumers
+    // (transcribers, voice models) often require a specific one. The
+    // driver lets the test set the capture rate at construction; the
+    // browser's WebAudio handles resampling internally — better than
+    // any Node-side post-processing we'd write.
+    const sampleRate = 24000;
+    await using audioDriver = new TestDriver({
+      baseUrl,
+      audio: true,
+      captureSampleRate: sampleRate,
+    });
+    await audioDriver.init();
+    await audioDriver.openSpeaker(); // plays 660Hz from the page's AudioContext
+    const stream = await audioDriver.captureToneStream();
+    try {
+      const { samples } = await readAtLeast(stream, FFT_WINDOW_SAMPLES);
+      // Decoding the samples at the configured rate proves both that
+      // the rate is honoured AND that the resampling preserved the
+      // signal: a 48k sample stream decoded at 24k would map a 660Hz
+      // tone to 330Hz, and a botched resample would smear the peak.
+      const observed = detectFrequency(samples, sampleRate);
+      expect(observed).toBeGreaterThan(560);
+      expect(observed).toBeLessThan(760);
     } finally {
       await stream.close();
     }
