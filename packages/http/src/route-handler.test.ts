@@ -100,8 +100,14 @@ describe("routeHandler", () => {
     const body = await res.json();
     expect(body).toEqual({
       errors: [
-        { field: "customerId", message: "Expected string, received number" },
-        { field: "items", message: "Required" },
+        {
+          field: "customerId",
+          message: "Invalid input: expected string, received number",
+        },
+        {
+          field: "items",
+          message: "Invalid input: expected array, received undefined",
+        },
       ],
     });
   });
@@ -528,7 +534,7 @@ describe("routeHandler", () => {
       errors: [
         {
           field: "id",
-          message: 'Invalid input: must start with "order_"',
+          message: 'Invalid string: must start with "order_"',
         },
       ],
     });
