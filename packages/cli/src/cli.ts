@@ -161,7 +161,7 @@ export class Cli<
     options: CommandOptions<TEnv, TSchema, TInput> & {
       input: (validated: TSchema, ctx: CliContext<TEnv>) => TInput;
     },
-  ): Cli<TEnv, TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
+  ): Cli<TEnv, TCommands & { [K in TName]: CommandSchema<TSchema, TResult> }>;
 
   /** Mount a sub-CLI as a command group. */
   command<

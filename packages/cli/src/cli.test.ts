@@ -351,7 +351,7 @@ describe("cli", () => {
     expect(io.exitCode).toBe(2);
     const stderr = io.stderr.join("");
     expect(stderr).toContain("customerId");
-    expect(stderr).toContain("Required");
+    expect(stderr).toContain("Invalid input");
   });
 
   it("runs a registered command with validated args from argv", async () => {
