@@ -84,6 +84,38 @@ export interface Retriever<TQuery, TResult> {
 }
 
 /**
+ * The write side of a retrieval store: add or replace chunks, and
+ * remove them by id.
+ *
+ * Deliberately split from {@link Retriever} — ingestion code doesn't
+ * need read capability and query-time use cases don't need write, so
+ * each depends only on the half it uses. A concrete store can satisfy
+ * both interfaces when it makes sense to share a connection or config.
+ *
+ * `upsert` is add-or-replace so re-ingesting a document is idempotent
+ * at the call site; the application owns the higher-level policy
+ * (content-hash dedup, deletion on source removal). `TChunk` is left
+ * open so the application owns its chunk shape.
+ *
+ * @example
+ * ```typescript
+ * import type { Indexer } from "@litmus/core/ai";
+ *
+ * class IngestDocument {
+ *   constructor(private index: Indexer<EmbeddedChunk>) {}
+ *
+ *   async handle({ chunks }: { chunks: EmbeddedChunk[] }) {
+ *     await this.index.upsert(chunks);
+ *   }
+ * }
+ * ```
+ */
+export interface Indexer<TChunk> {
+  upsert(chunks: TChunk[]): Promise<void>;
+  delete(ids: string[]): Promise<void>;
+}
+
+/**
  * An autonomous actor with a goal that interacts with the system
  * through use cases — the same way a user would via HTTP or CLI.
  *
