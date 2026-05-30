@@ -2,7 +2,7 @@ import { useInMemoryTracing } from "@litmus/test";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { Agent, type Retriever, Toolbox } from "#litmus/ai.ts";
+import { Agent, Toolbox } from "#litmus/ai.ts";
 
 const schema = z.object({ id: z.string() });
 
@@ -64,39 +64,6 @@ describe("Toolbox", () => {
 
     const result = await entry?.handler.handle({ id: "acc_123" });
     expect(result).toEqual({ balance: 100 });
-  });
-});
-
-describe("retrieval", () => {
-  it("pairs each retrieved result with a score", async () => {
-    interface Doc {
-      id: string;
-      content: string;
-    }
-
-    const corpus: Doc[] = [
-      { id: "a", content: "litmus tests acceptance" },
-      { id: "b", content: "vector search retrieval" },
-      { id: "c", content: "unrelated content" },
-    ];
-
-    const retriever: Retriever<string, Doc> = {
-      async retrieve(query, k) {
-        return corpus
-          .map((doc) => ({
-            result: doc,
-            score: doc.content.includes(query) ? 1 : 0,
-          }))
-          .sort((a, b) => b.score - a.score)
-          .slice(0, k);
-      },
-    };
-
-    const hits = await retriever.retrieve("retrieval", 2);
-
-    expect(hits).toHaveLength(2);
-    expect(hits[0]!.result.id).toBe("b");
-    expect(hits[0]!.score).toBe(1);
   });
 });
 
