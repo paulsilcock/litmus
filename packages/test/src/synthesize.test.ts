@@ -232,6 +232,56 @@ describe("synthesize", () => {
     }
   });
 
+  it("a long eval name is truncated to a readable slug with a hash suffix", async () => {
+    const testPath = expect.getState().testPath;
+    if (!testPath) throw new Error("test path unavailable");
+    const stem = testPath.replace(/\.test\.[jt]sx?$/, "");
+    const longName =
+      "moderator surfaces the participant s accommodation preference and the underlying reason";
+
+    const base = {
+      model: mockModelReturning([{ message: "x" }]),
+      schema: z.object({ message: z.string() }),
+      seeds: [{ message: "seed" }],
+      variants: 1,
+      prompt: () => "p",
+      mode: "regenerate" as const,
+      name: longName,
+    };
+
+    // Determine expected path: slug truncated at 40 chars + 8-char hash
+    const fullSlug = longName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    expect(fullSlug.length).toBeGreaterThan(20);
+
+    let cachePath: string | undefined;
+    try {
+      await synthesize(base);
+      // Find the file that was created — it should have a truncated slug
+      const { readdirSync } = await import("node:fs");
+      const dir = stem.replace(/\/[^/]+$/, "") || ".";
+      const basename = stem.replace(/.*\//, "");
+      const files = readdirSync(dir).filter(
+        (f: string) => f.startsWith(basename) && f.endsWith(".scenarios.json"),
+      );
+      expect(files).toHaveLength(1);
+      const filename = files[0];
+      expect(filename).toBeDefined();
+      // Filename should be short enough to be human-readable
+      expect(filename.length).toBeLessThan(60);
+      // Should contain a hash suffix (8 hex chars before .scenarios.json)
+      expect(filename).toMatch(/[0-9a-f]{8}\.scenarios\.json$/);
+
+      cachePath = join(dir, filename);
+    } finally {
+      if (cachePath) {
+        rmSync(cachePath, { force: true });
+      }
+    }
+  });
+
   it("synthesize refuses to call the model when no cache path is resolvable", async () => {
     expect.setState({ testPath: undefined });
 
