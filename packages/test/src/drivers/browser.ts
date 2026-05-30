@@ -63,26 +63,6 @@ interface BrowserDriverOptions {
    * - `string` — use the given UA string exactly.
    */
   userAgent?: string | null;
-  /**
-   * Which audio sources to intercept and route into the capture pipeline.
-   *
-   * - `"webrtc"` — RTCPeerConnection remote tracks
-   * - `"web-audio"` — AudioContext destination output
-   * - `"media-element"` — HTMLMediaElement.srcObject streams
-   *
-   * Defaults to all three. Omit sources that cause feedback loops in
-   * specific test scenarios (e.g. exclude `"web-audio"` when a page
-   * routes its own mic through an AudioContext).
-   */
-  captureSources?: ReadonlyArray<"webrtc" | "web-audio" | "media-element">;
-  /**
-   * Sample rate for the capture AudioContext in Hz.
-   *
-   * Defaults to the browser's default (typically 48000). Set to match
-   * the sample rate expected by the code under test (e.g. 24000 for
-   * systems that process 24kHz audio).
-   */
-  captureSampleRate?: number;
 }
 
 /**
