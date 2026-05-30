@@ -254,7 +254,7 @@ describe("synthesize", () => {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-    expect(fullSlug.length).toBeGreaterThan(40);
+    expect(fullSlug.length).toBeGreaterThan(20);
 
     let cachePath: string | undefined;
     try {
@@ -269,8 +269,8 @@ describe("synthesize", () => {
       expect(files).toHaveLength(1);
       const filename = files[0];
       expect(filename).toBeDefined();
-      // Filename should be well under 100 chars
-      expect(filename.length).toBeLessThan(100);
+      // Filename should be short enough to be human-readable
+      expect(filename.length).toBeLessThan(60);
       // Should contain a hash suffix (8 hex chars before .scenarios.json)
       expect(filename).toMatch(/[0-9a-f]{8}\.scenarios\.json$/);
 
