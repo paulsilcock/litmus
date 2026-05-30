@@ -1,5 +1,5 @@
 import { container } from "tsyringe";
-import type { ZodSchema } from "zod";
+import type { ZodType } from "zod";
 
 import { Traceable } from "#litmus/tracing.ts";
 import type { HandlerClass } from "#litmus/use-case/handlers.ts";
@@ -86,7 +86,7 @@ export abstract class Agent<TInput, TOutput = void> extends Traceable {
  */
 export interface Tool {
   description: string;
-  schema: ZodSchema;
+  schema: ZodType;
   handler: {
     handle(input: unknown): Promise<unknown> | AsyncIterable<unknown>;
   };
@@ -159,7 +159,7 @@ export class Toolbox<TNames extends string = never> {
   tool<TName extends string, TInput extends Record<string, unknown>, TOutput>(
     name: TName,
     Handler: HandlerClass<TInput, TOutput>,
-    schema: ZodSchema<TInput>,
+    schema: ZodType<TInput>,
     options: { description: string },
   ): Toolbox<TNames | TName> {
     const newEntries = new Map(this.#entries);
