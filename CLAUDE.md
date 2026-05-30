@@ -1,9 +1,6 @@
 # Claude Instructions
 
-Follow the canonical agent rules in `.agent-rules/`. They are imported below so the
-full guidance stays in context:
+The canonical guidance for every agent in this repo lives in `AGENTS.md`. It is
+imported below so the full ruleset and project context load into context at launch.
 
-@.agent-rules/index.md
-@.agent-rules/repo-overview.md
-@.agent-rules/tdd-workflow.md
-@.agent-rules/code-quality.md
+@AGENTS.md
