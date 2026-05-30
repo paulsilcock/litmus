@@ -44,6 +44,46 @@ export abstract class AiTask<TInput, TOutput = void> extends Traceable {
 }
 
 /**
+ * A single retrieved result paired with its relevance score.
+ *
+ * The score rides on the envelope rather than the result so the
+ * application's own result type stays clean, and so the next stage
+ * — a reranker or a relevance threshold — has the signal it needs.
+ */
+export interface Retrieved<TResult> {
+  result: TResult;
+  score: number;
+}
+
+/**
+ * The read side of a retrieval store: given a query, return the `k`
+ * most relevant results, each carrying a score.
+ *
+ * Naming the seam keeps retrieval out of inline vendor SDK calls and
+ * behind an interface the application owns — injectable, swappable,
+ * and evaluable stage by stage. `TQuery` is left open so an embedded
+ * vector, a raw string, or a hybrid `{ text, filter }` query all fit
+ * without prescribing a vendor-shaped filter on the port.
+ *
+ * @example
+ * ```typescript
+ * import type { Retriever } from "@litmus/core/ai";
+ *
+ * class AnswerSupportQuestion {
+ *   constructor(private knowledgeBase: Retriever<string, Article>) {}
+ *
+ *   async handle({ question }: { question: string }) {
+ *     const hits = await this.knowledgeBase.retrieve(question, 5);
+ *     // ...rank, summarise, answer
+ *   }
+ * }
+ * ```
+ */
+export interface Retriever<TQuery, TResult> {
+  retrieve(query: TQuery, k: number): Promise<Retrieved<TResult>[]>;
+}
+
+/**
  * An autonomous actor with a goal that interacts with the system
  * through use cases — the same way a user would via HTTP or CLI.
  *
