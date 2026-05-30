@@ -23,10 +23,19 @@
  * `toString()` and injected into the page — any module-scope helpers
  * wouldn't come along.
  */
-export function installAudioPump(): void {
+export function installAudioPump(opts?: {
+  captureSampleRate?: number;
+  captureSources?: string[];
+}): void {
+  const captureSampleRate = opts?.captureSampleRate;
+  const captureSources = opts?.captureSources ?? [
+    "webrtc",
+    "web-audio",
+    "media-element",
+  ];
   const RealAudioContext = globalThis.AudioContext;
   const captureSinks = new Set();
-  let lastSampleRate = 48000;
+  let lastSampleRate = captureSampleRate ?? 48000;
 
   function broadcast(samples) {
     for (const sink of captureSinks) sink(samples);
@@ -39,7 +48,9 @@ export function installAudioPump(): void {
 
   function ensureCaptureRoute() {
     if (captureCtx) return;
-    captureCtx = new RealAudioContext();
+    captureCtx = new RealAudioContext(
+      captureSampleRate ? { sampleRate: captureSampleRate } : undefined,
+    );
     captureMixer = captureCtx.createGain();
     const sp = captureCtx.createScriptProcessor(4096, 1, 1);
     captureMixer.connect(sp);
@@ -65,16 +76,47 @@ export function installAudioPump(): void {
   // hidden muted element to activate delivery; the srcObject hook
   // below routes the audio into the capture pipeline.
 
+  // --- HTMLMediaElement.srcObject tap -------------------------------------
+  // Defined before the WebRTC tap so realSrcObjectDesc is available to both.
+
+  const realSrcObjectDesc = Object.getOwnPropertyDescriptor(
+    HTMLMediaElement.prototype,
+    "srcObject",
+  );
+  if (captureSources.includes("media-element")) {
+    Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
+      configurable: true,
+      get() {
+        return realSrcObjectDesc.get.call(this);
+      },
+      set(value) {
+        if (value instanceof MediaStream) {
+          for (const track of value.getAudioTracks()) {
+            pipeStreamToCapture(new MediaStream([track]));
+          }
+        }
+        realSrcObjectDesc.set.call(this, value);
+      },
+    });
+  }
+
+  // --- RTCPeerConnection track tap ----------------------------------------
+  // Chromium quirk: a remote WebRTC audio track only starts receiving
+  // RTP packets once it's attached to an HTMLMediaElement. Attach to a
+  // hidden muted element to activate delivery; use realSrcObjectDesc.set
+  // to bypass the srcObject hook so the same stream isn't captured twice.
+
   const RealRTCPeerConnection = globalThis.RTCPeerConnection;
-  if (RealRTCPeerConnection) {
+  if (captureSources.includes("webrtc") && RealRTCPeerConnection) {
     globalThis.RTCPeerConnection = class extends RealRTCPeerConnection {
       constructor(...args) {
         super(...args);
         this.addEventListener("track", (event) => {
           if (!event.track || event.track.kind !== "audio") return;
+          const stream = event.streams[0] ?? new MediaStream([event.track]);
           const activator = document.createElement("audio");
-          activator.srcObject =
-            event.streams[0] ?? new MediaStream([event.track]);
+          realSrcObjectDesc.set.call(activator, stream);
+          pipeStreamToCapture(stream);
           activator.muted = true;
           activator.play().catch(() => {});
         });
@@ -82,53 +124,33 @@ export function installAudioPump(): void {
     };
   }
 
-  // --- HTMLMediaElement.srcObject tap -------------------------------------
-  // Any MediaStream assigned to a media element's `srcObject` has its
-  // audio tracks routed into the capture pipeline.
-
-  const realSrcObjectDesc = Object.getOwnPropertyDescriptor(
-    HTMLMediaElement.prototype,
-    "srcObject",
-  );
-  Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
-    configurable: true,
-    get() {
-      return realSrcObjectDesc.get.call(this);
-    },
-    set(value) {
-      if (value instanceof MediaStream) {
-        for (const track of value.getAudioTracks()) {
-          pipeStreamToCapture(new MediaStream([track]));
-        }
-      }
-      realSrcObjectDesc.set.call(this, value);
-    },
-  });
-
   // --- AudioContext destination tap ---------------------------------------
   // Any page-created AudioContext gets its `destination` swapped for a
   // gain node that fans out to the real destination AND a capture sink.
 
-  globalThis.AudioContext = class extends RealAudioContext {
-    constructor(...args) {
-      super(...args);
-      const realDest = this.destination;
-      const tap = this.createGain();
-      tap.connect(realDest);
-      const streamDest = this.createMediaStreamDestination();
-      tap.connect(streamDest);
-      pipeStreamToCapture(streamDest.stream);
-      Object.defineProperty(this, "destination", {
-        value: tap,
-        configurable: true,
-      });
-    }
-  };
+  if (captureSources.includes("web-audio")) {
+    globalThis.AudioContext = class extends RealAudioContext {
+      constructor(...args) {
+        super(...args);
+        const realDest = this.destination;
+        const tap = this.createGain();
+        tap.connect(realDest);
+        const streamDest = this.createMediaStreamDestination();
+        tap.connect(streamDest);
+        pipeStreamToCapture(streamDest.stream);
+        Object.defineProperty(this, "destination", {
+          value: tap,
+          configurable: true,
+        });
+      }
+    };
+  }
 
   // --- Microphone injection -----------------------------------------------
 
   let micCtx;
   let micDest;
+  let micNextStart = 0;
 
   function installMicProbe(stream) {
     const probeCtx = new RealAudioContext();
@@ -168,6 +190,7 @@ export function installAudioPump(): void {
   function ensureMic() {
     if (!micCtx) {
       micCtx = new RealAudioContext();
+      micNextStart = 0;
       micDest = micCtx.createMediaStreamDestination();
       // Consumers (notably @elevenlabs/convai-widget-embed) sometimes
       // call `track.stop()` on the mic track during setup. A stopped
@@ -205,10 +228,10 @@ export function installAudioPump(): void {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(dest);
-      return new Promise((resolve) => {
-        src.onended = () => resolve();
-        src.start();
-      });
+      const when = Math.max(ctx.currentTime, micNextStart);
+      micNextStart = when + buf.duration;
+      src.start(when);
+      return Promise.resolve();
     },
     capture(durationMs) {
       const collected = [];
