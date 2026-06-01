@@ -28,6 +28,24 @@ export interface RegisterArgs {
 
 const DEFAULT_CONCURRENCY = 5;
 
+declare global {
+  // oxlint-disable-next-line no-var
+  var __vitest_worker__: { config: { maxConcurrency: number } } | undefined;
+}
+
+/**
+ * Returns the pool size for concurrent sample execution. Reads
+ * `maxConcurrency` from the vitest worker config so callers can tune
+ * parallelism project-wide via their `vitest.config.ts` without
+ * touching individual evals. Falls back to `DEFAULT_CONCURRENCY` when
+ * running outside a vitest worker (e.g. unit tests of this module).
+ */
+function configuredConcurrency(): number {
+  return (
+    globalThis.__vitest_worker__?.config?.maxConcurrency ?? DEFAULT_CONCURRENCY
+  );
+}
+
 type TestFn = (
   name: string,
   body: () => Promise<void>,
@@ -63,17 +81,18 @@ export function register({
   mode = "run",
   setup,
 }: RegisterArgs): void {
+  const concurrency = configuredConcurrency();
   testFor(mode)(
     label,
     async () => {
       if (setup) await setup();
       if (concurrent) {
-        await runConcurrent(tasks, passRate, DEFAULT_CONCURRENCY, timeout);
+        await runConcurrent(tasks, passRate, concurrency, timeout);
       } else {
         await runSequential(tasks, passRate, timeout);
       }
     },
-    totalTimeout(timeout, tasks.length, concurrent),
+    totalTimeout(timeout, tasks.length, concurrent, concurrency),
   );
 }
 
@@ -88,12 +107,13 @@ function totalTimeout(
   perRun: number | undefined,
   runs: number,
   concurrent: boolean,
+  concurrency: number,
 ): number | undefined {
   if (perRun === undefined) return undefined;
   // Slack to absorb fixture setup/teardown so the user-facing timeout
   // surfaces as the failure cause rather than vitest's own cap.
   const SLACK_MS = 10_000;
   return concurrent
-    ? perRun * Math.ceil(runs / DEFAULT_CONCURRENCY) + SLACK_MS
+    ? perRun * Math.ceil(runs / concurrency) + SLACK_MS
     : perRun * runs + SLACK_MS;
 }

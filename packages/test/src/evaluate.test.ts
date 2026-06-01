@@ -432,6 +432,25 @@ describe("chain modifiers", () => {
   });
 });
 
+describe("vitest maxConcurrency setting", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture(
+      "max-concurrency.test.ts",
+      "vite.config.max-concurrency.ts",
+    );
+  }, 30_000);
+
+  it("the configured pool size limits how many samples run simultaneously", () => {
+    const result = assertionFor(run, (n) =>
+      n.startsWith("pool-constrained deadlock"),
+    );
+    expect(result.status).toBe("failed");
+    expect(result.failureMessages.join("\n")).toMatch(/timed out after 300ms/);
+  });
+});
+
 describe("failure modes", () => {
   let run: FixtureRun;
 
@@ -498,7 +517,10 @@ function assertionFor(
   return found;
 }
 
-async function runFixture(fixtureFile: string): Promise<FixtureRun> {
+async function runFixture(
+  fixtureFile: string,
+  configFile = "vite.config.ts",
+): Promise<FixtureRun> {
   const fixturesDir = join(import.meta.dirname, "fixtures");
   const logPath = join(
     tmpdir(),
@@ -506,7 +528,12 @@ async function runFixture(fixtureFile: string): Promise<FixtureRun> {
   );
 
   try {
-    const report = await spawnVitest(fixturesDir, fixtureFile, logPath);
+    const report = await spawnVitest(
+      fixturesDir,
+      fixtureFile,
+      logPath,
+      configFile,
+    );
     let logLines: string[] = [];
     try {
       logLines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
@@ -527,6 +554,7 @@ function spawnVitest(
   fixturesDir: string,
   fixtureFile: string,
   logPath: string,
+  configFile = "vite.config.ts",
 ): Promise<JsonReport> {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -534,7 +562,7 @@ function spawnVitest(
       [
         "test",
         "-c",
-        join(fixturesDir, "vite.config.ts"),
+        join(fixturesDir, configFile),
         join(fixturesDir, fixtureFile),
         "--reporter=json",
         // Subprocess is a fixture for testing `.only`, not the real CI
