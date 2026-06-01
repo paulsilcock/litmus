@@ -5,8 +5,7 @@ and the Vite+ toolchain) and `.claude/rules/` (the TDD workflow and code-quality
 rules). Those Claude-native files are the single source of truth; they are imported
 below so Codex — and any other agent — receives exactly the same rules and context.
 
-Treat everything below as **mandatory — adhere to it exactly.** Behaviour changes
-use **autonomous TDD** by default.
+Treat everything below as **mandatory — adhere to it exactly.**
 
 @CLAUDE.md
 @.claude/rules/tdd-workflow.md
