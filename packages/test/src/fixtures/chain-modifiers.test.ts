@@ -38,14 +38,23 @@ evaluate.samples(5)(
   { samples: 1 },
 );
 
-let chainActive = 0;
+// Same deterministic-overlap latch as samples.test.ts: every sample
+// blocks until all have started, which is only possible if .concurrent
+// ran them in parallel. Sample count stays at or below the default
+// concurrency so all samples can start and release the latch together.
+const CONCURRENT_SAMPLES = 3;
+let started = 0;
+let releaseAll: () => void = () => {};
+const allStarted = new Promise<void>((resolve) => {
+  releaseAll = resolve;
+});
 evaluate
-  .samples(10)
+  .samples(CONCURRENT_SAMPLES)
   .concurrent("chain-concurrent runs samples in parallel", async () => {
-    chainActive++;
-    append(`chain-active:${chainActive}`);
-    await new Promise((r) => setTimeout(r, 2));
-    chainActive--;
+    started++;
+    if (started === CONCURRENT_SAMPLES) releaseAll();
+    await allStarted;
+    append("chain-overlap");
   });
 
 const users = [{ name: "alice" }, { name: "bob" }];

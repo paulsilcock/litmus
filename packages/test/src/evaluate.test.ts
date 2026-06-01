@@ -28,12 +28,12 @@ describe("samples mode", () => {
     expect(result.status).toBe("passed");
   });
 
-  it("the concurrent option executes multiple samples at the same time", () => {
-    const peaks = run.logLines
-      .filter((l) => l.startsWith("active:"))
-      .map((l) => Number(l.slice("active:".length)));
-    expect(peaks).not.toHaveLength(0);
-    expect(Math.max(...peaks)).toBeGreaterThan(1);
+  it("the concurrent option runs samples in parallel, not one after another", () => {
+    // The fixture blocks every sample until all have started, so the
+    // "overlap" line is logged once per sample only if they truly ran
+    // at the same time. See samples.test.ts for the latch.
+    const overlaps = run.logLines.filter((l) => l === "overlap");
+    expect(overlaps).toHaveLength(3);
   });
 });
 
@@ -400,12 +400,12 @@ describe("chain modifiers", () => {
     expect(calls).toHaveLength(5);
   });
 
-  it(".concurrent executes multiple samples at the same time", () => {
-    const peaks = run.logLines
-      .filter((l) => l.startsWith("chain-active:"))
-      .map((l) => Number(l.slice("chain-active:".length)));
-    expect(peaks).not.toHaveLength(0);
-    expect(Math.max(...peaks)).toBeGreaterThan(1);
+  it(".concurrent runs samples in parallel, not one after another", () => {
+    // Same deterministic latch as the samples-mode parallelism test:
+    // all three "chain-overlap" lines appear only if .concurrent ran
+    // the samples at the same time.
+    const overlaps = run.logLines.filter((l) => l === "chain-overlap");
+    expect(overlaps).toHaveLength(3);
   });
 
   it(".samples(n).scenarios(cases) runs n samples per scenario", () => {
