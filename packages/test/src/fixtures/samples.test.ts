@@ -26,14 +26,25 @@ evaluate(
   { samples: 5, passRate: 0.6 },
 );
 
-let active = 0;
+// Every sample blocks on a shared latch until all of them have
+// started. The latch can only be released — and so the "overlap" line
+// can only be logged — if the runner started the samples concurrently.
+// Under sequential execution the first sample would await the latch
+// forever and the eval would time out. This makes the parallelism
+// assertion deterministic: no sleeps, no timing races.
+const CONCURRENT_SAMPLES = 3;
+let started = 0;
+let releaseAll: () => void = () => {};
+const allStarted = new Promise<void>((resolve) => {
+  releaseAll = resolve;
+});
 evaluate(
-  "tracks parallelism",
+  "samples overlap",
   async () => {
-    active++;
-    append(`active:${active}`);
-    await new Promise((r) => setTimeout(r, 2));
-    active--;
+    started++;
+    if (started === CONCURRENT_SAMPLES) releaseAll();
+    await allStarted;
+    append("overlap");
   },
-  { samples: 10, concurrent: true, concurrency: 3 },
+  { samples: CONCURRENT_SAMPLES, concurrent: true },
 );
