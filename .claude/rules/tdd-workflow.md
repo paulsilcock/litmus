@@ -4,9 +4,7 @@ TDD is a design methodology, not a testing strategy. Each test is a question: "w
 
 **One test at a time. Always.**
 
-Default to **autonomous** mode: clarify the behaviours, then run the loop independently. Switch to **guided** mode (propose each test, wait for approval) only when the user explicitly asks for it.
-
-TDD applies by default to changes that **add, change, or fix behaviour**. It does **not** apply by default to pure docs, mechanical renames, formatting-only changes, read-only analysis, or explicitly requested throwaway spikes.
+Before starting, ask the user: **guided** (propose each test, wait for approval) or **autonomous** (clarify behaviours, then run independently)?
 
 ## Before Writing Any Test
 
