@@ -16,8 +16,6 @@ export interface RegisterArgs {
   passRate: number;
   timeout?: number;
   concurrent: boolean;
-  /** Defaults to 5 if not specified by the caller's options. */
-  concurrency?: number;
   mode?: RunMode;
   /**
    * Optional setup that runs before the tasks. Errors propagate
@@ -62,7 +60,6 @@ export function register({
   passRate,
   timeout,
   concurrent,
-  concurrency = DEFAULT_CONCURRENCY,
   mode = "run",
   setup,
 }: RegisterArgs): void {
@@ -71,12 +68,12 @@ export function register({
     async () => {
       if (setup) await setup();
       if (concurrent) {
-        await runConcurrent(tasks, passRate, concurrency, timeout);
+        await runConcurrent(tasks, passRate, DEFAULT_CONCURRENCY, timeout);
       } else {
         await runSequential(tasks, passRate, timeout);
       }
     },
-    totalTimeout(timeout, tasks.length, concurrent, concurrency),
+    totalTimeout(timeout, tasks.length, concurrent),
   );
 }
 
@@ -91,13 +88,12 @@ function totalTimeout(
   perRun: number | undefined,
   runs: number,
   concurrent: boolean,
-  concurrency: number,
 ): number | undefined {
   if (perRun === undefined) return undefined;
   // Slack to absorb fixture setup/teardown so the user-facing timeout
   // surfaces as the failure cause rather than vitest's own cap.
   const SLACK_MS = 10_000;
   return concurrent
-    ? perRun * Math.ceil(runs / concurrency) + SLACK_MS
+    ? perRun * Math.ceil(runs / DEFAULT_CONCURRENCY) + SLACK_MS
     : perRun * runs + SLACK_MS;
 }

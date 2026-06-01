@@ -35,5 +35,5 @@ evaluate(
     await new Promise((r) => setTimeout(r, 2));
     active--;
   },
-  { samples: 10, concurrent: true, concurrency: 3 },
+  { samples: 10, concurrent: true },
 );

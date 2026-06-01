@@ -39,15 +39,14 @@ evaluate.samples(5)(
 );
 
 let chainActive = 0;
-evaluate.samples(10).concurrent(3)(
-  "chain-concurrent never exceeds configured limit",
-  async () => {
+evaluate
+  .samples(10)
+  .concurrent("chain-concurrent runs samples in parallel", async () => {
     chainActive++;
     append(`chain-active:${chainActive}`);
     await new Promise((r) => setTimeout(r, 2));
     chainActive--;
-  },
-);
+  });
 
 const users = [{ name: "alice" }, { name: "bob" }];
 

@@ -22,8 +22,6 @@ export interface EvaluateOptions {
   timeout?: number;
   /** Run repeats in parallel rather than sequentially. */
   concurrent?: boolean;
-  /** Maximum parallel runs when `concurrent: true`. Defaults to 5. */
-  concurrency?: number;
 }
 
 /** Options accepted by `evaluate.scenarios(cases, opts)`. */
@@ -34,16 +32,10 @@ export interface ScenariosFnOptions<T = unknown> {
    * to `scenario.name`, then `scenario.id`, then `"scenario"`.
    */
   labelBy?: (scenario: T) => string;
-  /** @deprecated Use chain modifiers: `evaluate.samples(n).passRate(r).scenarios(cases, { labelBy })`. */
   samples?: number;
-  /** @deprecated Use chain modifiers: `evaluate.samples(n).passRate(r).scenarios(cases, { labelBy })`. */
   passRate?: number;
-  /** @deprecated Use chain modifiers: `evaluate.timeout(ms).scenarios(cases, { labelBy })`. */
   timeout?: number;
-  /** @deprecated Use chain modifiers: `evaluate.concurrent().scenarios(cases, { labelBy })`. */
   concurrent?: boolean;
-  /** @deprecated Use chain modifiers: `evaluate.concurrent(n).scenarios(cases, { labelBy })`. */
-  concurrency?: number;
 }
 
 /**
@@ -171,8 +163,8 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
   samples(n: number): ExtendedEvaluate<TFixtures, K>;
   /** Sets pass ratio (0-1). Overrides the `passRate` option. */
   passRate(r: number): ExtendedEvaluate<TFixtures, K>;
-  /** Enables concurrent mode. Overrides `concurrent`/`concurrency` options. */
-  concurrent(concurrency?: number): ExtendedEvaluate<TFixtures, K>;
+  /** Enables concurrent mode. */
+  readonly concurrent: ExtendedEvaluate<TFixtures, K>;
 }
 
 /**
@@ -256,8 +248,8 @@ export interface Evaluate {
   samples(n: number): Evaluate;
   /** Sets pass ratio (0-1). Overrides the `passRate` option. */
   passRate(r: number): Evaluate;
-  /** Enables concurrent mode. Overrides `concurrent`/`concurrency` options. */
-  concurrent(concurrency?: number): Evaluate;
+  /** Enables concurrent mode. */
+  readonly concurrent: Evaluate;
 }
 
 // ── Task building ────────────────────────────────────────────────────
@@ -349,7 +341,7 @@ function scenarioWithFixturesRun<TScenario, TFixtures>(
   return () =>
     setup(async (fixtures) => {
       const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       await fn(scenario, { ...fixtures, guardrails: fixture } as TFixtures);
       assertInvoked();
     });
@@ -378,7 +370,6 @@ function registerSingle(
     passRate,
     timeout: opts.timeout,
     concurrent: opts.concurrent ?? false,
-    concurrency: opts.concurrency,
     mode,
   });
 }
@@ -425,7 +416,6 @@ function registerSynthesizedScenarios<TScenario>(
         passRate,
         timeout: input.timeout,
         concurrent: input.concurrent ?? false,
-        concurrency: input.concurrency,
       });
     }
   });
@@ -449,7 +439,6 @@ function registerScenarios<TScenario>(
         passRate,
         timeout: opts.timeout,
         concurrent: opts.concurrent ?? false,
-        concurrency: opts.concurrency,
       });
     }
   });
@@ -541,8 +530,6 @@ function makeEvaluate(
       makeEvaluate(mode, { ...chainOpts, samples: n }),
     passRate: (r: number): Evaluate =>
       makeEvaluate(mode, { ...chainOpts, passRate: r }),
-    concurrent: (concurrency?: number): Evaluate =>
-      makeEvaluate(mode, { ...chainOpts, concurrent: true, concurrency }),
   });
 
   Object.defineProperty(target, "skip", {
@@ -551,6 +538,10 @@ function makeEvaluate(
   });
   Object.defineProperty(target, "only", {
     get: () => makeEvaluate("only", chainOpts),
+    enumerable: true,
+  });
+  Object.defineProperty(target, "concurrent", {
+    get: () => makeEvaluate(mode, { ...chainOpts, concurrent: true }),
     enumerable: true,
   });
 
@@ -679,12 +670,6 @@ function makeExtended<TFixtures, K extends string = never>(
         ...chainOpts,
         passRate: r,
       }),
-    concurrent: (concurrency?: number): ExtendedEvaluate<TFixtures, K> =>
-      makeExtended<TFixtures, K>(setup, mode, guardrails, {
-        ...chainOpts,
-        concurrent: true,
-        concurrency,
-      }),
   });
 
   Object.defineProperty(target, "skip", {
@@ -693,6 +678,14 @@ function makeExtended<TFixtures, K extends string = never>(
   });
   Object.defineProperty(target, "only", {
     get: () => withMode("only"),
+    enumerable: true,
+  });
+  Object.defineProperty(target, "concurrent", {
+    get: () =>
+      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+        ...chainOpts,
+        concurrent: true,
+      }),
     enumerable: true,
   });
 
