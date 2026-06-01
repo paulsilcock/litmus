@@ -21,9 +21,22 @@ evaluate.samples(5).passRate(0.6)(
   },
 );
 
-evaluate.timeout(5_000)("chain-timeout short-circuits long run", async () => {
-  append("chain-timeout-ran");
-});
+evaluate.timeout(50)(
+  "chain-timeout fails a body that exceeds the limit",
+  async () => {
+    await new Promise((r) => setTimeout(r, 300));
+  },
+);
+
+let precedenceCounter = 0;
+evaluate.samples(5)(
+  "chain-precedence overrides the opts bag",
+  async () => {
+    precedenceCounter++;
+    append(`chain-precedence:${precedenceCounter}`);
+  },
+  { samples: 1 },
+);
 
 let chainActive = 0;
 evaluate.samples(10).concurrent(3)(

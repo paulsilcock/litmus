@@ -381,12 +381,19 @@ describe("chain modifiers", () => {
     expect(result?.status).toBe("passed");
   });
 
-  it(".timeout(ms) eval completes and is reported as passed", () => {
+  it(".timeout(ms) fails an eval whose body exceeds the limit", () => {
     const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("chain-timeout short-circuits long run"),
+      r.fullName.startsWith(
+        "chain-timeout fails a body that exceeds the limit",
+      ),
     );
-    expect(result?.status).toBe("passed");
-    expect(run.logLines).toContain("chain-timeout-ran");
+    expect(result?.status).toBe("failed");
+    expect(result?.failureMessages.join("\n")).toMatch(/timed out after 50ms/);
+  });
+
+  it("a chain modifier value takes precedence over the same key in the opts bag", () => {
+    const calls = run.logLines.filter((l) => l.startsWith("chain-precedence:"));
+    expect(calls).toHaveLength(5);
   });
 
   it(".concurrent(n) never exceeds the configured limit", () => {
