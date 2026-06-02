@@ -64,32 +64,17 @@ interface BrowserDriverOptions {
    */
   userAgent?: string | null;
   /**
-   * Sample rate (Hz) for the capture-side `AudioContext`. When set,
-   * the browser's WebAudio resamples all captured audio sources to
-   * this rate using its built-in polyphase resampler — higher quality
-   * than any Node-side post-processing. Useful when piping captured
-   * audio to a downstream model with a fixed input rate (e.g. OpenAI
-   * Realtime expects ≤ 24000Hz). Defaults to the browser's native
-   * AudioContext rate, typically 48000Hz on desktop platforms.
+   * Sample rate for the capture AudioContext in Hz.
+   * Defaults to the browser's default (typically 48000). Set to match
+   * the rate expected by downstream consumers (e.g. 24000 for systems
+   * that process 24kHz audio). WebAudio's polyphase resampler handles
+   * the conversion in-page.
    */
   captureSampleRate?: number;
   /**
-   * Which sources of page audio to capture into `captureAudioStream`.
-   * Defaults to all three. Narrow this when the page's audio shape
-   * is known and you want to avoid unwanted captures.
-   *
-   * - `"webrtc"` — remote audio tracks from `RTCPeerConnection`
-   *   (most modern voice/conferencing apps: daily.co, LiveKit, etc.)
-   * - `"web-audio"` — anything played through a Web Audio
-   *   `AudioContext.destination` (WebSocket-streamed voice apps that
-   *   decode audio in JS and play via `AudioBuffer`, e.g. ElevenLabs).
-   * - `"media-element"` — anything assigned to an `<audio>`/`<video>`
-   *   element's `srcObject`.
-   *
-   * **Common reason to narrow:** pages that pipe the microphone
-   * into a Web Audio context (for level meters or visualisers) will
-   * leak the injected mic audio back into the capture mixer,
-   * creating a feedback loop. Excluding `"web-audio"` avoids this.
+   * Which audio sources to intercept. Defaults to all three.
+   * Exclude `"web-audio"` when the page routes the mic through an
+   * AudioContext (e.g. for level meters) to prevent a feedback loop.
    */
   captureSources?: ReadonlyArray<"webrtc" | "web-audio" | "media-element">;
 }
@@ -181,21 +166,13 @@ export abstract class BrowserDriver extends Driver {
             // approval that never comes in a headless context.
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
-            // Run the audio service in-process instead of as a
-            // separate sandboxed service. Eliminates IPC overhead
-            // between the audio service and the renderer, which
-            // can otherwise add seconds of latency to WebRTC
-            // setup under load.
-            "--disable-features=AudioServiceOutOfProcess",
-            // Headless Chromium treats hidden tabs as backgrounded
-            // and aggressively throttles their timers, rendering,
-            // and audio processing. For voice agents this delays
-            // WebRTC ICE gathering and audio thread scheduling by
-            // multiple seconds. Disable all three sources of
-            // backgrounding throttling.
+            // Prevent new-headless Chromium from throttling timers and
+            // audio scheduling in background tabs (delays WebRTC ICE
+            // setup by multiple seconds, losing the first utterances).
             "--disable-background-timer-throttling",
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
+            "--disable-features=AudioServiceOutOfProcess",
           ]
         : undefined,
     });
@@ -242,18 +219,6 @@ export abstract class BrowserDriver extends Driver {
     await this.#browser?.close();
   }
 
-  /**
-   * Queue PCM audio for playback into the page's mic stream. Resolves
-   * once the chunk has been scheduled — not when playback completes —
-   * so consumers can pipeline many small chunks (e.g. streaming voice
-   * agent output) without each call paying the chunk's duration as
-   * latency. Sequential calls play back-to-back without overlap or
-   * gaps; the scheduler advances a cursor each call.
-   *
-   * To observe the result, capture it with `captureAudioStream` from a
-   * test whose page routes the mic back into an `AudioContext`
-   * destination (see the `audio-mic` fixture for an example).
-   */
   protected async sendAudio(
     samples: number[],
     sampleRate: number,

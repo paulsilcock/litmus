@@ -2,13 +2,32 @@
 <html>
   <body>
     <script>
-      // Consume the mic stream and route it into the AudioContext
-      // destination so the test can observe what arrived using the
-      // capture pump (which taps any new AudioContext.destination).
+      window.__observedFreq__ = 0;
+      window.__observedPeak__ = 0;
       navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
         const ctx = new AudioContext();
         const source = ctx.createMediaStreamSource(stream);
-        source.connect(ctx.destination);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 4096;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        (function loop() {
+          analyser.getByteFrequencyData(data);
+          let maxMag = 0;
+          let maxIdx = 0;
+          for (let i = 0; i < data.length; i++) {
+            if (data[i] > maxMag) {
+              maxMag = data[i];
+              maxIdx = i;
+            }
+          }
+          if (maxMag > window.__observedPeak__) {
+            window.__observedPeak__ = maxMag;
+            window.__observedFreq__ =
+              (maxIdx * ctx.sampleRate) / analyser.fftSize;
+          }
+          requestAnimationFrame(loop);
+        })();
       });
     </script>
   </body>

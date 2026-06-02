@@ -41,76 +41,40 @@ export function installAudioPump(opts?: {
     for (const sink of captureSinks) sink(samples);
   }
 
-  // --- AudioWorklet processor source -------------------------------------
-  // Batches 128-sample render quanta into 4096-sample chunks before
-  // posting to the main thread — preserves the cadence of the previous
-  // ScriptProcessor implementation while running on the audio thread,
-  // immune to main-thread jank.
-
-  const WORKLET_SOURCE = `
-    class BatchingProcessor extends AudioWorkletProcessor {
-      constructor() {
-        super();
-        this.batch = new Float32Array(4096);
-        this.pos = 0;
-      }
-      process(inputs) {
-        const samples = inputs[0] && inputs[0][0];
-        if (!samples || !samples.length) return true;
-        for (let i = 0; i < samples.length; i++) {
-          this.batch[this.pos++] = samples[i];
-          if (this.pos === this.batch.length) {
-            this.port.postMessage(this.batch.slice());
-            this.pos = 0;
-          }
-        }
-        return true;
-      }
-    }
-    registerProcessor("litmus-batching", BatchingProcessor);
-  `;
-  const workletUrl = URL.createObjectURL(
-    new Blob([WORKLET_SOURCE], { type: "application/javascript" }),
-  );
-
   // --- Central capture route ----------------------------------------------
 
   let captureCtx;
   let captureMixer;
-  let captureReady = null;
 
   function ensureCaptureRoute() {
-    if (captureReady) return captureReady;
+    if (captureCtx) return;
     captureCtx = new RealAudioContext(
       captureSampleRate ? { sampleRate: captureSampleRate } : undefined,
     );
     captureMixer = captureCtx.createGain();
+    const sp = captureCtx.createScriptProcessor(4096, 1, 1);
+    captureMixer.connect(sp);
+    sp.connect(captureCtx.destination);
+    sp.onaudioprocess = (event) => {
+      const inData = event.inputBuffer.getChannelData(0);
+      const outData = event.outputBuffer.getChannelData(0);
+      outData.fill(0);
+      broadcast(inData);
+    };
     lastSampleRate = captureCtx.sampleRate;
-    // Continuous silent baseline. Without this, the capture graph has
-    // no input until something piped in via pipeStreamToCapture, so
-    // the worklet produces nothing and downstream (e.g. Realtime VAD)
-    // has no buffer to apply prefix-padding against when real audio
-    // finally arrives. Mixing a zero-offset constant source is a no-op
-    // for amplitude but keeps the graph flowing.
-    const silence = captureCtx.createConstantSource();
-    silence.offset.value = 0;
-    silence.connect(captureMixer);
-    silence.start();
-    captureReady = captureCtx.audioWorklet.addModule(workletUrl).then(() => {
-      const node = new AudioWorkletNode(captureCtx, "litmus-batching");
-      node.port.onmessage = (e) => broadcast(e.data);
-      captureMixer.connect(node);
-      node.connect(captureCtx.destination);
-    });
-    return captureReady;
   }
 
   function pipeStreamToCapture(stream) {
-    ensureCaptureRoute().then(() => {
-      const source = captureCtx.createMediaStreamSource(stream);
-      source.connect(captureMixer);
-    });
+    ensureCaptureRoute();
+    const source = captureCtx.createMediaStreamSource(stream);
+    source.connect(captureMixer);
   }
+
+  // --- RTCPeerConnection track tap ----------------------------------------
+  // Chromium quirk: a remote WebRTC audio track only starts receiving
+  // RTP packets once it's attached to an HTMLMediaElement. Attach to a
+  // hidden muted element to activate delivery; the srcObject hook
+  // below routes the audio into the capture pipeline.
 
   // --- HTMLMediaElement.srcObject tap -------------------------------------
   // Defined before the WebRTC tap so realSrcObjectDesc is available to both.
@@ -191,24 +155,24 @@ export function installAudioPump(opts?: {
   function installMicProbe(stream) {
     const probeCtx = new RealAudioContext();
     const source = probeCtx.createMediaStreamSource(stream);
+    const sp = probeCtx.createScriptProcessor(2048, 1, 1);
+    source.connect(sp);
+    sp.connect(probeCtx.destination);
     let peak = 0;
     let energy = 0;
     let processedSamples = 0;
-    probeCtx.audioWorklet.addModule(workletUrl).then(() => {
-      const node = new AudioWorkletNode(probeCtx, "litmus-batching");
-      node.port.onmessage = (e) => {
-        const data = e.data;
-        for (let i = 0; i < data.length; i++) {
-          const v = data[i];
-          const abs = v < 0 ? -v : v;
-          if (abs > peak) peak = abs;
-          energy += v * v;
-        }
-        processedSamples += data.length;
-      };
-      source.connect(node);
-      node.connect(probeCtx.destination);
-    });
+    sp.onaudioprocess = (event) => {
+      const data = event.inputBuffer.getChannelData(0);
+      const out = event.outputBuffer.getChannelData(0);
+      out.fill(0);
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i];
+        const abs = v < 0 ? -v : v;
+        if (abs > peak) peak = abs;
+        energy += v * v;
+      }
+      processedSamples += data.length;
+    };
     globalThis.__litmusMicProbe = {
       snapshot() {
         const rms =
@@ -264,12 +228,6 @@ export function installAudioPump(opts?: {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(dest);
-      // Schedule against a wall-clock cursor (in micCtx.currentTime
-      // units) rather than awaiting `onended`. Each `send` starts at
-      // the next free moment in the queue and advances the cursor by
-      // the buffer's duration — gap-free, no overlap. Resolving
-      // immediately lets consumers pipeline writes without each call
-      // paying the chunk's playback duration as latency.
       const when = Math.max(ctx.currentTime, micNextStart);
       micNextStart = when + buf.duration;
       src.start(when);
