@@ -50,6 +50,20 @@ export abstract class AiTask<TInput, TOutput = void> extends Traceable {
 export type ChunkMetadata = Record<string, string | number | boolean>;
 
 /**
+ * A source document, before it is split into {@link Chunk}s.
+ *
+ * Its `id` becomes the `documentId` on every chunk derived from it,
+ * which is what ties chunks back to their source for document-scoped
+ * re-indexing. Loading or parsing a raw file into `content` is an
+ * upstream concern; a {@link Chunker} starts from text.
+ */
+export interface Document<M extends ChunkMetadata = ChunkMetadata> {
+  id: string;
+  content: string;
+  metadata?: M;
+}
+
+/**
  * A unit of retrievable content carved out of a source document.
  *
  * Litmus owns the identity graph — `id`, the originating
@@ -130,6 +144,33 @@ export interface Retrieved<TResult> {
  */
 export interface Retriever<TQuery, TResult extends Chunk> {
   retrieve(query: TQuery, k: number): Promise<Retrieved<TResult>[]>;
+}
+
+/**
+ * Splits a source {@link Document} into the {@link Chunk}s that get
+ * embedded and indexed.
+ *
+ * Naming the seam keeps chunking — easily the most overlooked stage,
+ * where silent ingestion failures originate — out of an inline blob
+ * and behind an interface that can be tested and evaluated on its
+ * own. The return is a promise so an agentic chunker (one that asks
+ * an LLM where to split) fits the same shape as a deterministic one.
+ * `TChunk` is open so a chunker can emit {@link LinkedChunk}s when it
+ * builds a hierarchy.
+ *
+ * @example
+ * ```typescript
+ * import type { Chunk, Chunker, Document } from "@litmus/core/ai";
+ *
+ * class FixedSizeChunker implements Chunker<Document, Chunk> {
+ *   async chunk(document: Document): Promise<Chunk[]> {
+ *     // ...split document.content, stamp each chunk's documentId
+ *   }
+ * }
+ * ```
+ */
+export interface Chunker<TDoc extends Document, TChunk extends Chunk> {
+  chunk(document: TDoc): Promise<TChunk[]>;
 }
 
 /**
