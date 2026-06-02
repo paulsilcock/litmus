@@ -396,18 +396,23 @@ describe("BrowserDriver", () => {
     const chunkDurationMs = 20;
     const totalDurationMs = 4000;
     const totalChunks = Math.floor(totalDurationMs / chunkDurationMs);
+    // Precompute the chunk so the loop times only the per-send cost,
+    // not PCM synthesis.
+    const chunk = sineWavePcm(440, sampleRate, chunkDurationMs);
 
     const start = Date.now();
     for (let i = 0; i < totalChunks; i++) {
-      await audioDriver.sendTone(
-        sineWavePcm(440, sampleRate, chunkDurationMs),
-        sampleRate,
-      );
+      await audioDriver.sendTone(chunk, sampleRate);
     }
     const elapsed = Date.now() - start;
 
-    // With onended, total ≈ 4000ms; with cursor scheduling, well under audio duration.
-    expect(elapsed).toBeLessThan(1500);
+    // A blocking send (awaiting `onended`) cannot beat the audio's own
+    // real-time duration — it would take at least `totalDurationMs`.
+    // Cursor scheduling resolves each send in ~IPC time, far below that.
+    // Assert comfortably under the real-time floor: lenient enough to
+    // absorb CDP round-trip cost on a loaded CI runner, strict enough
+    // that a per-chunk playback wait would blow it.
+    expect(elapsed).toBeLessThan(totalDurationMs / 2);
   });
 
   it("audio is captured at the configured sample rate", async () => {
