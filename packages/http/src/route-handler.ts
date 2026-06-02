@@ -4,7 +4,7 @@ import type { Context, Env } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { container } from "tsyringe";
-import type { ZodSchema } from "zod";
+import type { ZodType } from "zod";
 
 type ValidationTarget = "json" | "param" | "query";
 
@@ -29,14 +29,16 @@ type HandlerContext<TEnv extends Env> = Context<
 function validationHook(
   result: {
     success: boolean;
-    error?: { errors: { path: (string | number)[]; message: string }[] };
+    error?: {
+      issues: { path: (string | number | symbol)[]; message: string }[];
+    };
   },
   c: Context,
 ) {
   if (!result.success && result.error) {
     return c.json(
       {
-        errors: result.error.errors.map((issue) => ({
+        errors: result.error.issues.map((issue) => ({
           field: issue.path.join("."),
           message: issue.message,
         })),
@@ -109,7 +111,7 @@ export function createRouteHandler<TEnv extends Env = any>() {
     TSchema extends Record<string, unknown> = TInput,
   >(
     Handler: HandlerClass<TInput, TResult>,
-    schema: ZodSchema<TSchema>,
+    schema: ZodType<TSchema>,
     options: JsonOptions & Partial<WithInput<TEnv, TSchema, TInput>> = {},
   ) {
     const target = options.target ?? "json";
@@ -137,7 +139,7 @@ export function createRouteHandler<TEnv extends Env = any>() {
     TSchema extends Record<string, unknown> = TInput,
   >(
     Handler: HandlerClass<TInput, void>,
-    schema: ZodSchema<TSchema>,
+    schema: ZodType<TSchema>,
     options: CommonOptions & Partial<WithInput<TEnv, TSchema, TInput>> = {},
   ) {
     const target = options.target ?? "json";
@@ -166,7 +168,7 @@ export function createRouteHandler<TEnv extends Env = any>() {
     TSchema extends Record<string, unknown> = TInput,
   >(
     Handler: HandlerClass<TInput, TChunk>,
-    schema: ZodSchema<TSchema>,
+    schema: ZodType<TSchema>,
     options: CommonOptions & Partial<WithInput<TEnv, TSchema, TInput>> = {},
   ) {
     const target = options.target ?? "json";
@@ -205,7 +207,7 @@ export function createRouteHandler<TEnv extends Env = any>() {
     TSchema extends Record<string, unknown> = TInput,
   >(
     Handler: HandlerClass<TInput, TResult>,
-    schema: ZodSchema<TSchema>,
+    schema: ZodType<TSchema>,
     respond: (
       result: TResult | AsyncIterable<TResult>,
       c: Context<TEnv>,

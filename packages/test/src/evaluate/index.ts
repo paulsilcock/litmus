@@ -22,18 +22,20 @@ export interface EvaluateOptions {
   timeout?: number;
   /** Run repeats in parallel rather than sequentially. */
   concurrent?: boolean;
-  /** Maximum parallel runs when `concurrent: true`. Defaults to 5. */
-  concurrency?: number;
 }
 
 /** Options accepted by `evaluate.scenarios(cases, opts)`. */
-export interface ScenariosFnOptions<T = unknown> extends EvaluateOptions {
+export interface ScenariosFnOptions<T = unknown> {
   /**
    * Derives the per-scenario test label shown in the vitest report.
    * Useful when scenarios don't have a `name` or `id` field. Defaults
    * to `scenario.name`, then `scenario.id`, then `"scenario"`.
    */
   labelBy?: (scenario: T) => string;
+  samples?: number;
+  passRate?: number;
+  timeout?: number;
+  concurrent?: boolean;
 }
 
 /**
@@ -97,6 +99,12 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
     name: string,
     fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   ) => void;
+  scenarios<TScenario>(
+    input: ScenariosSynthesizeInput<TScenario>,
+  ): (
+    name: string,
+    fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
+  ) => void;
   /**
    * Register a set of guardrails on this extended evaluate. The
    * returned evaluate injects a `guardrails` fixture into every eval
@@ -149,6 +157,14 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
   skipIf: (condition: boolean) => ExtendedEvaluate<TFixtures, K>;
   /** Run only when `condition` is true; otherwise skip. */
   runIf: (condition: boolean) => ExtendedEvaluate<TFixtures, K>;
+  /** Sets per-run timeout (ms). Overrides the `timeout` option. */
+  timeout(ms: number): ExtendedEvaluate<TFixtures, K>;
+  /** Sets number of samples. Overrides the `samples` option. */
+  samples(n: number): ExtendedEvaluate<TFixtures, K>;
+  /** Sets pass ratio (0-1). Overrides the `passRate` option. */
+  passRate(r: number): ExtendedEvaluate<TFixtures, K>;
+  /** Enables concurrent mode. */
+  readonly concurrent: ExtendedEvaluate<TFixtures, K>;
 }
 
 /**
@@ -226,6 +242,14 @@ export interface Evaluate {
   skipIf: (condition: boolean) => Evaluate;
   /** Run only when `condition` is true; otherwise skip. */
   runIf: (condition: boolean) => Evaluate;
+  /** Sets per-run timeout (ms). Overrides the `timeout` option. */
+  timeout(ms: number): Evaluate;
+  /** Sets number of samples. Overrides the `samples` option. */
+  samples(n: number): Evaluate;
+  /** Sets pass ratio (0-1). Overrides the `passRate` option. */
+  passRate(r: number): Evaluate;
+  /** Enables concurrent mode. */
+  readonly concurrent: Evaluate;
 }
 
 // ── Task building ────────────────────────────────────────────────────
@@ -302,7 +326,7 @@ function withFixturesRun<TFixtures>(
   return () =>
     setup(async (fixtures) => {
       const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       await fn({ ...fixtures, guardrails: fixture } as TFixtures);
       assertInvoked();
     });
@@ -317,13 +341,20 @@ function scenarioWithFixturesRun<TScenario, TFixtures>(
   return () =>
     setup(async (fixtures) => {
       const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       await fn(scenario, { ...fixtures, guardrails: fixture } as TFixtures);
       assertInvoked();
     });
 }
 
 // ── Registration entry points ────────────────────────────────────────
+
+function mergeOpts(
+  chainOpts: EvaluateOptions,
+  callOpts: EvaluateOptions,
+): EvaluateOptions {
+  return { ...callOpts, ...chainOpts };
+}
 
 function registerSingle(
   name: string,
@@ -339,7 +370,6 @@ function registerSingle(
     passRate,
     timeout: opts.timeout,
     concurrent: opts.concurrent ?? false,
-    concurrency: opts.concurrency,
     mode,
   });
 }
@@ -386,7 +416,6 @@ function registerSynthesizedScenarios<TScenario>(
         passRate,
         timeout: input.timeout,
         concurrent: input.concurrent ?? false,
-        concurrency: input.concurrency,
       });
     }
   });
@@ -410,7 +439,6 @@ function registerScenarios<TScenario>(
         passRate,
         timeout: opts.timeout,
         concurrent: opts.concurrent ?? false,
-        concurrency: opts.concurrency,
       });
     }
   });
@@ -418,36 +446,46 @@ function registerScenarios<TScenario>(
 
 // ── Public factories ─────────────────────────────────────────────────
 
-function makeEvaluate(mode: RunMode): Evaluate {
+function makeEvaluate(
+  mode: RunMode,
+  chainOpts: EvaluateOptions = {},
+): Evaluate {
   function evaluateOne(
     name: string,
     fn: () => void | Promise<void>,
     opts: EvaluateOptions = {},
   ): void {
-    registerSingle(name, () => async () => fn(), opts, mode);
+    registerSingle(
+      name,
+      () => async () => fn(),
+      mergeOpts(chainOpts, opts),
+      mode,
+    );
   }
 
   function scenarios<T>(
     casesOrInput: T[] | ScenariosSynthesizeInput<T>,
     opts: ScenariosFnOptions<T> = {},
   ) {
+    const merged = mergeOpts(chainOpts, opts);
     if (Array.isArray(casesOrInput)) {
       return (name: string, fn: (scenario: T) => void | Promise<void>): void =>
         registerScenarios(
           casesOrInput,
-          opts,
+          merged,
           name,
           (scenario) => async () => fn(scenario),
           mode,
         );
     }
     const input = casesOrInput;
+    const mergedInput: ScenariosSynthesizeInput<T> = { ...input, ...chainOpts };
     return (name: string, fn: (scenario: T) => void | Promise<void>): void => {
-      const synthOpts = { name, ...input.synthesize };
+      const synthOpts = { name, ...mergedInput.synthesize };
 
       if (resolveMode(synthOpts.mode) === "regenerate") {
         registerSynthesizedScenarios(
-          input,
+          mergedInput,
           name,
           (scenario) => async () => fn(scenario),
           mode,
@@ -459,7 +497,7 @@ function makeEvaluate(mode: RunMode): Evaluate {
         const cached = readCachedScenariosSync<T>(synthOpts);
         registerScenarios(
           cached,
-          input,
+          mergedInput,
           name,
           (scenario) => async () => fn(scenario),
           mode,
@@ -477,26 +515,37 @@ function makeEvaluate(mode: RunMode): Evaluate {
 
   const target = Object.assign(evaluateOne, {
     scenarios,
-    extend: <TFixtures>(setup: SetupFn<TFixtures>) => makeExtended(setup, mode),
+    extend: <TFixtures>(setup: SetupFn<TFixtures>) =>
+      makeExtended(setup, mode, {}, chainOpts),
     todo: (name: string) => {
       test.todo(name);
     },
     skipIf: (condition: boolean): Evaluate =>
-      makeEvaluate(condition ? "skip" : mode),
+      makeEvaluate(condition ? "skip" : mode, chainOpts),
     runIf: (condition: boolean): Evaluate =>
-      makeEvaluate(condition ? mode : "skip"),
+      makeEvaluate(condition ? mode : "skip", chainOpts),
+    timeout: (ms: number): Evaluate =>
+      makeEvaluate(mode, { ...chainOpts, timeout: ms }),
+    samples: (n: number): Evaluate =>
+      makeEvaluate(mode, { ...chainOpts, samples: n }),
+    passRate: (r: number): Evaluate =>
+      makeEvaluate(mode, { ...chainOpts, passRate: r }),
   });
 
   Object.defineProperty(target, "skip", {
-    get: () => makeEvaluate("skip"),
+    get: () => makeEvaluate("skip", chainOpts),
     enumerable: true,
   });
   Object.defineProperty(target, "only", {
-    get: () => makeEvaluate("only"),
+    get: () => makeEvaluate("only", chainOpts),
+    enumerable: true,
+  });
+  Object.defineProperty(target, "concurrent", {
+    get: () => makeEvaluate(mode, { ...chainOpts, concurrent: true }),
     enumerable: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  // oxlint-disable-next-line no-unsafe-type-assertion
   return target as Evaluate;
 }
 
@@ -504,9 +553,10 @@ function makeExtended<TFixtures, K extends string = never>(
   setup: SetupFn<TFixtures>,
   mode: RunMode,
   guardrails: GuardrailMap = {},
+  chainOpts: EvaluateOptions = {},
 ): ExtendedEvaluate<TFixtures, K> {
   const withMode = (m: RunMode): ExtendedEvaluate<TFixtures, K> =>
-    makeExtended<TFixtures, K>(setup, m, guardrails);
+    makeExtended<TFixtures, K>(setup, m, guardrails, chainOpts);
 
   function evaluateOne(
     name: string,
@@ -516,26 +566,68 @@ function makeExtended<TFixtures, K extends string = never>(
     registerSingle(
       name,
       () => withFixturesRun(fn, setup, guardrails),
-      opts,
+      mergeOpts(chainOpts, opts),
       mode,
     );
   }
 
   function scenarios<TScenario>(
-    cases: TScenario[],
+    casesOrInput: TScenario[] | ScenariosSynthesizeInput<TScenario>,
     opts: ScenariosFnOptions<TScenario> = {},
   ) {
+    if (Array.isArray(casesOrInput)) {
+      const merged = mergeOpts(chainOpts, opts);
+      return (
+        name: string,
+        fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
+      ): void =>
+        registerScenarios(
+          casesOrInput,
+          merged,
+          name,
+          (scenario) =>
+            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          mode,
+        );
+    }
+    const input = casesOrInput;
     return (
       name: string,
       fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
-    ): void =>
-      registerScenarios(
-        cases,
-        opts,
+    ): void => {
+      const synthOpts = {
         name,
-        (scenario) => scenarioWithFixturesRun(fn, setup, scenario, guardrails),
-        mode,
-      );
+        ...input.synthesize,
+        ...mergeOpts(chainOpts, opts),
+      };
+
+      if (resolveMode(synthOpts.mode) === "regenerate") {
+        registerSynthesizedScenarios(
+          input,
+          name,
+          (scenario) =>
+            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          mode,
+        );
+        return;
+      }
+
+      try {
+        const cached = readCachedScenariosSync<TScenario>(synthOpts);
+        registerScenarios(
+          cached,
+          input,
+          name,
+          (scenario) =>
+            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          mode,
+        );
+      } catch (err) {
+        testFor(mode)(name, () => {
+          throw err;
+        });
+      }
+    };
   }
 
   const target = Object.assign(evaluateOne, {
@@ -553,15 +645,31 @@ function makeExtended<TFixtures, K extends string = never>(
         // The user's setup produces TFixtures; the run wrapper layers
         // the guardrails fixture on top before invoking the body, so
         // the runtime shape matches the widened TFixtures.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        // oxlint-disable-next-line no-unsafe-type-assertion
         setup as SetupFn<TFixtures & { guardrails: GuardrailsFixture }>,
         mode,
         { ...guardrails, ...map },
+        chainOpts,
       ),
     skipIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
       withMode(condition ? "skip" : mode),
     runIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
       withMode(condition ? mode : "skip"),
+    timeout: (ms: number): ExtendedEvaluate<TFixtures, K> =>
+      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+        ...chainOpts,
+        timeout: ms,
+      }),
+    samples: (n: number): ExtendedEvaluate<TFixtures, K> =>
+      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+        ...chainOpts,
+        samples: n,
+      }),
+    passRate: (r: number): ExtendedEvaluate<TFixtures, K> =>
+      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+        ...chainOpts,
+        passRate: r,
+      }),
   });
 
   Object.defineProperty(target, "skip", {
@@ -572,8 +680,16 @@ function makeExtended<TFixtures, K extends string = never>(
     get: () => withMode("only"),
     enumerable: true,
   });
+  Object.defineProperty(target, "concurrent", {
+    get: () =>
+      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+        ...chainOpts,
+        concurrent: true,
+      }),
+    enumerable: true,
+  });
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  // oxlint-disable-next-line no-unsafe-type-assertion
   return target as ExtendedEvaluate<TFixtures, K>;
 }
 

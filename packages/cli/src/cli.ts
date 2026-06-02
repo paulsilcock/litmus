@@ -1,7 +1,7 @@
 import { DomainError, type HandlerClass, isAsyncIterable } from "@litmus/core";
 import { container } from "tsyringe";
 import yargsParser from "yargs-parser";
-import { ZodError, type ZodSchema } from "zod";
+import { ZodError, type ZodType } from "zod";
 
 export interface CliEnv {
   Variables?: Record<string, unknown>;
@@ -31,7 +31,7 @@ interface CommandOptions<TEnv extends CliEnv, TSchema, TInput> {
 
 interface CommandEntry {
   Handler: HandlerClass<any, any>;
-  schema: ZodSchema<any>;
+  schema: ZodType<any>;
   description?: string;
   input?: (validated: any, ctx: CliContext<any>) => any;
 }
@@ -146,7 +146,7 @@ export class Cli<
   >(
     name: TName,
     Handler: HandlerClass<TInput, TResult>,
-    schema: ZodSchema<TInput>,
+    schema: ZodType<TInput>,
     options?: CommandOptions<TEnv, TInput, TInput>,
   ): Cli<TEnv, TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
   command<
@@ -157,11 +157,11 @@ export class Cli<
   >(
     name: TName,
     Handler: HandlerClass<TInput, TResult>,
-    schema: ZodSchema<TSchema>,
+    schema: ZodType<TSchema>,
     options: CommandOptions<TEnv, TSchema, TInput> & {
       input: (validated: TSchema, ctx: CliContext<TEnv>) => TInput;
     },
-  ): Cli<TEnv, TCommands & { [K in TName]: CommandSchema<TInput, TResult> }>;
+  ): Cli<TEnv, TCommands & { [K in TName]: CommandSchema<TSchema, TResult> }>;
 
   /** Mount a sub-CLI as a command group. */
   command<
@@ -179,7 +179,7 @@ export class Cli<
 
     if (args.length >= 3) {
       const Handler = args[1] as HandlerClass<any, any>;
-      const schema = args[2] as ZodSchema<any>;
+      const schema = args[2] as ZodType<any>;
       const options = args[3] as
         | CommandOptions<TEnv, unknown, unknown>
         | undefined;
@@ -277,7 +277,7 @@ export class Cli<
       input = entry.schema.parse(flags);
     } catch (e) {
       if (e instanceof ZodError) {
-        for (const issue of e.errors) {
+        for (const issue of e.issues) {
           const field = issue.path.join(".") || "(root)";
           stderr(`${field}: ${issue.message}\n`);
         }

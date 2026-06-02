@@ -16,8 +16,6 @@ export interface RegisterArgs {
   passRate: number;
   timeout?: number;
   concurrent: boolean;
-  /** Defaults to 5 if not specified by the caller's options. */
-  concurrency?: number;
   mode?: RunMode;
   /**
    * Optional setup that runs before the tasks. Errors propagate
@@ -29,6 +27,24 @@ export interface RegisterArgs {
 }
 
 const DEFAULT_CONCURRENCY = 5;
+
+declare global {
+  // oxlint-disable-next-line no-var
+  var __vitest_worker__: { config: { maxConcurrency: number } } | undefined;
+}
+
+/**
+ * Returns the pool size for concurrent sample execution. Reads
+ * `maxConcurrency` from the vitest worker config so callers can tune
+ * parallelism project-wide via their `vitest.config.ts` without
+ * touching individual evals. Falls back to `DEFAULT_CONCURRENCY` when
+ * running outside a vitest worker (e.g. unit tests of this module).
+ */
+function configuredConcurrency(): number {
+  return (
+    globalThis.__vitest_worker__?.config?.maxConcurrency ?? DEFAULT_CONCURRENCY
+  );
+}
 
 type TestFn = (
   name: string,
@@ -62,10 +78,10 @@ export function register({
   passRate,
   timeout,
   concurrent,
-  concurrency = DEFAULT_CONCURRENCY,
   mode = "run",
   setup,
 }: RegisterArgs): void {
+  const concurrency = configuredConcurrency();
   testFor(mode)(
     label,
     async () => {

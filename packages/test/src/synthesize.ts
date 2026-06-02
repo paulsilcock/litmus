@@ -50,11 +50,26 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+const SLUG_MAX_LENGTH = 20;
+
+function truncateSlug(slug: string): string {
+  if (slug.length <= SLUG_MAX_LENGTH) return slug;
+  const hash = createHash("sha256").update(slug).digest("hex").slice(0, 8);
+  // Snap to the last word boundary within the limit so we don't cut mid-word.
+  const window = slug.slice(0, SLUG_MAX_LENGTH + 1);
+  const lastDash = window.lastIndexOf("-");
+  const prefix =
+    lastDash > 0 ? slug.slice(0, lastDash) : slug.slice(0, SLUG_MAX_LENGTH);
+  return `${prefix}-${hash}`;
+}
+
 function autoDeriveCachePath(name: string | undefined): string | undefined {
   const testPath = expect.getState().testPath;
   if (!testPath) return undefined;
   const stem = testPath.replace(/\.test\.[jt]sx?$/, "");
-  const suffix = name ? `.${slugify(name)}.scenarios.json` : ".scenarios.json";
+  const suffix = name
+    ? `.${truncateSlug(slugify(name))}.scenarios.json`
+    : ".scenarios.json";
   return `${stem}${suffix}`;
 }
 

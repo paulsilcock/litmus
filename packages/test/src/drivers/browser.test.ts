@@ -246,6 +246,32 @@ describe("BrowserDriver", () => {
     expect(reported.brands).toContain("Google Chrome");
   });
 
+  it("the page reports a realistic Chrome UA by default when no userAgent option is given", async () => {
+    // Without an explicit UA, headless Chromium broadcasts
+    // `HeadlessChrome/...`. Many real-world sites sniff for this string
+    // and refuse to render properly. The driver must default to a
+    // realistic Chrome UA so tests exercise the same code paths a real
+    // user would hit.
+    await using d = new TestDriver({ baseUrl });
+    await d.init();
+    const reported = await d.navigatorIdentity();
+    expect(reported.userAgent).toContain("Chrome");
+    expect(reported.userAgent).not.toContain("HeadlessChrome");
+    expect(reported.brands).toContain("Google Chrome");
+  });
+
+  it("the page uses Playwright's default UA when userAgent is explicitly null", async () => {
+    // Consumers can opt out of the default Chrome UA spoofing by
+    // passing `userAgent: null`. This is the escape hatch for tests
+    // that deliberately want to exercise the raw headless UA.
+    await using d = new TestDriver({ baseUrl, userAgent: null });
+    await d.init();
+    const reported = await d.navigatorIdentity();
+    // The raw headless UA is whatever Playwright gives us — we just
+    // assert it does NOT equal the default spoofed UA.
+    expect(reported.userAgent).not.toContain("Chrome/136");
+  });
+
   it("audio sent to the page's mic is received by client code", async () => {
     await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
@@ -363,35 +389,6 @@ describe("BrowserDriver", () => {
     expect(elapsed).toBeLessThan(1500);
   });
 
-  it("audio is captured at the configured sample rate", async () => {
-    // The browser can produce audio at any rate; downstream consumers
-    // (transcribers, voice models) often require a specific one. The
-    // driver lets the test set the capture rate at construction; the
-    // browser's WebAudio handles resampling internally — better than
-    // any Node-side post-processing we'd write.
-    const sampleRate = 24000;
-    await using audioDriver = new TestDriver({
-      baseUrl,
-      audio: true,
-      captureSampleRate: sampleRate,
-    });
-    await audioDriver.init();
-    await audioDriver.openSpeaker(); // plays 660Hz from the page's AudioContext
-    const stream = await audioDriver.captureToneStream();
-    try {
-      const { samples } = await readAtLeast(stream, FFT_WINDOW_SAMPLES);
-      // Decoding the samples at the configured rate proves both that
-      // the rate is honoured AND that the resampling preserved the
-      // signal: a 48k sample stream decoded at 24k would map a 660Hz
-      // tone to 330Hz, and a botched resample would smear the peak.
-      const observed = detectFrequency(samples, sampleRate);
-      expect(observed).toBeGreaterThan(560);
-      expect(observed).toBeLessThan(760);
-    } finally {
-      await stream.close();
-    }
-  });
-
   it("audio played by the page can be drained progressively while it's still playing", async () => {
     // Voice-agent scenarios need to read what the agent has said so
     // far without waiting for it to stop. A stream handle should
@@ -418,5 +415,38 @@ describe("BrowserDriver", () => {
     } finally {
       await stream.close();
     }
+  });
+
+  it("audio is captured at the configured sample rate", async () => {
+    await using audioDriver = new TestDriver({
+      baseUrl,
+      audio: true,
+      captureSampleRate: 24000,
+    });
+    await audioDriver.init();
+    await audioDriver.openSpeaker();
+
+    const { samples, sampleRate } = await audioDriver.captureTone(500);
+    expect(sampleRate).toBe(24000);
+    // The 660Hz tone from the speaker fixture must survive the 48→24kHz resample.
+    const observed = detectFrequency(samples, sampleRate);
+    expect(observed).toBeGreaterThan(560);
+    expect(observed).toBeLessThan(760);
+  });
+
+  it("excluding a capture source prevents that tap from being captured", async () => {
+    // The speaker fixture plays audio via an AudioContext. If captureSources
+    // excludes "web-audio", the AudioContext destination tap is not installed
+    // and no samples should flow into the capture pipeline.
+    await using audioDriver = new TestDriver({
+      baseUrl,
+      audio: true,
+      captureSources: ["webrtc", "media-element"],
+    });
+    await audioDriver.init();
+    await audioDriver.openSpeaker();
+
+    const { samples } = await audioDriver.captureTone(500);
+    expect(samples.length).toBe(0);
   });
 });

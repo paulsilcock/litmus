@@ -5,7 +5,12 @@ export default defineConfig({
     setupFiles: ["./test-setup.ts", "@litmus/test/vitest-setup"],
     // fixtures/ dirs hold intentionally-failing files invoked on demand
     // by subprocess-based acceptance tests; skip auto-discovery.
-    exclude: ["**/node_modules/**", "**/dist/**", "**/fixtures/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/fixtures/**",
+      ".claude/worktrees/**",
+    ],
     tags: [
       {
         name: "bookshop-acceptance",
@@ -18,10 +23,12 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
+    ignorePatterns: [".claude/worktrees/**"],
     printWidth: 80,
     sortImports: true,
   },
   lint: {
+    ignorePatterns: [".claude/worktrees/**"],
     options: {
       typeAware: true,
       typeCheck: true,

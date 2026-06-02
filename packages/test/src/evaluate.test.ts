@@ -16,20 +16,24 @@ describe("samples mode", () => {
     expect(run.logLines.filter((l) => l === "inv")).toHaveLength(3);
   });
 
-  it("sample failures are tolerated up to the configured threshold", () => {
+  it("every sample runs even when earlier samples fail", () => {
     const calls = run.logLines.filter((l) => l.startsWith("tolerance-call:"));
     expect(calls).toHaveLength(5);
-    const test = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("first two samples fail"),
-    );
-    expect(test?.status).toBe("passed");
   });
 
-  it("parallel execution never exceeds the configured limit", () => {
-    const peaks = run.logLines
-      .filter((l) => l.startsWith("active:"))
-      .map((l) => Number(l.slice("active:".length)));
-    expect(Math.max(...peaks)).toBe(3);
+  it("an eval passes when failures stay within the pass-rate threshold", () => {
+    const result = assertionFor(run, (n) =>
+      n.startsWith("first two samples fail"),
+    );
+    expect(result.status).toBe("passed");
+  });
+
+  it("the concurrent option runs samples in parallel, not one after another", () => {
+    // The fixture blocks every sample until all have started, so the
+    // "overlap" line is logged once per sample only if they truly ran
+    // at the same time. See samples.test.ts for the latch.
+    const overlaps = run.logLines.filter((l) => l === "overlap");
+    expect(overlaps).toHaveLength(3);
   });
 });
 
@@ -46,17 +50,16 @@ describe("scenarios mode", () => {
   });
 
   it("a passing scenario surfaces as a passed test, named via labelBy", () => {
-    const passed = run.report.testResults[0]!.assertionResults.find(
-      (r) => r.fullName === "declines refund c1 for $50",
-    );
-    expect(passed?.status).toBe("passed");
+    const passed = assertionFor(run, (n) => n === "declines refund c1 for $50");
+    expect(passed.status).toBe("passed");
   });
 
   it("a failing scenario surfaces as a failed test, named via labelBy", () => {
-    const failed = run.report.testResults[0]!.assertionResults.find(
-      (r) => r.fullName === "declines refund c2 for $120",
+    const failed = assertionFor(
+      run,
+      (n) => n === "declines refund c2 for $120",
     );
-    expect(failed?.status).toBe("failed");
+    expect(failed.status).toBe("failed");
   });
 });
 
@@ -123,11 +126,9 @@ describe("scenarios synthesize stale cache", () => {
   });
 
   it("the stale-cache failure points users at the regenerate command", () => {
-    const stale = run.report.testResults[0]!.assertionResults.find(
-      (r) => r.fullName === "stale eval",
-    );
-    expect(stale?.status).toBe("failed");
-    expect(stale?.failureMessages.join("\n")).toMatch(
+    const stale = assertionFor(run, (n) => n === "stale eval");
+    expect(stale.status).toBe("failed");
+    expect(stale.failureMessages.join("\n")).toMatch(
       /LITMUS_SYNTH_MODE=regenerate/,
     );
   });
@@ -137,10 +138,11 @@ describe("scenarios synthesize stale cache", () => {
   });
 
   it("an unrelated test in the same file still runs", () => {
-    const unrelated = run.report.testResults[0]!.assertionResults.find(
-      (r) => r.fullName === "unrelated test runs fine",
+    const unrelated = assertionFor(
+      run,
+      (n) => n === "unrelated test runs fine",
     );
-    expect(unrelated?.status).toBe("passed");
+    expect(unrelated.status).toBe("passed");
   });
 });
 
@@ -180,10 +182,8 @@ describe("modifiers", () => {
     run = await runFixture("modifiers.test.ts");
   }, 30_000);
 
-  function statusOf(name: string): string | undefined {
-    return run.report.testResults[0]!.assertionResults.find(
-      (r) => r.fullName === name,
-    )?.status;
+  function statusOf(name: string): string {
+    return assertionFor(run, (n) => n === name).status;
   }
 
   it("an explicitly skipped eval is reported as skipped and never runs the body", () => {
@@ -191,17 +191,23 @@ describe("modifiers", () => {
     expect(run.logLines).not.toContain("skip-direct");
   });
 
-  it("skipIf with a truthy condition skips; with a falsy condition runs", () => {
+  it("skipIf with a truthy condition skips the eval", () => {
     expect(statusOf("skipif-true")).toBe("skipped");
-    expect(statusOf("skipif-false")).toBe("passed");
     expect(run.logLines).not.toContain("skipif-true");
+  });
+
+  it("skipIf with a falsy condition runs the eval", () => {
+    expect(statusOf("skipif-false")).toBe("passed");
     expect(run.logLines).toContain("skipif-false");
   });
 
-  it("runIf inverts the gate compared to skipIf", () => {
+  it("runIf with a truthy condition runs the eval", () => {
     expect(statusOf("runif-true")).toBe("passed");
-    expect(statusOf("runif-false")).toBe("skipped");
     expect(run.logLines).toContain("runif-true");
+  });
+
+  it("runIf with a falsy condition skips the eval", () => {
+    expect(statusOf("runif-false")).toBe("skipped");
     expect(run.logLines).not.toContain("runif-false");
   });
 
@@ -230,17 +236,17 @@ describe("guardrails", () => {
   });
 
   it("a passing grader leaves the scenario passing", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("passing grader records each input"),
+    const result = assertionFor(run, (n) =>
+      n.startsWith("passing grader records each input"),
     );
-    expect(result?.status).toBe("passed");
+    expect(result.status).toBe("passed");
   });
 
-  it(".withGuardrails({}) injects the fixture but no graders run", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("eval registered with .withGuardrails({})"),
+  it(".withGuardrails with no registered graders still injects the fixture", () => {
+    const result = assertionFor(run, (n) =>
+      n.startsWith("eval registered with .withGuardrails({})"),
     );
-    expect(result?.status).toBe("passed");
+    expect(result.status).toBe("passed");
   });
 
   it("scenarios-form invokes the grader once per (scenario, sample) with that run's body output", () => {
@@ -261,26 +267,26 @@ describe("guardrails: failure", () => {
   }, 30_000);
 
   it("a rejecting grader fails the scenario", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("grader rejects with 'violates content policy'"),
+    const result = assertionFor(run, (n) =>
+      n.startsWith("grader rejects with 'violates content policy'"),
     );
-    expect(result?.status).toBe("failed");
+    expect(result.status).toBe("failed");
   });
 
   it("the failure message names the grader and includes its reason", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("grader rejects with 'violates content policy'"),
+    const result = assertionFor(run, (n) =>
+      n.startsWith("grader rejects with 'violates content policy'"),
     );
-    const message = result?.failureMessages.join("\n") ?? "";
+    const message = result.failureMessages.join("\n");
     expect(message).toContain("policy check");
     expect(message).toContain("violates content policy");
   });
 
   it("every failing grader's reason surfaces in one message", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("two graders reject with distinct"),
+    const result = assertionFor(run, (n) =>
+      n.startsWith("two graders reject with distinct"),
     );
-    const message = result?.failureMessages.join("\n") ?? "";
+    const message = result.failureMessages.join("\n");
     expect(message).toContain("tone check");
     expect(message).toContain("tone too curt");
     expect(message).toContain("policy check");
@@ -288,20 +294,20 @@ describe("guardrails: failure", () => {
   });
 
   it("chained .withGuardrails calls accumulate — downstream sees every registration", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("first grader registered, then second appended"),
+    const result = assertionFor(run, (n) =>
+      n.startsWith("first grader registered, then second appended"),
     );
-    const message = result?.failureMessages.join("\n") ?? "";
+    const message = result.failureMessages.join("\n");
     expect(message).toContain("tone check");
     expect(message).toContain("policy check");
   });
 
   it("forgetting to invoke the guardrails fixture fails the sample", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("guardrails registered but body never calls them"),
+    const result = assertionFor(run, (n) =>
+      n.startsWith("guardrails registered but body never calls them"),
     );
-    expect(result?.status).toBe("failed");
-    const message = result?.failureMessages.join("\n") ?? "";
+    expect(result.status).toBe("failed");
+    const message = result.failureMessages.join("\n");
     expect(message).toContain("policy check");
     expect(message).toContain("never invoked");
   });
@@ -315,11 +321,33 @@ describe("guardrails: modifier composition", () => {
   }, 30_000);
 
   it("modifiers preserve registered guardrails through composition", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("rejecting grader registered, then .only applied"),
+    const result = assertionFor(run, (n) =>
+      n.startsWith("rejecting grader registered, then .only applied"),
     );
-    expect(result?.status).toBe("failed");
-    expect(result?.failureMessages.join("\n") ?? "").toContain("policy check");
+    expect(result.status).toBe("failed");
+    expect(result.failureMessages.join("\n")).toContain("policy check");
+  });
+});
+
+describe("guardrails with synthesized scenarios", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("scenarios-synthesize-extended.test.ts");
+  }, 30_000);
+
+  it("the body runs once for each synthesised scenario", () => {
+    const iters = run.logLines.filter((l) => l.startsWith("iter:"));
+    expect(iters).toHaveLength(3); // 1 seed + 2 variants
+  });
+
+  it("fixtures and guardrails are both injected into the body", () => {
+    expect(run.logLines).toContain("iter:alice:ready");
+  });
+
+  it("the grader is invoked once per synthesised scenario", () => {
+    const graderCalls = run.logLines.filter((l) => l.startsWith("grader:"));
+    expect(graderCalls).toHaveLength(3);
   });
 });
 
@@ -336,6 +364,93 @@ describe("only mode", () => {
   });
 });
 
+describe("chain modifiers", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture("chain-modifiers.test.ts");
+  }, 30_000);
+
+  it(".samples(n) runs the body n times", () => {
+    const samples = run.logLines.filter((l) => l === "chain-sample");
+    expect(samples).toHaveLength(3);
+  });
+
+  it(".samples(n).passRate(r) tolerates failures up to the configured threshold", () => {
+    const calls = run.logLines.filter((l) =>
+      l.startsWith("chain-passrate-call:"),
+    );
+    expect(calls).toHaveLength(5);
+    const result = assertionFor(run, (n) =>
+      n.startsWith("chain-passrate tolerates threshold failures"),
+    );
+    expect(result.status).toBe("passed");
+  });
+
+  it(".timeout(ms) fails an eval whose body exceeds the limit", () => {
+    const result = assertionFor(run, (n) =>
+      n.startsWith("chain-timeout fails a body that exceeds the limit"),
+    );
+    expect(result.status).toBe("failed");
+    expect(result.failureMessages.join("\n")).toMatch(/timed out after 50ms/);
+  });
+
+  it("a chain modifier value overrides the same option passed at the call site", () => {
+    const calls = run.logLines.filter((l) => l.startsWith("chain-precedence:"));
+    expect(calls).toHaveLength(5);
+  });
+
+  it(".concurrent runs samples in parallel, not one after another", () => {
+    // Same deterministic latch as the samples-mode parallelism test:
+    // all three "chain-overlap" lines appear only if .concurrent ran
+    // the samples at the same time.
+    const overlaps = run.logLines.filter((l) => l === "chain-overlap");
+    expect(overlaps).toHaveLength(3);
+  });
+
+  it(".samples(n).scenarios(cases) runs n samples per scenario", () => {
+    const alice = run.logLines.filter((l) => l === "chain-scenario:alice");
+    const bob = run.logLines.filter((l) => l === "chain-scenario:bob");
+    expect(alice).toHaveLength(2);
+    expect(bob).toHaveLength(2);
+  });
+
+  it(".skip composed with a chain modifier skips the eval", () => {
+    const result = assertionFor(run, (n) =>
+      n.startsWith("chain-skip does not run body"),
+    );
+    expect(result.status).toBe("skipped");
+    expect(run.logLines).not.toContain("chain-skip-ran");
+  });
+
+  it(".skipIf(false) with a chain modifier runs the eval", () => {
+    const result = assertionFor(run, (n) =>
+      n.startsWith("chain-skipif-false runs"),
+    );
+    expect(result.status).toBe("passed");
+    expect(run.logLines).toContain("chain-skipif-false");
+  });
+});
+
+describe("vitest maxConcurrency setting", () => {
+  let run: FixtureRun;
+
+  beforeAll(async () => {
+    run = await runFixture(
+      "max-concurrency.test.ts",
+      "vite.config.max-concurrency.ts",
+    );
+  }, 30_000);
+
+  it("the configured pool size limits how many samples run simultaneously", () => {
+    const result = assertionFor(run, (n) =>
+      n.startsWith("pool-constrained deadlock"),
+    );
+    expect(result.status).toBe("failed");
+    expect(result.failureMessages.join("\n")).toMatch(/timed out after 300ms/);
+  });
+});
+
 describe("failure modes", () => {
   let run: FixtureRun;
 
@@ -344,23 +459,23 @@ describe("failure modes", () => {
   }, 30_000);
 
   it("a body that breaches the pass-rate threshold fails the registered test", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("breaches pass rate"),
-    );
-    expect(result?.status).toBe("failed");
-    expect(result?.failureMessages.join("\n")).toMatch(
+    const result = assertionFor(run, (n) => n.startsWith("breaches pass rate"));
+    expect(result.status).toBe("failed");
+    expect(result.failureMessages.join("\n")).toMatch(
       /Evaluate failed: 2\/5 passed/,
     );
   });
 
   it("a body that exceeds the timeout fails the registered test", () => {
-    const result = run.report.testResults[0]!.assertionResults.find((r) =>
-      r.fullName.startsWith("exceeds timeout"),
-    );
-    expect(result?.status).toBe("failed");
-    expect(result?.failureMessages.join("\n")).toMatch(
-      /Evaluate failed: 0\/1 passed/,
-    );
+    const result = assertionFor(run, (n) => n.startsWith("exceeds timeout"));
+    expect(result.status).toBe("failed");
+    expect(result.failureMessages.join("\n")).toMatch(/timed out after 10ms/);
+  });
+
+  it("a single-sample failure surfaces the original error directly, not a wrapper", () => {
+    const result = assertionFor(run, (n) => n.startsWith("exceeds timeout"));
+    const msg = result.failureMessages.join("\n");
+    expect(msg).not.toMatch(/Evaluate failed:/);
   });
 });
 
@@ -380,7 +495,32 @@ interface FixtureRun {
   logLines: string[];
 }
 
-async function runFixture(fixtureFile: string): Promise<FixtureRun> {
+/**
+ * Find the reported sub-test whose name matches, throwing with the full
+ * list of reported names if none does. Returning a non-optional result
+ * means a fixture rename surfaces as "no test matched — reported: …"
+ * rather than a misleading `expected undefined to be 'passed'`.
+ */
+function assertionFor(
+  run: FixtureRun,
+  matcher: (fullName: string) => boolean,
+): AssertionResult {
+  const results = run.report.testResults[0]!.assertionResults;
+  const found = results.find((r) => matcher(r.fullName));
+  if (!found) {
+    throw new Error(
+      `No reported test matched. Reported tests: ${results
+        .map((r) => r.fullName)
+        .join(", ")}`,
+    );
+  }
+  return found;
+}
+
+async function runFixture(
+  fixtureFile: string,
+  configFile = "vite.config.ts",
+): Promise<FixtureRun> {
   const fixturesDir = join(import.meta.dirname, "fixtures");
   const logPath = join(
     tmpdir(),
@@ -388,7 +528,12 @@ async function runFixture(fixtureFile: string): Promise<FixtureRun> {
   );
 
   try {
-    const report = await spawnVitest(fixturesDir, fixtureFile, logPath);
+    const report = await spawnVitest(
+      fixturesDir,
+      fixtureFile,
+      logPath,
+      configFile,
+    );
     let logLines: string[] = [];
     try {
       logLines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
@@ -409,6 +554,7 @@ function spawnVitest(
   fixturesDir: string,
   fixtureFile: string,
   logPath: string,
+  configFile = "vite.config.ts",
 ): Promise<JsonReport> {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -416,7 +562,7 @@ function spawnVitest(
       [
         "test",
         "-c",
-        join(fixturesDir, "vite.config.ts"),
+        join(fixturesDir, configFile),
         join(fixturesDir, fixtureFile),
         "--reporter=json",
         // Subprocess is a fixture for testing `.only`, not the real CI

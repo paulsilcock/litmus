@@ -23,15 +23,19 @@
  * `toString()` and injected into the page — any module-scope helpers
  * wouldn't come along.
  */
-export function installAudioPump(opts: {
+export function installAudioPump(opts?: {
   captureSampleRate?: number;
-  captureWebRtc?: boolean;
-  captureWebAudio?: boolean;
-  captureMediaElement?: boolean;
+  captureSources?: string[];
 }): void {
+  const captureSampleRate = opts?.captureSampleRate;
+  const captureSources = opts?.captureSources ?? [
+    "webrtc",
+    "web-audio",
+    "media-element",
+  ];
   const RealAudioContext = globalThis.AudioContext;
   const captureSinks = new Set();
-  let lastSampleRate = opts.captureSampleRate ?? 48000;
+  let lastSampleRate = captureSampleRate ?? 48000;
 
   function broadcast(samples) {
     for (const sink of captureSinks) sink(samples);
@@ -77,9 +81,9 @@ export function installAudioPump(opts: {
 
   function ensureCaptureRoute() {
     if (captureReady) return captureReady;
-    captureCtx = opts.captureSampleRate
-      ? new RealAudioContext({ sampleRate: opts.captureSampleRate })
-      : new RealAudioContext();
+    captureCtx = new RealAudioContext(
+      captureSampleRate ? { sampleRate: captureSampleRate } : undefined,
+    );
     captureMixer = captureCtx.createGain();
     lastSampleRate = captureCtx.sampleRate;
     // Continuous silent baseline. Without this, the capture graph has
@@ -108,43 +112,14 @@ export function installAudioPump(opts: {
     });
   }
 
-  // Original srcObject descriptor — both the RTC wrap and the
-  // media-element wrap need to read/write the underlying property
-  // without triggering each other.
+  // --- HTMLMediaElement.srcObject tap -------------------------------------
+  // Defined before the WebRTC tap so realSrcObjectDesc is available to both.
+
   const realSrcObjectDesc = Object.getOwnPropertyDescriptor(
     HTMLMediaElement.prototype,
     "srcObject",
   );
-
-  // --- RTCPeerConnection track tap ----------------------------------------
-  // Chromium quirk: a remote WebRTC audio track only starts receiving
-  // RTP packets once it's attached to an HTMLMediaElement. Attach to a
-  // hidden muted element to activate delivery, then pipe the stream
-  // into the capture mixer directly.
-
-  const RealRTCPeerConnection = globalThis.RTCPeerConnection;
-  if (opts.captureWebRtc && RealRTCPeerConnection) {
-    globalThis.RTCPeerConnection = class extends RealRTCPeerConnection {
-      constructor(...args) {
-        super(...args);
-        this.addEventListener("track", (event) => {
-          if (!event.track || event.track.kind !== "audio") return;
-          const stream = event.streams[0] ?? new MediaStream([event.track]);
-          const activator = document.createElement("audio");
-          activator.muted = true;
-          realSrcObjectDesc.set.call(activator, stream);
-          activator.play().catch(() => {});
-          pipeStreamToCapture(stream);
-        });
-      }
-    };
-  }
-
-  // --- HTMLMediaElement.srcObject tap -------------------------------------
-  // Any MediaStream assigned to a media element's `srcObject` has its
-  // audio tracks routed into the capture pipeline.
-
-  if (opts.captureMediaElement) {
+  if (captureSources.includes("media-element")) {
     Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
       configurable: true,
       get() {
@@ -161,11 +136,35 @@ export function installAudioPump(opts: {
     });
   }
 
+  // --- RTCPeerConnection track tap ----------------------------------------
+  // Chromium quirk: a remote WebRTC audio track only starts receiving
+  // RTP packets once it's attached to an HTMLMediaElement. Attach to a
+  // hidden muted element to activate delivery; use realSrcObjectDesc.set
+  // to bypass the srcObject hook so the same stream isn't captured twice.
+
+  const RealRTCPeerConnection = globalThis.RTCPeerConnection;
+  if (captureSources.includes("webrtc") && RealRTCPeerConnection) {
+    globalThis.RTCPeerConnection = class extends RealRTCPeerConnection {
+      constructor(...args) {
+        super(...args);
+        this.addEventListener("track", (event) => {
+          if (!event.track || event.track.kind !== "audio") return;
+          const stream = event.streams[0] ?? new MediaStream([event.track]);
+          const activator = document.createElement("audio");
+          realSrcObjectDesc.set.call(activator, stream);
+          pipeStreamToCapture(stream);
+          activator.muted = true;
+          activator.play().catch(() => {});
+        });
+      }
+    };
+  }
+
   // --- AudioContext destination tap ---------------------------------------
   // Any page-created AudioContext gets its `destination` swapped for a
   // gain node that fans out to the real destination AND a capture sink.
 
-  if (opts.captureWebAudio) {
+  if (captureSources.includes("web-audio")) {
     globalThis.AudioContext = class extends RealAudioContext {
       constructor(...args) {
         super(...args);
@@ -187,6 +186,7 @@ export function installAudioPump(opts: {
 
   let micCtx;
   let micDest;
+  let micNextStart = 0;
 
   function installMicProbe(stream) {
     const probeCtx = new RealAudioContext();
@@ -226,6 +226,7 @@ export function installAudioPump(opts: {
   function ensureMic() {
     if (!micCtx) {
       micCtx = new RealAudioContext();
+      micNextStart = 0;
       micDest = micCtx.createMediaStreamDestination();
       // Consumers (notably @elevenlabs/convai-widget-embed) sometimes
       // call `track.stop()` on the mic track during setup. A stopped
@@ -254,13 +255,6 @@ export function installAudioPump(opts: {
 
   const streams = new Map();
   let nextStreamId = 0;
-  // Wall-clock-relative cursor (in micCtx.currentTime units) of the
-  // next free moment in the playback queue. Each `send` schedules its
-  // buffer to start here, then advances the cursor by the buffer's
-  // duration — gap-free, no overlap. Resolving immediately (instead
-  // of awaiting onended) means consumers can pipeline writes without
-  // each call paying the chunk's playback duration as latency.
-  let nextStart = 0;
 
   globalThis.__litmusAudio = {
     send(samples, sampleRate) {
@@ -270,9 +264,16 @@ export function installAudioPump(opts: {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(dest);
-      const startAt = Math.max(ctx.currentTime, nextStart);
-      src.start(startAt);
-      nextStart = startAt + buf.duration;
+      // Schedule against a wall-clock cursor (in micCtx.currentTime
+      // units) rather than awaiting `onended`. Each `send` starts at
+      // the next free moment in the queue and advances the cursor by
+      // the buffer's duration — gap-free, no overlap. Resolving
+      // immediately lets consumers pipeline writes without each call
+      // paying the chunk's playback duration as latency.
+      const when = Math.max(ctx.currentTime, micNextStart);
+      micNextStart = when + buf.duration;
+      src.start(when);
+      return Promise.resolve();
     },
     capture(durationMs) {
       const collected = [];

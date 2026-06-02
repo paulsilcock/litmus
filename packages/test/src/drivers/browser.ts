@@ -9,6 +9,19 @@ import { Driver } from "#litmus-test/drivers/base.ts";
 import { installAudioPump } from "#litmus-test/drivers/browser-audio.ts";
 import { spoofUserAgentData } from "#litmus-test/drivers/browser-ua.ts";
 
+/**
+ * A realistic current Chrome UA string used by default when no
+ * `userAgent` option is provided. Spoofing this prevents headless
+ * Chromium's `HeadlessChrome/...` UA from being sniffed by sites that
+ * refuse to render their Chrome-only paths for headless agents.
+ *
+ * Pass `userAgent: null` to opt out and use Playwright's raw default.
+ */
+export const DEFAULT_CHROME_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/136.0.0.0 Safari/537.36";
+
 declare global {
   // Installed inside the browser by `installAudioPump` when `audio: true`.
   // Only valid inside `page.evaluate` callbacks.
@@ -40,7 +53,16 @@ interface BrowserDriverOptions {
   baseUrl: string;
   headless?: boolean;
   audio?: boolean;
-  userAgent?: string;
+  /**
+   * User-agent string to use for the browser context.
+   *
+   * - `undefined` (omitted) — use the default spoofed Chrome UA
+   *   (`DEFAULT_CHROME_UA`). Prevents sites from detecting headless
+   *   Chromium via the `HeadlessChrome/...` UA string.
+   * - `null` — opt out of UA spoofing; Playwright's raw default is used.
+   * - `string` — use the given UA string exactly.
+   */
+  userAgent?: string | null;
   /**
    * Sample rate (Hz) for the capture-side `AudioContext`. When set,
    * the browser's WebAudio resamples all captured audio sources to
@@ -177,29 +199,41 @@ export abstract class BrowserDriver extends Driver {
           ]
         : undefined,
     });
+    // Resolve the effective UA:
+    //   undefined → apply DEFAULT_CHROME_UA (hide headless fingerprint)
+    //   null      → let Playwright use its own default (opt-out)
+    //   string    → use exactly what the consumer provided
+    const effectiveUserAgent =
+      this.#options.userAgent === undefined
+        ? DEFAULT_CHROME_UA
+        : (this.#options.userAgent ?? undefined);
     this.#context = await this.#browser.newContext({
       baseURL: this.#options.baseUrl,
-      userAgent: this.#options.userAgent,
+      userAgent: effectiveUserAgent,
     });
-    if (this.#options.userAgent) {
+    if (effectiveUserAgent !== undefined) {
       // Playwright's `userAgent` only sets the UA string + HTTP
       // header. Mirror it onto `navigator.userAgentData` so sites
       // that read Client Hints see the same identity.
-      const userAgent = this.#options.userAgent;
-      await this.#context.addInitScript(spoofUserAgentData, { userAgent });
+      await this.#context.addInitScript(spoofUserAgentData, {
+        userAgent: effectiveUserAgent,
+      });
     }
     if (this.#options.audio) {
-      const sources = this.#options.captureSources ?? [
-        "webrtc",
-        "web-audio",
-        "media-element",
-      ];
-      await this.#context.addInitScript(installAudioPump, {
-        captureSampleRate: this.#options.captureSampleRate,
-        captureWebRtc: sources.includes("webrtc"),
-        captureWebAudio: sources.includes("web-audio"),
-        captureMediaElement: sources.includes("media-element"),
-      });
+      const audioOpts: {
+        captureSampleRate?: number;
+        captureSources?: string[];
+      } = {};
+      if (this.#options.captureSampleRate !== undefined) {
+        audioOpts.captureSampleRate = this.#options.captureSampleRate;
+      }
+      if (this.#options.captureSources !== undefined) {
+        audioOpts.captureSources = [...this.#options.captureSources];
+      }
+      await this.#context.addInitScript(
+        installAudioPump,
+        Object.keys(audioOpts).length > 0 ? audioOpts : undefined,
+      );
     }
     this.#page = await this.#context.newPage();
   }
@@ -216,9 +250,9 @@ export abstract class BrowserDriver extends Driver {
    * latency. Sequential calls play back-to-back without overlap or
    * gaps; the scheduler advances a cursor each call.
    *
-   * To observe the result, use `captureAudioStream` from a test that
-   * routes the mic back through an analyser, or poll an in-page
-   * observer (see `audio-mic` fixture for an example).
+   * To observe the result, capture it with `captureAudioStream` from a
+   * test whose page routes the mic back into an `AudioContext`
+   * destination (see the `audio-mic` fixture for an example).
    */
   protected async sendAudio(
     samples: number[],
