@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fake Support Chat</title>
+  </head>
+  <body>
+    <!--
+      A generic stand-in for a hosted support chat widget, used to test
+      the driver's mechanics (open → greet → send → reply, including a
+      streamed reply) without touching the live Sonos site. Its markup is
+      shaped to satisfy the candidate selectors in selectors.ts.
+    -->
+    <button id="launcher">Chat with us</button>
+
+    <div id="widget" hidden>
+      <div id="thread" aria-live="polite"></div>
+      <textarea aria-label="Type your message"></textarea>
+      <button id="send">Send</button>
+    </div>
+
+    <script>
+      const launcher = document.getElementById("launcher");
+      const widget = document.getElementById("widget");
+      const thread = document.getElementById("thread");
+      const input = document.querySelector("textarea");
+      const send = document.getElementById("send");
+
+      function addBubble(cls, text) {
+        const el = document.createElement("div");
+        el.className = cls;
+        el.textContent = text;
+        thread.appendChild(el);
+        return el;
+      }
+
+      // Type `text` into `el` one chunk at a time, mimicking a streamed
+      // agent reply so the driver's "wait until text settles" path is
+      // actually exercised.
+      function stream(el, text) {
+        let i = 0;
+        const tick = () => {
+          i += 5;
+          el.textContent = text.slice(0, i);
+          if (i < text.length) setTimeout(tick, 60);
+        };
+        tick();
+      }
+
+      launcher.addEventListener("click", () => {
+        widget.hidden = false;
+        setTimeout(() => {
+          stream(addBubble("agent-msg", ""), "Hi! How can I help you today?");
+        }, 150);
+      });
+
+      send.addEventListener("click", () => {
+        const text = input.value.trim();
+        if (!text) return;
+        addBubble("user-msg", text);
+        input.value = "";
+        setTimeout(() => {
+          stream(addBubble("agent-msg", ""), "You said: " + text);
+        }, 200);
+      });
+    </script>
+  </body>
+</html>
