@@ -270,7 +270,65 @@ describe("UserSimulator", () => {
 
     expect(discountCalls).toEqual([{ code: "SAVE10" }]);
   });
-  it.todo("taking domain actions doesn't consume conversational turns");
+  it("taking domain actions doesn't consume conversational turns", async () => {
+    const actionCalls: string[] = [];
+
+    const responses = [
+      {
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: "1",
+            toolName: "lookup",
+            input: JSON.stringify({ q: "balance" }),
+          },
+        ],
+        finishReason: { unified: "tool-calls" as const, raw: undefined },
+      },
+      {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              message: "Got it, thanks!",
+              status: "goal_met",
+            }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      },
+    ];
+    let callIndex = 0;
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({ ...mockResult, ...responses[callIndex++] }),
+    });
+
+    const customer = UserSimulator.text({
+      model,
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "ok",
+      abilities: {
+        lookup: {
+          reason: "Look something up",
+          how: z.object({ q: z.string() }),
+          use: async ({ q }) => {
+            actionCalls.push(q);
+            return { found: "$1250" };
+          },
+        },
+      },
+    });
+
+    // maxTurns: 1 — only one conversational round is allowed. The model
+    // should still be able to use the ability and produce a final
+    // utterance, all within that single turn.
+    const result = await customer.pursueGoal("find balance", { maxTurns: 1 });
+
+    expect(actionCalls).toEqual(["balance"]);
+    expect(result).toEqual({ met: true, reason: "goal_met" });
+  });
   it.todo(
     "the simulated user still produces an utterance even when it keeps taking actions",
   );

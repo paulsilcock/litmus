@@ -164,6 +164,7 @@ export class UserSimulator {
       transcript: async () => [...turns],
       pursueGoal: async (goal, pursuitOpts = {}) => {
         const maxTurns = pursuitOpts.maxTurns ?? 10;
+        const maxStepsPerTurn = 10;
         const tools = options.abilities
           ? Object.fromEntries(
               Object.entries(options.abilities).map(([name, ability]) => [
@@ -186,7 +187,7 @@ export class UserSimulator {
             prompt: promptText,
             output: Output.object({ schema: userResponseSchema }),
             tools,
-            stopWhen: tools ? stepCountIs(maxTurns) : undefined,
+            stopWhen: tools ? stepCountIs(maxStepsPerTurn) : undefined,
           });
           await options.send(result.output.message);
           if (result.output.status !== "continue") {
