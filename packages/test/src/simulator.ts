@@ -105,11 +105,30 @@ Decide your next message and whether your goal has been met.`;
  * expect(conversation.outcome).toBe("goal_met");
  * ```
  */
+interface TextOptions {
+  model: LanguageModel;
+  persona: string;
+  send: (message: string) => Promise<void>;
+  receive: () => Promise<string>;
+}
+
+interface TextSimulator {
+  write(message: string): Promise<void>;
+}
+
 export class UserSimulator {
   readonly #model: LanguageModel;
   readonly #buildPrompt: (turns: readonly Turn[]) => string;
   readonly #maxTurns: number;
   readonly #tools: ToolSet | undefined;
+
+  static text(options: TextOptions): TextSimulator {
+    return {
+      write: async (message) => {
+        await options.send(message);
+      },
+    };
+  }
 
   constructor(options: UserSimulatorOptions) {
     this.#model = options.model;

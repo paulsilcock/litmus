@@ -1,7 +1,47 @@
-import { describe, it } from "vite-plus/test";
+import { MockLanguageModelV3 } from "ai/test";
+import { describe, expect, it } from "vite-plus/test";
+
+import { UserSimulator } from "#litmus-test/simulator.ts";
+
+const mockResult = {
+  usage: {
+    inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
+    outputTokens: { total: 5, text: 5, reasoning: 0 },
+  },
+  warnings: [],
+};
+
+const unusedModel = new MockLanguageModelV3({
+  doGenerate: async () => ({
+    ...mockResult,
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({ message: "unused", done: true }),
+      },
+    ],
+    finishReason: { unified: "stop", raw: undefined },
+  }),
+});
 
 describe("UserSimulator", () => {
-  it.todo("the simulated user can be scripted to send a specific message");
+  it("the simulated user can be scripted to send a specific message", async () => {
+    const sent: string[] = [];
+
+    const customer = UserSimulator.text({
+      model: unusedModel,
+      persona: "a customer",
+      send: async (message) => {
+        sent.push(message);
+      },
+      receive: async () => "ok",
+    });
+
+    await customer.write("I want to cancel my subscription");
+
+    expect(sent).toEqual(["I want to cancel my subscription"]);
+  });
+
   it.todo(
     "the simulated user can be scripted to read the system's next message",
   );
