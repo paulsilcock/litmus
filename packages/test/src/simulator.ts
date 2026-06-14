@@ -119,10 +119,17 @@ interface PursuitResult {
   reason: PursuitOutcome;
 }
 
+function pursuitOutcome(reason: PursuitOutcome): PursuitResult {
+  return { met: reason === "goal_met", reason };
+}
+
 interface TextSimulator {
   write(message: string): Promise<void>;
   read(): Promise<string>;
-  pursueGoal(goal: string, opts?: { maxTurns?: number }): Promise<PursuitResult>;
+  pursueGoal(
+    goal: string,
+    opts?: { maxTurns?: number },
+  ): Promise<PursuitResult>;
 }
 
 export class UserSimulator {
@@ -135,16 +142,21 @@ export class UserSimulator {
     return {
       write: (message) => options.send(message),
       read: () => options.receive(),
-      pursueGoal: async (goal) => {
-        const result = await generateText({
-          model: options.model,
-          prompt: `Persona: ${options.persona}. Goal: ${goal}.`,
-          output: Output.object({ schema: userResponseSchema }),
-        });
-        if (result.output.done) {
-          return { met: true, reason: "goal_met" };
+      pursueGoal: async (goal, pursuitOpts = {}) => {
+        const maxTurns = pursuitOpts.maxTurns ?? 10;
+        for (let i = 0; i < maxTurns; i++) {
+          const result = await generateText({
+            model: options.model,
+            prompt: `Persona: ${options.persona}. Goal: ${goal}.`,
+            output: Output.object({ schema: userResponseSchema }),
+          });
+          await options.send(result.output.message);
+          if (result.output.done) {
+            return pursuitOutcome("goal_met");
+          }
+          await options.receive();
         }
-        throw new Error("loop not yet implemented");
+        return pursuitOutcome("max_turns");
       },
     };
   }
