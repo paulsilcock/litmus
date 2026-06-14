@@ -117,6 +117,13 @@ type TextOptions = {
   send: (message: string) => Promise<void>;
   receive: () => Promise<string>;
   abilities?: Record<string, Ability>;
+  /**
+   * Cap on the number of steps (ability calls + reasoning) the
+   * simulator's model is allowed to take inside a single conversational
+   * turn before being forced to produce an utterance. Prevents the
+   * model from looping on ability calls indefinitely. Defaults to 5.
+   */
+  maxStepsPerTurn?: number;
 } & (
   | { persona: string }
   | { prompt: (turns: readonly Turn[], goal: string) => string }
@@ -164,7 +171,7 @@ export class UserSimulator {
       transcript: async () => [...turns],
       pursueGoal: async (goal, pursuitOpts = {}) => {
         const maxTurns = pursuitOpts.maxTurns ?? 10;
-        const maxStepsPerTurn = 10;
+        const maxStepsPerTurn = options.maxStepsPerTurn ?? 5;
         const tools = options.abilities
           ? Object.fromEntries(
               Object.entries(options.abilities).map(([name, ability]) => [
@@ -189,9 +196,21 @@ export class UserSimulator {
             tools,
             stopWhen: tools ? stepCountIs(maxStepsPerTurn) : undefined,
           });
-          await options.send(result.output.message);
-          if (result.output.status !== "continue") {
-            return pursuitOutcome(result.output.status);
+          let output: z.infer<typeof userResponseSchema>;
+          try {
+            output = result.output;
+          } catch {
+            // Step limit hit before the model produced a parseable
+            // utterance. Send a fallback and let the outer turn loop
+            // continue — next turn may recover.
+            output = {
+              message: "(Took too many actions without speaking; continuing.)",
+              status: "continue",
+            };
+          }
+          await options.send(output.message);
+          if (output.status !== "continue") {
+            return pursuitOutcome(output.status);
           }
           await options.receive();
         }
