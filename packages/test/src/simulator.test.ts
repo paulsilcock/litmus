@@ -135,7 +135,24 @@ describe("UserSimulator", () => {
 
     expect(result).toEqual({ met: false, reason: "abandoned" });
   });
-  it.todo("the simulated user exposes the conversation transcript");
+  it("the simulated user exposes the conversation transcript", async () => {
+    const customer = UserSimulator.text({
+      model: unusedModel,
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "Hello there",
+    });
+
+    await customer.write("hi");
+    await customer.read();
+
+    const transcript = await customer.transcript();
+
+    expect(transcript).toEqual([
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "Hello there" },
+    ]);
+  });
   it.todo("a simulated user remembers prior conversation when interacting");
   it.todo("a custom prompt overrides the persona-and-goal default");
   it.todo("the simulated user can take domain actions during a conversation");

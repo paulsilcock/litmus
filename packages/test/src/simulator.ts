@@ -130,6 +130,7 @@ interface TextSimulator {
     goal: string,
     opts?: { maxTurns?: number },
   ): Promise<PursuitResult>;
+  transcript(): Promise<readonly Turn[]>;
 }
 
 export class UserSimulator {
@@ -139,9 +140,18 @@ export class UserSimulator {
   readonly #tools: ToolSet | undefined;
 
   static text(options: TextOptions): TextSimulator {
+    const turns: Turn[] = [];
     return {
-      write: (message) => options.send(message),
-      read: () => options.receive(),
+      write: async (message) => {
+        await options.send(message);
+        turns.push({ role: "user", content: message });
+      },
+      read: async () => {
+        const reply = await options.receive();
+        turns.push({ role: "assistant", content: reply });
+        return reply;
+      },
+      transcript: async () => [...turns],
       pursueGoal: async (goal, pursuitOpts = {}) => {
         const maxTurns = pursuitOpts.maxTurns ?? 10;
         for (let i = 0; i < maxTurns; i++) {
