@@ -42,9 +42,18 @@ describe("UserSimulator", () => {
     expect(sent).toEqual(["I want to cancel my subscription"]);
   });
 
-  it.todo(
-    "the simulated user can be scripted to read the system's next message",
-  );
+  it("the simulated user can be scripted to read the system's next message", async () => {
+    const customer = UserSimulator.text({
+      model: unusedModel,
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "Hello, how can I help?",
+    });
+
+    const reply = await customer.read();
+
+    expect(reply).toBe("Hello, how can I help?");
+  });
   it.todo("the conversation ends when the simulated user reaches their goal");
   it.todo(
     "the conversation ends after max turns when the simulated user can't reach their goal",

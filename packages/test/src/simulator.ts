@@ -114,6 +114,7 @@ interface TextOptions {
 
 interface TextSimulator {
   write(message: string): Promise<void>;
+  read(): Promise<string>;
 }
 
 export class UserSimulator {
@@ -124,9 +125,8 @@ export class UserSimulator {
 
   static text(options: TextOptions): TextSimulator {
     return {
-      write: async (message) => {
-        await options.send(message);
-      },
+      write: (message) => options.send(message),
+      read: () => options.receive(),
     };
   }
 
