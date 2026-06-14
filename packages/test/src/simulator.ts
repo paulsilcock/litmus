@@ -112,9 +112,17 @@ interface TextOptions {
   receive: () => Promise<string>;
 }
 
+type PursuitOutcome = "goal_met" | "abandoned" | "max_turns";
+
+interface PursuitResult {
+  met: boolean;
+  reason: PursuitOutcome;
+}
+
 interface TextSimulator {
   write(message: string): Promise<void>;
   read(): Promise<string>;
+  pursueGoal(goal: string, opts?: { maxTurns?: number }): Promise<PursuitResult>;
 }
 
 export class UserSimulator {
@@ -127,6 +135,17 @@ export class UserSimulator {
     return {
       write: (message) => options.send(message),
       read: () => options.receive(),
+      pursueGoal: async (goal) => {
+        const result = await generateText({
+          model: options.model,
+          prompt: `Persona: ${options.persona}. Goal: ${goal}.`,
+          output: Output.object({ schema: userResponseSchema }),
+        });
+        if (result.output.done) {
+          return { met: true, reason: "goal_met" };
+        }
+        throw new Error("loop not yet implemented");
+      },
     };
   }
 

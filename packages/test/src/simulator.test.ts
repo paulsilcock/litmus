@@ -54,7 +54,31 @@ describe("UserSimulator", () => {
 
     expect(reply).toBe("Hello, how can I help?");
   });
-  it.todo("the conversation ends when the simulated user reaches their goal");
+  it("the conversation ends when the simulated user reaches their goal", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ message: "Thanks!", done: true }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const customer = UserSimulator.text({
+      model,
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "ok",
+    });
+
+    const result = await customer.pursueGoal("get a refund");
+
+    expect(result).toEqual({ met: true, reason: "goal_met" });
+  });
   it.todo(
     "the conversation ends after max turns when the simulated user can't reach their goal",
   );
