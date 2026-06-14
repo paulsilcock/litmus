@@ -17,7 +17,7 @@ const unusedModel = new MockLanguageModelV3({
     content: [
       {
         type: "text",
-        text: JSON.stringify({ message: "unused", done: true }),
+        text: JSON.stringify({ message: "unused", status: "goal_met" }),
       },
     ],
     finishReason: { unified: "stop", raw: undefined },
@@ -61,7 +61,7 @@ describe("UserSimulator", () => {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ message: "Thanks!", done: true }),
+            text: JSON.stringify({ message: "Thanks!", status: "goal_met" }),
           },
         ],
         finishReason: { unified: "stop", raw: undefined },
@@ -86,7 +86,10 @@ describe("UserSimulator", () => {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ message: "still trying", done: false }),
+            text: JSON.stringify({
+              message: "still trying",
+              status: "continue",
+            }),
           },
         ],
         finishReason: { unified: "stop", raw: undefined },
@@ -104,7 +107,34 @@ describe("UserSimulator", () => {
 
     expect(result).toEqual({ met: false, reason: "max_turns" });
   });
-  it.todo("the simulated user abandons a goal it judges unreachable");
+  it("the simulated user abandons a goal it judges unreachable", async () => {
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              message: "Never mind, this isn't going to work",
+              status: "abandoned",
+            }),
+          },
+        ],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const customer = UserSimulator.text({
+      model,
+      persona: "a discouraged customer",
+      send: async () => {},
+      receive: async () => "we can't help with that",
+    });
+
+    const result = await customer.pursueGoal("get a refund");
+
+    expect(result).toEqual({ met: false, reason: "abandoned" });
+  });
   it.todo("the simulated user exposes the conversation transcript");
   it.todo("a simulated user remembers prior conversation when interacting");
   it.todo("a custom prompt overrides the persona-and-goal default");

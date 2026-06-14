@@ -56,7 +56,7 @@ interface Conversation {
 
 const userResponseSchema = z.object({
   message: z.string(),
-  done: z.boolean(),
+  status: z.enum(["continue", "goal_met", "abandoned"] as const),
 });
 
 function defaultPrompt(
@@ -151,8 +151,8 @@ export class UserSimulator {
             output: Output.object({ schema: userResponseSchema }),
           });
           await options.send(result.output.message);
-          if (result.output.done) {
-            return pursuitOutcome("goal_met");
+          if (result.output.status !== "continue") {
+            return pursuitOutcome(result.output.status);
           }
           await options.receive();
         }
@@ -206,7 +206,7 @@ export class UserSimulator {
           stopWhen: this.#tools ? stepCountIs(this.#maxTurns) : undefined,
         });
         userMessage = result.output.message;
-        done = result.output.done;
+        done = result.output.status === "goal_met";
       }
 
       turns.push({ role: "user", content: userMessage });
