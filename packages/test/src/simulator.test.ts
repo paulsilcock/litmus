@@ -185,7 +185,35 @@ describe("UserSimulator", () => {
     expect(capturedPrompt).toContain("I bought a faulty product");
     expect(capturedPrompt).toContain("We can offer store credit");
   });
-  it.todo("a custom prompt overrides the persona-and-goal default");
+  it("a custom prompt overrides the persona-and-goal default", async () => {
+    let capturedPrompt = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async ({ prompt }) => {
+        capturedPrompt = JSON.stringify(prompt);
+        return {
+          ...mockResult,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ message: "ok", status: "goal_met" }),
+            },
+          ],
+          finishReason: { unified: "stop", raw: undefined },
+        };
+      },
+    });
+
+    const customer = UserSimulator.text({
+      model,
+      prompt: () => "custom-prompt-text",
+      send: async () => {},
+      receive: async () => "ok",
+    });
+
+    await customer.pursueGoal("some goal");
+
+    expect(capturedPrompt).toContain("custom-prompt-text");
+  });
   it.todo("the simulated user can take domain actions during a conversation");
   it.todo("taking domain actions doesn't consume conversational turns");
   it.todo(

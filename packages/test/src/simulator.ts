@@ -105,12 +105,14 @@ Decide your next message and whether your goal has been met.`;
  * expect(conversation.outcome).toBe("goal_met");
  * ```
  */
-interface TextOptions {
+type TextOptions = {
   model: LanguageModel;
-  persona: string;
   send: (message: string) => Promise<void>;
   receive: () => Promise<string>;
-}
+} & (
+  | { persona: string }
+  | { prompt: (turns: readonly Turn[], goal: string) => string }
+);
 
 type PursuitOutcome = "goal_met" | "abandoned" | "max_turns";
 
@@ -155,9 +157,13 @@ export class UserSimulator {
       pursueGoal: async (goal, pursuitOpts = {}) => {
         const maxTurns = pursuitOpts.maxTurns ?? 10;
         for (let i = 0; i < maxTurns; i++) {
+          const promptText =
+            "prompt" in options
+              ? options.prompt(turns, goal)
+              : defaultPrompt(options.persona, goal, turns);
           const result = await generateText({
             model: options.model,
-            prompt: defaultPrompt(options.persona, goal, turns),
+            prompt: promptText,
             output: Output.object({ schema: userResponseSchema }),
           });
           await options.send(result.output.message);
