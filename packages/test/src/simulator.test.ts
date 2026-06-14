@@ -153,7 +153,38 @@ describe("UserSimulator", () => {
       { role: "assistant", content: "Hello there" },
     ]);
   });
-  it.todo("a simulated user remembers prior conversation when interacting");
+  it("a simulated user remembers prior conversation when interacting", async () => {
+    let capturedPrompt = "";
+    const model = new MockLanguageModelV3({
+      doGenerate: async ({ prompt }) => {
+        capturedPrompt = JSON.stringify(prompt);
+        return {
+          ...mockResult,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ message: "ok", status: "goal_met" }),
+            },
+          ],
+          finishReason: { unified: "stop", raw: undefined },
+        };
+      },
+    });
+
+    const customer = UserSimulator.text({
+      model,
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "We can offer store credit",
+    });
+
+    await customer.write("I bought a faulty product");
+    await customer.read();
+    await customer.pursueGoal("get a refund");
+
+    expect(capturedPrompt).toContain("I bought a faulty product");
+    expect(capturedPrompt).toContain("We can offer store credit");
+  });
   it.todo("a custom prompt overrides the persona-and-goal default");
   it.todo("the simulated user can take domain actions during a conversation");
   it.todo("taking domain actions doesn't consume conversational turns");

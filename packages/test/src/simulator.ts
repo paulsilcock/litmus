@@ -157,7 +157,7 @@ export class UserSimulator {
         for (let i = 0; i < maxTurns; i++) {
           const result = await generateText({
             model: options.model,
-            prompt: `Persona: ${options.persona}. Goal: ${goal}.`,
+            prompt: defaultPrompt(options.persona, goal, turns),
             output: Output.object({ schema: userResponseSchema }),
           });
           await options.send(result.output.message);
