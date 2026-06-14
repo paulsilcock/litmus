@@ -3,6 +3,7 @@ import {
   type LanguageModel,
   Output,
   stepCountIs,
+  tool,
   type ToolSet,
 } from "ai";
 import { z } from "zod";
@@ -105,10 +106,17 @@ Decide your next message and whether your goal has been met.`;
  * expect(conversation.outcome).toBe("goal_met");
  * ```
  */
+interface Ability<TSchema extends z.ZodType = z.ZodType> {
+  reason: string;
+  how: TSchema;
+  use: (input: z.infer<TSchema>) => Promise<unknown>;
+}
+
 type TextOptions = {
   model: LanguageModel;
   send: (message: string) => Promise<void>;
   receive: () => Promise<string>;
+  abilities?: Record<string, Ability>;
 } & (
   | { persona: string }
   | { prompt: (turns: readonly Turn[], goal: string) => string }
@@ -156,6 +164,18 @@ export class UserSimulator {
       transcript: async () => [...turns],
       pursueGoal: async (goal, pursuitOpts = {}) => {
         const maxTurns = pursuitOpts.maxTurns ?? 10;
+        const tools = options.abilities
+          ? Object.fromEntries(
+              Object.entries(options.abilities).map(([name, ability]) => [
+                name,
+                tool({
+                  description: ability.reason,
+                  inputSchema: ability.how,
+                  execute: ability.use,
+                }),
+              ]),
+            )
+          : undefined;
         for (let i = 0; i < maxTurns; i++) {
           const promptText =
             "prompt" in options
@@ -165,6 +185,8 @@ export class UserSimulator {
             model: options.model,
             prompt: promptText,
             output: Output.object({ schema: userResponseSchema }),
+            tools,
+            stopWhen: tools ? stepCountIs(maxTurns) : undefined,
           });
           await options.send(result.output.message);
           if (result.output.status !== "continue") {

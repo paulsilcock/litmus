@@ -1,5 +1,6 @@
 import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
+import { z } from "zod";
 
 import { UserSimulator } from "#litmus-test/simulator.ts";
 
@@ -214,7 +215,61 @@ describe("UserSimulator", () => {
 
     expect(capturedPrompt).toContain("custom-prompt-text");
   });
-  it.todo("the simulated user can take domain actions during a conversation");
+  it("the simulated user can take domain actions during a conversation", async () => {
+    const discountCalls: Array<{ code: string }> = [];
+
+    const responses = [
+      {
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: "call_1",
+            toolName: "applyDiscountCode",
+            input: JSON.stringify({ code: "SAVE10" }),
+          },
+        ],
+        finishReason: { unified: "tool-calls" as const, raw: undefined },
+      },
+      {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ message: "Done!", status: "goal_met" }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      },
+    ];
+    let callIndex = 0;
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        ...responses[callIndex++],
+      }),
+    });
+
+    const customer = UserSimulator.text({
+      model,
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "ok",
+      abilities: {
+        applyDiscountCode: {
+          reason: "Apply a discount code to their cart",
+          how: z.object({ code: z.string() }),
+          use: async ({ code }) => {
+            discountCalls.push({ code });
+            return { applied: true };
+          },
+        },
+      },
+    });
+
+    await customer.pursueGoal("apply discount and confirm");
+
+    expect(discountCalls).toEqual([{ code: "SAVE10" }]);
+  });
   it.todo("taking domain actions doesn't consume conversational turns");
   it.todo(
     "the simulated user still produces an utterance even when it keeps taking actions",
