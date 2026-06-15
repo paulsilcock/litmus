@@ -55,6 +55,7 @@ describe("UserSimulator", () => {
 
     expect(reply).toBe("Hello, how can I help?");
   });
+
   it("the conversation ends when the simulated user reaches their goal", async () => {
     const model = new MockLanguageModelV3({
       doGenerate: async () => ({
@@ -80,6 +81,7 @@ describe("UserSimulator", () => {
 
     expect(result).toEqual({ met: true, reason: "goal_met" });
   });
+
   it("the conversation ends after max turns when the simulated user can't reach their goal", async () => {
     const model = new MockLanguageModelV3({
       doGenerate: async () => ({
@@ -108,6 +110,7 @@ describe("UserSimulator", () => {
 
     expect(result).toEqual({ met: false, reason: "max_turns" });
   });
+
   it("the simulated user abandons a goal it judges unreachable", async () => {
     const model = new MockLanguageModelV3({
       doGenerate: async () => ({
@@ -136,6 +139,7 @@ describe("UserSimulator", () => {
 
     expect(result).toEqual({ met: false, reason: "abandoned" });
   });
+
   it("the simulated user exposes the conversation transcript", async () => {
     const customer = UserSimulator.text({
       model: unusedModel,
@@ -154,6 +158,7 @@ describe("UserSimulator", () => {
       { role: "assistant", content: "Hello there" },
     ]);
   });
+
   it("a simulated user remembers prior conversation when interacting", async () => {
     let capturedPrompt = "";
     const model = new MockLanguageModelV3({
@@ -186,6 +191,7 @@ describe("UserSimulator", () => {
     expect(capturedPrompt).toContain("I bought a faulty product");
     expect(capturedPrompt).toContain("We can offer store credit");
   });
+
   it("a custom prompt overrides the persona-and-goal default", async () => {
     let capturedPrompt = "";
     const model = new MockLanguageModelV3({
@@ -215,6 +221,7 @@ describe("UserSimulator", () => {
 
     expect(capturedPrompt).toContain("custom-prompt-text");
   });
+
   it("the simulated user can take domain actions during a conversation", async () => {
     const discountCalls: Array<{ code: string }> = [];
 
@@ -270,6 +277,7 @@ describe("UserSimulator", () => {
 
     expect(discountCalls).toEqual([{ code: "SAVE10" }]);
   });
+
   it("taking domain actions doesn't consume conversational turns", async () => {
     const actionCalls: string[] = [];
 
@@ -329,6 +337,7 @@ describe("UserSimulator", () => {
     expect(actionCalls).toEqual(["balance"]);
     expect(result).toEqual({ met: true, reason: "goal_met" });
   });
+
   it("the simulated user still produces an utterance even when it keeps taking actions", async () => {
     const sent: string[] = [];
     let callIndex = 0;
