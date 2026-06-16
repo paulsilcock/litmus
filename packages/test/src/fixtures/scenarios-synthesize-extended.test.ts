@@ -39,7 +39,7 @@ const guarded = evaluate
   .extend<{ dsl: string }>(async (use) => {
     await use({ dsl: "ready" });
   })
-  .withGuardrails({
+  .withPolicies({
     "no empty": async (input) => {
       append(`grader:${input}`);
       return { pass: input.length > 0, reason: "empty input" };
@@ -58,8 +58,8 @@ guarded.scenarios({
   },
 })(
   "extended eval handles synthesised scenario",
-  async (scenario, { dsl, guardrails }) => {
+  async (scenario, { dsl, policies }) => {
     append(`iter:${scenario.name}:${dsl}`);
-    await guardrails(scenario.name);
+    await policies(scenario.name);
   },
 );

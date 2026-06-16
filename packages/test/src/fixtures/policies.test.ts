@@ -13,7 +13,7 @@ const invocationEval = evaluate
   .extend<{ greeting: string }>(async (use) => {
     await use({ greeting: "hello" });
   })
-  .withGuardrails({
+  .withPolicies({
     "input recorder": async (input) => {
       append(`single:${input}`);
       return { pass: true, reason: "" };
@@ -22,18 +22,18 @@ const invocationEval = evaluate
 
 invocationEval(
   "passing grader records each input it receives",
-  async ({ greeting, guardrails }) => {
-    await guardrails(greeting);
+  async ({ greeting, policies }) => {
+    await policies(greeting);
   },
 );
 
-// No guardrails registered: the eval should run cleanly with an
-// unconstrained body and no injected guardrails fixture.
+// No policies registered: the eval should run cleanly with an
+// unconstrained body and no injected policies fixture.
 const unguardedEval = evaluate.extend<{ x: number }>(async (use) => {
   await use({ x: 1 });
 });
 
-unguardedEval("eval without .withGuardrails", async ({ x }) => {
+unguardedEval("eval without .withPolicies", async ({ x }) => {
   void x;
 });
 
@@ -43,12 +43,12 @@ const emptyGuardedEval = evaluate
   .extend<{ x: number }>(async (use) => {
     await use({ x: 1 });
   })
-  .withGuardrails({});
+  .withPolicies({});
 
 emptyGuardedEval(
-  "eval registered with .withGuardrails({})",
-  async ({ x, guardrails }) => {
-    await guardrails(String(x));
+  "eval registered with .withPolicies({})",
+  async ({ x, policies }) => {
+    await policies(String(x));
   },
 );
 
@@ -60,7 +60,7 @@ const scenariosEval = evaluate
   .extend<{ greeting: string }>(async (use) => {
     await use({ greeting: "hello" });
   })
-  .withGuardrails({
+  .withPolicies({
     "input recorder": async (input) => {
       append(`scenario:${input}`);
       return { pass: true, reason: "" };
@@ -69,7 +69,7 @@ const scenariosEval = evaluate
 
 scenariosEval.scenarios(customers, { labelBy: (c) => c.name, samples: 2 })(
   "passing grader records input for each (scenario, sample)",
-  async (scenario, { greeting, guardrails }) => {
-    await guardrails(`${greeting} ${scenario.name}`);
+  async (scenario, { greeting, policies }) => {
+    await policies(`${greeting} ${scenario.name}`);
   },
 );

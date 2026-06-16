@@ -50,20 +50,20 @@ async function runWithDsl<TDsl extends Dsl>(
  * ```
  *
  * @example
- * Layer shared guardrails on top of an acceptance evaluate:
+ * Layer shared policies on top of an acceptance evaluate:
  * ```typescript
  * const { evaluate } = acceptance(() => new TelcoDsl(driver));
  *
- * const guarded = evaluate.withGuardrails({
+ * const guarded = evaluate.withPolicies({
  *   "no PII leakage": noPiiGrader,
  *   "no upsell after refusal": noUpsellGrader,
  * });
  *
  * guarded.scenarios(scenarios)(
  *   "agent upsells without pressure",
- *   async (scenario, { dsl, guardrails }) => {
+ *   async (scenario, { dsl, policies }) => {
  *     const conversation = await dsl.customerCallsSupport(scenario);
- *     await guardrails(renderTranscript(conversation));
+ *     await policies(renderTranscript(conversation));
  *   },
  * );
  * ```
