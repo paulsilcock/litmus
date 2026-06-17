@@ -154,17 +154,14 @@ evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
       goal: "get a replacement for my damaged book",
     });
 
-    const conversation = await dsl.customerSpeaksToSupport({
+    await dsl.customerSpeaksToSupport({
       email: complaint.email,
       asUser: customer,
     });
 
-    // The objective outcome — code-checked, binary, tied to user value.
-    // This is the north star: assert it before you have any traces.
+    // The objective outcome the business cares about — code-checked and
+    // binary. With no production traces yet, this is the eval's north star.
     await dsl.assertReplacementOrdered({ to: complaint.email });
-    // A subjective, LLM-judged check. Add these once error analysis on
-    // real traces shows where the agent actually slips — not speculatively.
-    await dsl.assertSupportWasEmpathetic(conversation);
   },
 );
 ```
