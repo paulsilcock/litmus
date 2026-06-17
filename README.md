@@ -12,7 +12,7 @@ Modern AI apps drift fast. LLM calls scatter through business logic. Evals lag t
 
 **Bounded autonomy.** An `Agent` has a defined scope: the tools it can pick from, the goal it's pursuing. Tools are wrapped use cases, so an agent's reach into the system is the same surface a human or a script would use. The rest of your code never sees an LLM directly.
 
-**TDD-first, including for AI.** Litmus encourages outside-in TDD — [acceptance tests](https://continuous-delivery.co.uk/downloads/ATDD%20Guide%2026-03-21.pdf) on the outside, smaller tests inside. Evaluations are acceptance tests with a probabilistic shell, not a separate testing universe. The CLI adapter doubles as a fast feedback loop: pipe text at a use case from the terminal and explore an agent's behaviour without standing up a UI.
+**TDD-first, including for AI.** Litmus encourages outside-in TDD — [acceptance tests](https://continuous-delivery.co.uk/downloads/ATDD%20Guide%2026-03-21.pdf) on the outside, smaller tests inside. Evaluations are acceptance tests with a probabilistic shell, not a separate testing universe — and like acceptance tests, the first one asserts an objective outcome tied to user value: a north star for the releasable slice, not a guess at how the model might misbehave. Subjective checks and LLM judges earn their place later, grown from analysing real traces rather than speculating about failure modes up front. The CLI adapter doubles as a fast feedback loop: pipe text at a use case from the terminal and explore an agent's behaviour without standing up a UI.
 
 ## Architecture
 
@@ -159,7 +159,11 @@ evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
       asUser: customer,
     });
 
+    // The objective outcome — code-checked, binary, tied to user value.
+    // This is the north star: assert it before you have any traces.
     await dsl.assertReplacementOrdered({ to: complaint.email });
+    // A subjective, LLM-judged check. Add these once error analysis on
+    // real traces shows where the agent actually slips — not speculatively.
     await dsl.assertSupportWasEmpathetic(conversation);
   },
 );
