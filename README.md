@@ -285,6 +285,55 @@ And `IssueRefund` doesn't know who's calling it. Human staff in an admin UI hit 
 
 `packages/test-acceptance` is a fully worked example — domain, use cases, entrypoints, ATDD, and evals end-to-end.
 
+## Evaluating AI features
+
+An AI feature is non-deterministic: the same input can produce different outputs across runs. Evaluations handle this by running the same assertion many times and checking a pass rate, but the assertion itself should start simple and grow from evidence.
+
+### Start with a functional north star
+
+The first eval for any AI feature asserts an objective, code-checkable outcome — did the system do the thing the user needed? In the [evaluation example above](#evaluation), `assertReplacementOrdered` checks whether a replacement was actually created. It's binary, it runs in CI, and it doesn't require an LLM to judge.
+
+This is the north star. It ties the eval to user value and gives you a pass rate you can trust before you have production traces to learn from.
+
+### Grow criteria from traces, not speculation
+
+Qualitative checks — tone, safety, verbosity, format — earn their place once you can study real execution traces and identify _specific failure modes_ the system actually exhibits. Each failure mode becomes a policy (a focused assertion that checks for one thing), and its pass rate across your dataset tells you whether it's getting better or worse.
+
+Resist the urge to enumerate failure modes up front. Speculative criteria are expensive to maintain and often test for problems that never materialise. Let error analysis of real behaviour guide what you add next.
+
+### Two tiers of eval
+
+Not every eval needs to exercise the whole system. Use the tier that matches what you're testing:
+
+- **Acceptance-level** — boot the app, drive it through entrypoints (HTTP, CLI, tool calls), assert on outcomes. Tests the full stack including routing, persistence, and domain rules. Higher confidence, higher cost.
+- **Component-level** — test an individual `AiTask` or agent in isolation with fakes for its dependencies. Faster feedback, useful for iterating on prompts and model selection.
+
+Both tiers use the same `evaluate()` API and run as ordinary tests in CI.
+
+### When an eval plateaus
+
+A failure mode that stops improving under prompt changes is telling you something: the problem isn't the prompt. Work through the options in order:
+
+1. **Decompose** — break a large AI call into smaller, focused `AiTask`s with narrower responsibilities.
+2. **Push logic to deterministic code** — if a rule can be checked programmatically, don't ask the model to follow it. Move it to the domain.
+3. **Fix retrieval** — if the model lacks context, the answer is better retrieval, not a longer prompt.
+4. **Fine-tune** — last resort, when the task is well-scoped and you have good training data.
+
+### Agents vs workflows
+
+Evaluating an autonomous agent is expensive: the execution path varies per run, failures compound across steps, and each sample costs multiple LLM calls. When the steps _are_ known up front, a workflow (composed `AiTask`s in a `CommandHandler`) is cheaper to build, test, and evaluate.
+
+Reach for an agent only when the path through the system genuinely can't be enumerated in advance — and expect to invest proportionally more in its eval suite.
+
+### Building a good scenario set
+
+`synthesize()` fans out a small number of hand-written seeds into a larger dataset. A few guidelines:
+
+- **Generate inputs, not outputs.** Seeds describe situations the system will encounter, not the responses it should give. The eval's assertions define correctness.
+- **Cover dimensions that matter.** Think about the axes of variation — tone, complexity, edge cases, user type — and make sure your seeds span them. Gaps in the seeds produce gaps in coverage.
+- **Start small, scale up.** Begin with 3–5 seeds and a handful of variants while iterating on the prompt. Once the eval is stable, scale to 20+ scenarios for meaningful signal. More scenarios surface rare failures; more samples per scenario measure per-input reliability.
+- **Pin and commit.** Scenario files are hash-keyed and deterministic. Commit them so the suite is reproducible across machines and CI runs.
+
 ## Packages
 
 ```
