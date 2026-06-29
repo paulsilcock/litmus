@@ -44,6 +44,170 @@ export abstract class AiTask<TInput, TOutput = void> extends Traceable {
 }
 
 /**
+ * Scalar metadata attached to a {@link Chunk}, kept to the value
+ * types vector stores can reliably filter on across vendors.
+ */
+export type ChunkMetadata = Record<string, string | number | boolean>;
+
+/**
+ * A source document, before it is split into {@link Chunk}s.
+ *
+ * Its `id` becomes the `documentId` on every chunk derived from it,
+ * which is what ties chunks back to their source for document-scoped
+ * re-indexing. Loading or parsing a raw file into `content` is an
+ * upstream concern; a {@link Chunker} starts from text.
+ */
+export interface Document<M extends ChunkMetadata = ChunkMetadata> {
+  id: string;
+  content: string;
+  metadata?: M;
+}
+
+/**
+ * A unit of retrievable content carved out of a source document.
+ *
+ * Litmus owns the identity graph — `id`, the originating
+ * `documentId`, and the `content` — while the application owns the
+ * payload via `metadata`. The `documentId` is what makes
+ * document-scoped re-indexing possible (replace every chunk for a
+ * document rather than reconcile chunk by chunk) and lets a
+ * retrieved chunk be traced back to its source without a lookup.
+ */
+export interface Chunk<M extends ChunkMetadata = ChunkMetadata> {
+  id: string;
+  documentId: string;
+  content: string;
+  metadata?: M;
+}
+
+/**
+ * A {@link Chunk} that also carries its position in a chunk graph —
+ * its parent (hierarchical, small-to-big) and its neighbours either
+ * side (sequential, sentence-window).
+ *
+ * Opt-in: any interface bounded on {@link Chunk} accepts a
+ * `LinkedChunk` transparently. `parentId` is nullable so the root of
+ * a hierarchy is representable; the store keeps chunks flat and the
+ * graph is reconstructed from these links at read time.
+ */
+export interface LinkedChunk<
+  M extends ChunkMetadata = ChunkMetadata,
+> extends Chunk<M> {
+  relationships: {
+    parentId: string | null;
+    previousId: string | null;
+    nextId: string | null;
+  };
+}
+
+/**
+ * A single retrieved result paired with its relevance score.
+ *
+ * The score rides on the envelope rather than the result so the
+ * application's own result type stays clean, and so the next stage
+ * — a reranker or a relevance threshold — has the signal it needs.
+ */
+export interface Retrieved<TResult> {
+  result: TResult;
+  score: number;
+}
+
+/**
+ * The read side of a retrieval store: given a query, return the `k`
+ * most relevant chunks, each carrying a score.
+ *
+ * Naming the seam keeps retrieval out of inline vendor SDK calls and
+ * behind an interface the application owns — injectable, swappable,
+ * and evaluable stage by stage. `TQuery` is left open so an embedded
+ * vector, a raw string, or a hybrid `{ text, filter }` query all fit
+ * without prescribing a vendor-shaped filter on the port. Results are
+ * {@link Chunk}s so they carry their `documentId` and content back to
+ * the caller.
+ *
+ * @example
+ * ```typescript
+ * import type { Chunk, Retriever } from "@litmus/core/ai";
+ *
+ * interface Article extends Chunk {
+ *   metadata?: { title: string };
+ * }
+ *
+ * class AnswerSupportQuestion {
+ *   constructor(private knowledgeBase: Retriever<string, Article>) {}
+ *
+ *   async handle({ question }: { question: string }) {
+ *     const hits = await this.knowledgeBase.retrieve(question, 5);
+ *     // ...rank, summarise, answer
+ *   }
+ * }
+ * ```
+ */
+export interface Retriever<TQuery, TResult extends Chunk> {
+  retrieve(query: TQuery, k: number): Promise<Retrieved<TResult>[]>;
+}
+
+/**
+ * Splits a source {@link Document} into the {@link Chunk}s that get
+ * embedded and indexed.
+ *
+ * Naming the seam keeps chunking — easily the most overlooked stage,
+ * where silent ingestion failures originate — out of an inline blob
+ * and behind an interface that can be tested and evaluated on its
+ * own. The return is a promise so an agentic chunker (one that asks
+ * an LLM where to split) fits the same shape as a deterministic one.
+ * `TChunk` is open so a chunker can emit {@link LinkedChunk}s when it
+ * builds a hierarchy.
+ *
+ * @example
+ * ```typescript
+ * import type { Chunk, Chunker, Document } from "@litmus/core/ai";
+ *
+ * class FixedSizeChunker implements Chunker<Document, Chunk> {
+ *   async chunk(document: Document): Promise<Chunk[]> {
+ *     // ...split document.content, stamp each chunk's documentId
+ *   }
+ * }
+ * ```
+ */
+export interface Chunker<TDoc extends Document, TChunk extends Chunk> {
+  chunk(document: TDoc): Promise<TChunk[]>;
+}
+
+/**
+ * The write side of a retrieval store, scoped to the document.
+ *
+ * `index(documentId, chunks)` makes the stored chunks for a document
+ * become *exactly* the supplied set — the store drops whatever it
+ * held for that document and writes these. Re-ingesting a document
+ * therefore can't orphan stale chunks, which sidesteps the genuinely
+ * hard problem of reconciling shifted chunk boundaries after an edit.
+ * `delete(documentId)` removes a document's chunks wholesale (source
+ * removal). This is the grain mature frameworks settled on.
+ *
+ * Deliberately split from {@link Retriever} — ingestion code doesn't
+ * need read capability and query-time use cases don't need write, so
+ * each depends only on the half it uses. A concrete store can satisfy
+ * both interfaces when it makes sense to share a connection or config.
+ *
+ * @example
+ * ```typescript
+ * import type { Chunk, Indexer } from "@litmus/core/ai";
+ *
+ * class IngestDocument {
+ *   constructor(private index: Indexer<Chunk>) {}
+ *
+ *   async handle({ documentId, chunks }: { documentId: string; chunks: Chunk[] }) {
+ *     await this.index.index(documentId, chunks);
+ *   }
+ * }
+ * ```
+ */
+export interface Indexer<TChunk extends Chunk> {
+  index(documentId: string, chunks: TChunk[]): Promise<void>;
+  delete(documentId: string): Promise<void>;
+}
+
+/**
  * An autonomous actor with a goal that interacts with the system
  * through use cases — the same way a user would via HTTP or CLI.
  *
