@@ -224,11 +224,11 @@ describe("modifiers", () => {
   });
 });
 
-describe("guardrails", () => {
+describe("policies", () => {
   let run: FixtureRun;
 
   beforeAll(async () => {
-    run = await runFixture("guardrails.test.ts");
+    run = await runFixture("policies.test.ts");
   }, 30_000);
 
   it("a passing grader is invoked with the body's return value", () => {
@@ -242,9 +242,9 @@ describe("guardrails", () => {
     expect(result.status).toBe("passed");
   });
 
-  it(".withGuardrails with no registered graders still injects the fixture", () => {
+  it(".withPolicies with no registered graders still injects the fixture", () => {
     const result = assertionFor(run, (n) =>
-      n.startsWith("eval registered with .withGuardrails({})"),
+      n.startsWith("eval registered with .withPolicies({})"),
     );
     expect(result.status).toBe("passed");
   });
@@ -259,11 +259,11 @@ describe("guardrails", () => {
   });
 });
 
-describe("guardrails: failure", () => {
+describe("policies: failure", () => {
   let run: FixtureRun;
 
   beforeAll(async () => {
-    run = await runFixture("guardrails-failure.test.ts");
+    run = await runFixture("policies-failure.test.ts");
   }, 30_000);
 
   it("a rejecting grader fails the scenario", () => {
@@ -293,7 +293,7 @@ describe("guardrails: failure", () => {
     expect(message).toContain("violates content policy");
   });
 
-  it("chained .withGuardrails calls accumulate — downstream sees every registration", () => {
+  it("chained .withPolicies calls accumulate — downstream sees every registration", () => {
     const result = assertionFor(run, (n) =>
       n.startsWith("first grader registered, then second appended"),
     );
@@ -302,9 +302,9 @@ describe("guardrails: failure", () => {
     expect(message).toContain("policy check");
   });
 
-  it("forgetting to invoke the guardrails fixture fails the sample", () => {
+  it("forgetting to invoke the policies fixture fails the sample", () => {
     const result = assertionFor(run, (n) =>
-      n.startsWith("guardrails registered but body never calls them"),
+      n.startsWith("policies registered but body never calls them"),
     );
     expect(result.status).toBe("failed");
     const message = result.failureMessages.join("\n");
@@ -313,14 +313,14 @@ describe("guardrails: failure", () => {
   });
 });
 
-describe("guardrails: modifier composition", () => {
+describe("policies: modifier composition", () => {
   let run: FixtureRun;
 
   beforeAll(async () => {
-    run = await runFixture("guardrails-modifier.test.ts");
+    run = await runFixture("policies-modifier.test.ts");
   }, 30_000);
 
-  it("modifiers preserve registered guardrails through composition", () => {
+  it("modifiers preserve registered policies through composition", () => {
     const result = assertionFor(run, (n) =>
       n.startsWith("rejecting grader registered, then .only applied"),
     );
@@ -329,7 +329,7 @@ describe("guardrails: modifier composition", () => {
   });
 });
 
-describe("guardrails with synthesized scenarios", () => {
+describe("policies with synthesized scenarios", () => {
   let run: FixtureRun;
 
   beforeAll(async () => {
@@ -341,7 +341,7 @@ describe("guardrails with synthesized scenarios", () => {
     expect(iters).toHaveLength(3); // 1 seed + 2 variants
   });
 
-  it("fixtures and guardrails are both injected into the body", () => {
+  it("fixtures and policies are both injected into the body", () => {
     expect(run.logLines).toContain("iter:alice:ready");
   });
 

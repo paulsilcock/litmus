@@ -56,24 +56,24 @@ export type SetupFn<TFixtures> = (
   use: (fixtures: TFixtures) => Promise<void>,
 ) => Promise<void>;
 
-/** Map of guardrail registration key → grader. */
-export type GuardrailMap = Record<string, Grader<string>>;
+/** Map of policy registration key → grader. */
+export type PolicyMap = Record<string, Grader<string>>;
 
 /**
- * Fixture injected by `.withGuardrails(...)`. The eval body calls it
+ * Fixture injected by `.withPolicies(...)`. The eval body calls it
  * with the value to grade; the fixture runs every registered grader
  * and throws an aggregated error on any rejection.
  */
-export type GuardrailsFixture = (input: string) => Promise<void>;
+export type PoliciesFixture = (input: string) => Promise<void>;
 
 /**
  * An evaluate-shaped namespace whose registered evals run through a
  * `setup` function that builds and tears down a fresh fixtures bag per
  * repeat. Returned by `evaluate.extend(setup)`.
  *
- * The second type parameter is the union of guardrail names already
- * registered via `.withGuardrails(...)`. It defaults to `never` (no
- * guardrails) and accumulates with each chained call, enabling a
+ * The second type parameter is the union of policy names already
+ * registered via `.withPolicies(...)`. It defaults to `never` (no
+ * policies) and accumulates with each chained call, enabling a
  * compile-time check against duplicate registrations.
  */
 export interface ExtendedEvaluate<TFixtures, K extends string = never> {
@@ -106,22 +106,22 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
     fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   ) => void;
   /**
-   * Register a set of guardrails on this extended evaluate. The
-   * returned evaluate injects a `guardrails` fixture into every eval
-   * body — calling `guardrails(input)` runs each registered grader
+   * Register a set of policies on this extended evaluate. The
+   * returned evaluate injects a `policies` fixture into every eval
+   * body — calling `policies(input)` runs each registered grader
    * against `input` and throws an aggregated error if any reject.
-   * Forgetting to call `guardrails(...)` fails the sample with a
+   * Forgetting to call `policies(...)` fails the sample with a
    * message naming every registered grader.
    *
    * Chained calls accumulate — the returned extended evaluate sees
-   * every guardrail registered on the chain so far. Re-registering an
+   * every policy registered on the chain so far. Re-registering an
    * existing name is a compile-time error. An empty map is a no-op.
    *
    * **Intended for acceptance-level evals**, where the same cross-
    * cutting checks (PII leakage, disclaimer presence, vulnerable-user
    * tone) apply across many scenarios driven through a DSL. Compose
-   * with `acceptance(createDsl).evaluate.withGuardrails({...})` to get
-   * both the `dsl` and `guardrails` fixtures on every body.
+   * with `acceptance(createDsl).evaluate.withPolicies({...})` to get
+   * both the `dsl` and `policies` fixtures on every body.
    *
    * For component-level evals (testing a single agent or prompt),
    * prefer calling shared `Grader<string>` functions directly rather
@@ -132,21 +132,21 @@ export interface ExtendedEvaluate<TFixtures, K extends string = never> {
    * ```typescript
    * const { evaluate } = acceptance(() => new TelcoDsl(driver));
    *
-   * const guarded = evaluate.withGuardrails({
+   * const guarded = evaluate.withPolicies({
    *   "no PII leakage": noPiiGrader,
    *   "no upsell after refusal": noUpsellGrader,
    * });
    *
-   * guarded("agent stays on policy", async ({ dsl, guardrails }) => {
+   * guarded("agent stays on policy", async ({ dsl, policies }) => {
    *   const conversation = await dsl.customerCallsSupport({ ... });
-   *   await guardrails(renderTranscript(conversation));
+   *   await policies(renderTranscript(conversation));
    * });
    * ```
    */
-  withGuardrails<G extends { [P in keyof G]: Grader<string> }>(
+  withPolicies<G extends { [P in keyof G]: Grader<string> }>(
     map: G & { [P in keyof G & K]: never },
   ): ExtendedEvaluate<
-    TFixtures & { guardrails: GuardrailsFixture },
+    TFixtures & { policies: PoliciesFixture },
     K | (keyof G & string)
   >;
   /** Skip variant — registered evals are reported as skipped. */
@@ -272,18 +272,15 @@ function sampleTasks(
 
 /**
  * Run every registered grader against `input`, accumulating per-
- * guardrail failure reasons. Throws once with all reasons concatenated
+ * policy failure reasons. Throws once with all reasons concatenated
  * if any grader returned `pass: false`.
  */
-async function runGuardrails(
-  input: string,
-  guardrails: GuardrailMap,
-): Promise<void> {
+async function runPolicies(input: string, policies: PolicyMap): Promise<void> {
   const failures: string[] = [];
-  for (const [name, grade] of Object.entries(guardrails)) {
+  for (const [name, grade] of Object.entries(policies)) {
     const verdict = await grade(input);
     if (!verdict.pass) {
-      failures.push(`guardrail "${name}" failed: ${verdict.reason}`);
+      failures.push(`policy "${name}" failed: ${verdict.reason}`);
     }
   }
   if (failures.length > 0) {
@@ -292,26 +289,26 @@ async function runGuardrails(
 }
 
 /**
- * Build the `guardrails` fixture handed to eval bodies. Returns the
+ * Build the `policies` fixture handed to eval bodies. Returns the
  * fixture plus an `assertInvoked()` callback the run wrapper calls
- * after a successful body, which throws if guardrails were registered
+ * after a successful body, which throws if policies were registered
  * but never invoked.
  */
-function buildGuardrailsFixture(guardrails: GuardrailMap): {
-  fixture: GuardrailsFixture;
+function buildPoliciesFixture(policies: PolicyMap): {
+  fixture: PoliciesFixture;
   assertInvoked: () => void;
 } {
   let called = false;
-  const fixture: GuardrailsFixture = async (input) => {
+  const fixture: PoliciesFixture = async (input) => {
     called = true;
-    await runGuardrails(input, guardrails);
+    await runPolicies(input, policies);
   };
   const assertInvoked = (): void => {
-    const names = Object.keys(guardrails);
+    const names = Object.keys(policies);
     if (names.length > 0 && !called) {
       throw new Error(
-        `guardrails [${names.join(", ")}] registered but never invoked — ` +
-          `call the \`guardrails\` fixture with the value to grade.`,
+        `policies [${names.join(", ")}] registered but never invoked — ` +
+          `call the \`policies\` fixture with the value to grade.`,
       );
     }
   };
@@ -321,13 +318,13 @@ function buildGuardrailsFixture(guardrails: GuardrailMap): {
 function withFixturesRun<TFixtures>(
   fn: (fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
-  guardrails: GuardrailMap = {},
+  policies: PolicyMap = {},
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
+      const { fixture, assertInvoked } = buildPoliciesFixture(policies);
       // oxlint-disable-next-line no-unsafe-type-assertion
-      await fn({ ...fixtures, guardrails: fixture } as TFixtures);
+      await fn({ ...fixtures, policies: fixture } as TFixtures);
       assertInvoked();
     });
 }
@@ -336,13 +333,13 @@ function scenarioWithFixturesRun<TScenario, TFixtures>(
   fn: (scenario: TScenario, fixtures: TFixtures) => unknown,
   setup: SetupFn<TFixtures>,
   scenario: TScenario,
-  guardrails: GuardrailMap = {},
+  policies: PolicyMap = {},
 ): () => Promise<void> {
   return () =>
     setup(async (fixtures) => {
-      const { fixture, assertInvoked } = buildGuardrailsFixture(guardrails);
+      const { fixture, assertInvoked } = buildPoliciesFixture(policies);
       // oxlint-disable-next-line no-unsafe-type-assertion
-      await fn(scenario, { ...fixtures, guardrails: fixture } as TFixtures);
+      await fn(scenario, { ...fixtures, policies: fixture } as TFixtures);
       assertInvoked();
     });
 }
@@ -552,11 +549,11 @@ function makeEvaluate(
 function makeExtended<TFixtures, K extends string = never>(
   setup: SetupFn<TFixtures>,
   mode: RunMode,
-  guardrails: GuardrailMap = {},
+  policies: PolicyMap = {},
   chainOpts: EvaluateOptions = {},
 ): ExtendedEvaluate<TFixtures, K> {
   const withMode = (m: RunMode): ExtendedEvaluate<TFixtures, K> =>
-    makeExtended<TFixtures, K>(setup, m, guardrails, chainOpts);
+    makeExtended<TFixtures, K>(setup, m, policies, chainOpts);
 
   function evaluateOne(
     name: string,
@@ -565,7 +562,7 @@ function makeExtended<TFixtures, K extends string = never>(
   ): void {
     registerSingle(
       name,
-      () => withFixturesRun(fn, setup, guardrails),
+      () => withFixturesRun(fn, setup, policies),
       mergeOpts(chainOpts, opts),
       mode,
     );
@@ -585,8 +582,7 @@ function makeExtended<TFixtures, K extends string = never>(
           casesOrInput,
           merged,
           name,
-          (scenario) =>
-            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          (scenario) => scenarioWithFixturesRun(fn, setup, scenario, policies),
           mode,
         );
     }
@@ -605,8 +601,7 @@ function makeExtended<TFixtures, K extends string = never>(
         registerSynthesizedScenarios(
           input,
           name,
-          (scenario) =>
-            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          (scenario) => scenarioWithFixturesRun(fn, setup, scenario, policies),
           mode,
         );
         return;
@@ -618,8 +613,7 @@ function makeExtended<TFixtures, K extends string = never>(
           cached,
           input,
           name,
-          (scenario) =>
-            scenarioWithFixturesRun(fn, setup, scenario, guardrails),
+          (scenario) => scenarioWithFixturesRun(fn, setup, scenario, policies),
           mode,
         );
       } catch (err) {
@@ -632,23 +626,23 @@ function makeExtended<TFixtures, K extends string = never>(
 
   const target = Object.assign(evaluateOne, {
     scenarios,
-    withGuardrails: <G extends { [P in keyof G]: Grader<string> }>(
+    withPolicies: <G extends { [P in keyof G]: Grader<string> }>(
       map: G & { [P in keyof G & K]: never },
     ): ExtendedEvaluate<
-      TFixtures & { guardrails: GuardrailsFixture },
+      TFixtures & { policies: PoliciesFixture },
       K | (keyof G & string)
     > =>
       makeExtended<
-        TFixtures & { guardrails: GuardrailsFixture },
+        TFixtures & { policies: PoliciesFixture },
         K | (keyof G & string)
       >(
         // The user's setup produces TFixtures; the run wrapper layers
-        // the guardrails fixture on top before invoking the body, so
+        // the policies fixture on top before invoking the body, so
         // the runtime shape matches the widened TFixtures.
         // oxlint-disable-next-line no-unsafe-type-assertion
-        setup as SetupFn<TFixtures & { guardrails: GuardrailsFixture }>,
+        setup as SetupFn<TFixtures & { policies: PoliciesFixture }>,
         mode,
-        { ...guardrails, ...map },
+        { ...policies, ...map },
         chainOpts,
       ),
     skipIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
@@ -656,17 +650,17 @@ function makeExtended<TFixtures, K extends string = never>(
     runIf: (condition: boolean): ExtendedEvaluate<TFixtures, K> =>
       withMode(condition ? mode : "skip"),
     timeout: (ms: number): ExtendedEvaluate<TFixtures, K> =>
-      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+      makeExtended<TFixtures, K>(setup, mode, policies, {
         ...chainOpts,
         timeout: ms,
       }),
     samples: (n: number): ExtendedEvaluate<TFixtures, K> =>
-      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+      makeExtended<TFixtures, K>(setup, mode, policies, {
         ...chainOpts,
         samples: n,
       }),
     passRate: (r: number): ExtendedEvaluate<TFixtures, K> =>
-      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+      makeExtended<TFixtures, K>(setup, mode, policies, {
         ...chainOpts,
         passRate: r,
       }),
@@ -682,7 +676,7 @@ function makeExtended<TFixtures, K extends string = never>(
   });
   Object.defineProperty(target, "concurrent", {
     get: () =>
-      makeExtended<TFixtures, K>(setup, mode, guardrails, {
+      makeExtended<TFixtures, K>(setup, mode, policies, {
         ...chainOpts,
         concurrent: true,
       }),
