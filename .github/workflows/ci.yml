@@ -29,11 +29,9 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - name: Install Playwright system deps
-        run: vp dlx playwright@${{ steps.playwright.outputs.version }} install-deps chromium
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: vp dlx playwright@${{ steps.playwright.outputs.version }} install chromium
+        run: vp dlx playwright@${{ steps.playwright.outputs.version }} install --with-deps chromium
       - run: vp check
       - name: Run changed tests (PR)
         if: github.event_name == 'pull_request'
