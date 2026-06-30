@@ -140,6 +140,42 @@ describe("UserSimulator", () => {
     expect(result).toEqual({ met: false, reason: "abandoned" });
   });
 
+  it("the conversation transcript includes turns from an autonomous pursuit", async () => {
+    const responses = [
+      JSON.stringify({
+        message: "I'd like a refund please",
+        status: "continue",
+      }),
+      JSON.stringify({ message: "Thanks, got my refund!", status: "goal_met" }),
+    ];
+    let callIndex = 0;
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({
+        ...mockResult,
+        content: [{ type: "text", text: responses[callIndex++] }],
+        finishReason: { unified: "stop", raw: undefined },
+      }),
+    });
+
+    const customer = UserSimulator.text({
+      model,
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "Here is your refund",
+    });
+
+    await customer.pursueGoal("get a refund");
+
+    const transcript = await customer.transcript();
+
+    expect(transcript).toEqual([
+      { role: "user", content: "I'd like a refund please" },
+      { role: "assistant", content: "Here is your refund" },
+      { role: "user", content: "Thanks, got my refund!" },
+    ]);
+  });
+
   it("the simulated user exposes the conversation transcript", async () => {
     const customer = UserSimulator.text({
       model: unusedModel,
