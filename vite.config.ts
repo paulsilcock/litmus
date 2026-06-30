@@ -9,7 +9,7 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "**/fixtures/**",
-      ".claude/worktrees/**",
+      "**/.claude/worktrees/**",
     ],
     tags: [
       {
@@ -23,12 +23,12 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: [".claude/worktrees/**"],
+    ignorePatterns: ["**/.claude/worktrees/**"],
     printWidth: 80,
     sortImports: true,
   },
   lint: {
-    ignorePatterns: [".claude/worktrees/**"],
+    ignorePatterns: ["**/.claude/worktrees/**"],
     options: {
       typeAware: true,
       typeCheck: true,

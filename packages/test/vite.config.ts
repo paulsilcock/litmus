@@ -14,7 +14,7 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "**/fixtures/**",
-      ".claude/worktrees/**",
+      "**/.claude/worktrees/**",
     ],
   },
 });
