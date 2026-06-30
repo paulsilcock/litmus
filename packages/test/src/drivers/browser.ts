@@ -150,8 +150,14 @@ export abstract class BrowserDriver extends Driver {
   }
 
   async init(): Promise<void> {
+    // Use Chromium's new headless mode (real Chromium binary, GPU
+    // rasterization) rather than Playwright's default
+    // `chrome-headless-shell` (legacy headless, software rendering).
+    // New-headless handles audio/video work without the CPU spikes
+    // that the legacy shell hits when pages do heavy rendering.
     this.#browser = await chromium.launch({
       headless: this.#options.headless ?? true,
+      channel: "chromium",
       args: this.#options.audio
         ? [
             "--autoplay-policy=no-user-gesture-required",
