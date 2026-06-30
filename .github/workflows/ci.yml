@@ -22,16 +22,22 @@ jobs:
       - run: vp install
       - name: Resolve Playwright version
         id: playwright
-        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(node -p "require('./package.json').catalog.playwright")
+          if [ -z "$version" ]; then
+            echo "::error::Failed to resolve Playwright version from package.json catalog" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - name: Install Playwright (browsers)
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ hashFiles('.github/workflows/ci.yml') }}
+      - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: vp dlx playwright install --with-deps chromium
+        run: vp dlx playwright@${{ steps.playwright.outputs.version }} install --with-deps chromium
       - run: vp check
       - name: Run changed tests (PR)
         if: github.event_name == 'pull_request'
