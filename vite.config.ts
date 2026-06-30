@@ -1,5 +1,7 @@
 import { defineConfig } from "vite-plus";
 
+import { WORKTREE_EXCLUDE } from "./vite.shared.ts";
+
 export default defineConfig({
   test: {
     setupFiles: ["./test-setup.ts", "@litmus/test/vitest-setup"],
@@ -9,7 +11,7 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "**/fixtures/**",
-      ".claude/worktrees/**",
+      WORKTREE_EXCLUDE,
     ],
     tags: [
       {
@@ -23,12 +25,12 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: [".claude/worktrees/**"],
+    ignorePatterns: [WORKTREE_EXCLUDE],
     printWidth: 80,
     sortImports: true,
   },
   lint: {
-    ignorePatterns: [".claude/worktrees/**"],
+    ignorePatterns: [WORKTREE_EXCLUDE],
     options: {
       typeAware: true,
       typeCheck: true,

@@ -1,5 +1,7 @@
 import { defineConfig } from "vite-plus";
 
+import { WORKTREE_EXCLUDE } from "../../vite.shared.ts";
+
 export default defineConfig({
   pack: {
     dts: {
@@ -14,7 +16,7 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "**/fixtures/**",
-      ".claude/worktrees/**",
+      WORKTREE_EXCLUDE,
     ],
   },
 });
