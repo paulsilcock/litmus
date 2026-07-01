@@ -12,15 +12,21 @@ interface Turn {
   content: string;
 }
 
-interface Ability<TSchema extends z.ZodType = z.ZodType> {
+export type Ability<TSchema extends z.ZodType> = {
   reason: string;
   how: TSchema;
   use: (input: z.infer<TSchema>) => Promise<unknown>;
+};
+
+export function ability<TSchema extends z.ZodType>(
+  config: Ability<TSchema>,
+): Ability<TSchema> {
+  return config;
 }
 
 type BaseOptions = {
   model: LanguageModel;
-  abilities?: Record<string, Ability>;
+  abilities?: Record<string, Ability<z.ZodType<any>>>;
   /**
    * Cap on the number of steps (ability calls + reasoning) the
    * simulator's model is allowed to take inside a single conversational
@@ -79,7 +85,7 @@ Decide your next message and set status to:
 export abstract class UserSimulator {
   readonly #model: LanguageModel;
   readonly #turns: Turn[] = [];
-  readonly #abilities?: Record<string, Ability>;
+  readonly #abilities?: Record<string, Ability<z.ZodType<any>>>;
   readonly #maxStepsPerTurn: number;
   readonly #buildPrompt: (turns: readonly Turn[], goal: string) => string;
 

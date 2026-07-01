@@ -2,7 +2,7 @@ import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { UserSimulator } from "#litmus-test/simulator.ts";
+import { ability, UserSimulator } from "#litmus-test/simulator.ts";
 
 const mockResult = {
   usage: {
@@ -298,14 +298,14 @@ describe("UserSimulator", () => {
       send: async () => {},
       receive: async () => "ok",
       abilities: {
-        applyDiscountCode: {
+        applyDiscountCode: ability({
           reason: "Apply a discount code to their cart",
           how: z.object({ code: z.string() }),
           use: async ({ code }) => {
             discountCalls.push({ code });
             return { applied: true };
           },
-        },
+        }),
       },
     });
 
@@ -354,14 +354,14 @@ describe("UserSimulator", () => {
       send: async () => {},
       receive: async () => "ok",
       abilities: {
-        lookup: {
+        lookup: ability({
           reason: "Look something up",
           how: z.object({ q: z.string() }),
           use: async ({ q }) => {
             actionCalls.push(q);
             return { found: "$1250" };
           },
-        },
+        }),
       },
     });
 
