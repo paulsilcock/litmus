@@ -107,6 +107,24 @@ describe("tools with trusted parameters", () => {
     await entry?.handler.handle({ orderId: "order_456" });
     expect(received).toEqual({ orderId: "order_456", userId: "user_123" });
   });
+
+  it("a trusted parameter that cannot be hidden from the LLM is refused", () => {
+    // A transformed schema is opaque — its fields cannot be removed, so
+    // the trusted param would reach the LLM. Registration must refuse.
+    const opaqueSchema = z
+      .object({ order_id: z.string(), user_id: z.string() })
+      .transform(({ order_id, user_id }) => ({
+        orderId: order_id,
+        userId: user_id,
+      }));
+
+    expect(() =>
+      new Toolbox().tool("cancelOrder", CancelOrder, opaqueSchema, {
+        description: "Cancel an order",
+        trustedParams: ["userId"],
+      }),
+    ).toThrow(/cannot be hidden/);
+  });
 });
 
 describe("agent tracing", () => {
