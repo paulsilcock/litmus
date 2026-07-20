@@ -88,20 +88,22 @@ describe("trusted tool parameters", () => {
       message: "Cancel order 456 for me",
     });
 
-    // The tool params shown to the model are exactly the LLM-decidable
-    // fields — the trusted param is absent.
-    expect(toolsSeenByModel).toHaveLength(1);
-    const seen = z
-      .object({
-        name: z.literal("cancelOrder"),
-        inputSchema: z.object({
-          properties: z.record(z.string(), z.unknown()),
-          required: z.array(z.string()),
-        }),
-      })
-      .parse(toolsSeenByModel[0]);
-    expect(Object.keys(seen.inputSchema.properties)).toEqual(["orderId"]);
-    expect(seen.inputSchema.required).toEqual(["orderId"]);
+    // The tool params shown to the model — on every call — are exactly
+    // the LLM-decidable fields; the trusted param is absent.
+    expect(toolsSeenByModel.length).toBeGreaterThan(0);
+    for (const seenTool of toolsSeenByModel) {
+      const seen = z
+        .object({
+          name: z.literal("cancelOrder"),
+          inputSchema: z.object({
+            properties: z.record(z.string(), z.unknown()),
+            required: z.array(z.string()),
+          }),
+        })
+        .parse(seenTool);
+      expect(Object.keys(seen.inputSchema.properties)).toEqual(["orderId"]);
+      expect(seen.inputSchema.required).toEqual(["orderId"]);
+    }
 
     // The use case received it anyway, injected by the application.
     expect(CancelOrder.received).toEqual({

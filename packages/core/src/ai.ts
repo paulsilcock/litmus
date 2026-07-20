@@ -1,5 +1,5 @@
 import { container } from "tsyringe";
-import type { ZodType } from "zod";
+import { z, type ZodType } from "zod";
 
 import { Traceable } from "#litmus/tracing.ts";
 import type { HandlerClass } from "#litmus/use-case/handlers.ts";
@@ -90,6 +90,21 @@ export interface Tool {
   handler: {
     handle(input: unknown): Promise<unknown> | AsyncIterable<unknown>;
   };
+  trustedParams?: readonly string[];
+}
+
+function omitTrustedParams(
+  schema: ZodType,
+  trustedParams: readonly string[],
+): ZodType {
+  if (!(schema instanceof z.ZodObject)) {
+    throw new Error(
+      "trusted params require a plain object schema — the framework cannot hide them from the LLM otherwise",
+    );
+  }
+  const shape = { ...schema.shape };
+  for (const key of trustedParams) delete shape[key];
+  return z.object(shape);
 }
 
 /**
@@ -111,9 +126,25 @@ export class ToolSelection {
   }
 
   withTrustedValues(
-    _values: Record<string, Record<string, unknown>>,
+    values: Record<string, Record<string, unknown>>,
   ): ToolSelection {
-    throw new Error("not implemented");
+    const newEntries = new Map<string, Tool>();
+    for (const [name, entry] of this.#entries) {
+      const trusted = values[name];
+      if (!trusted || !entry.trustedParams?.length) {
+        newEntries.set(name, entry);
+        continue;
+      }
+      newEntries.set(name, {
+        ...entry,
+        schema: omitTrustedParams(entry.schema, entry.trustedParams),
+        handler: {
+          handle: (input) =>
+            entry.handler.handle(Object.assign({}, input, trusted)),
+        },
+      });
+    }
+    return new ToolSelection(newEntries);
   }
 }
 
@@ -176,6 +207,7 @@ export class Toolbox<TNames extends string = never> {
       description: options.description,
       schema,
       handler: container.resolve(Handler) as Tool["handler"],
+      trustedParams: options.trustedParams,
     });
     return new Toolbox(newEntries);
   }
