@@ -67,6 +67,48 @@ describe("Toolbox", () => {
   });
 });
 
+describe("tools with trusted parameters", () => {
+  const cancelOrderSchema = z.object({
+    orderId: z.string(),
+    userId: z.string(),
+  });
+
+  let received: unknown;
+
+  class CancelOrder {
+    async handle(input: { orderId: string; userId: string }) {
+      received = input;
+      return { cancelled: true };
+    }
+  }
+
+  it("tools can be invoked without the LLM supplying every parameter — the application fills in the rest at runtime", async () => {
+    const toolbox = new Toolbox().tool(
+      "cancelOrder",
+      CancelOrder,
+      cancelOrderSchema,
+      { description: "Cancel an order", trustedParams: ["userId"] },
+    );
+
+    const entry = toolbox
+      .pick("cancelOrder")
+      .withTrustedValues({ cancelOrder: { userId: "user_123" } })
+      .entries()
+      .get("cancelOrder");
+    expect(entry).toBeDefined();
+
+    // The exposed schema asks for exactly the LLM-decidable fields.
+    expect(entry?.schema.safeParse({ orderId: "order_456" }).success).toBe(
+      true,
+    );
+
+    // The use case still receives the trusted value, filled in by the
+    // application.
+    await entry?.handler.handle({ orderId: "order_456" });
+    expect(received).toEqual({ orderId: "order_456", userId: "user_123" });
+  });
+});
+
 describe("agent tracing", () => {
   const tracing = useInMemoryTracing();
 
