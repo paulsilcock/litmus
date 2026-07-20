@@ -114,7 +114,12 @@ function omitTrustedParams(
  * an agent has access to. Pass to an SDK adapter (e.g.
  * `toVercelTools`) to convert to the vendor-specific format.
  */
-export class ToolSelection {
+export class ToolSelection<
+  TTrusted extends Record<string, Record<string, unknown>> = Record<
+    never,
+    never
+  >,
+> {
   readonly #entries: Map<string, Tool>;
 
   constructor(entries: Map<string, Tool>) {
@@ -125,12 +130,12 @@ export class ToolSelection {
     return this.#entries;
   }
 
-  withTrustedValues(
-    values: Record<string, Record<string, unknown>>,
-  ): ToolSelection {
+  withTrustedValues(values: TTrusted): ToolSelection {
+    const valuesByTool: Record<string, Record<string, unknown> | undefined> =
+      values;
     const newEntries = new Map<string, Tool>();
     for (const [name, entry] of this.#entries) {
-      const trusted = values[name];
+      const trusted = valuesByTool[name];
       if (!trusted || !entry.trustedParams?.length) {
         newEntries.set(name, entry);
         continue;
@@ -176,7 +181,13 @@ export class ToolSelection {
  * const vercelTools = toVercelTools(disputeTools);
  * ```
  */
-export class Toolbox<TNames extends string = never> {
+export class Toolbox<
+  TNames extends string = never,
+  TTrusted extends Record<string, Record<string, unknown>> = Record<
+    never,
+    never
+  >,
+> {
   readonly #entries: Map<string, Tool>;
 
   constructor(entries?: Map<string, Tool>) {
@@ -193,15 +204,25 @@ export class Toolbox<TNames extends string = never> {
    *   LLM-friendly field names to the handler's expected input shape.
    * @param options.description - Tool description used by the LLM for tool selection.
    */
-  tool<TName extends string, TInput extends Record<string, unknown>, TOutput>(
+  tool<
+    TName extends string,
+    TInput extends Record<string, unknown>,
+    TOutput,
+    TKeys extends keyof TInput & string = never,
+  >(
     name: TName,
     Handler: HandlerClass<TInput, TOutput>,
     schema: ZodType<TInput>,
     options: {
       description: string;
-      trustedParams?: readonly (keyof TInput & string)[];
+      trustedParams?: readonly TKeys[];
     },
-  ): Toolbox<TNames | TName> {
+  ): Toolbox<
+    TNames | TName,
+    [TKeys] extends [never]
+      ? TTrusted
+      : TTrusted & { [K in TName]: Pick<TInput, TKeys> }
+  > {
     if (options.trustedParams?.length && !(schema instanceof z.ZodObject)) {
       throw new Error(
         `tool "${name}": trusted params cannot be hidden from the LLM unless the schema is a plain object`,
@@ -214,7 +235,12 @@ export class Toolbox<TNames extends string = never> {
       handler: container.resolve(Handler) as Tool["handler"],
       trustedParams: options.trustedParams,
     });
-    return new Toolbox(newEntries);
+    return new Toolbox<
+      TNames | TName,
+      [TKeys] extends [never]
+        ? TTrusted
+        : TTrusted & { [K in TName]: Pick<TInput, TKeys> }
+    >(newEntries);
   }
 
   /**
@@ -223,12 +249,16 @@ export class Toolbox<TNames extends string = never> {
    *
    * Only accepts names that have been registered via {@link tool}.
    */
-  pick(...names: TNames[]): ToolSelection {
+  pick<TPicked extends TNames>(
+    ...names: TPicked[]
+  ): ToolSelection<Pick<TTrusted, Extract<keyof TTrusted, TPicked>>> {
     const newEntries = new Map<string, Tool>();
     for (const name of names) {
       const entry = this.#entries.get(name);
       if (entry) newEntries.set(name, entry);
     }
-    return new ToolSelection(newEntries);
+    return new ToolSelection<Pick<TTrusted, Extract<keyof TTrusted, TPicked>>>(
+      newEntries,
+    );
   }
 }

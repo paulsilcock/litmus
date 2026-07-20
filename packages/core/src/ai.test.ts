@@ -82,6 +82,24 @@ describe("tools with trusted parameters", () => {
     }
   }
 
+  // Type-level regression: trusted values must match the declared
+  // trusted params exactly. If the constraint is removed, the
+  // expect-error directives below fail the type check.
+  const typedSelection = new Toolbox()
+    .tool("cancelOrder", CancelOrder, cancelOrderSchema, {
+      description: "Cancel an order",
+      trustedParams: ["userId"],
+    })
+    .pick("cancelOrder");
+  // @ts-expect-error — a binding for "cancelOrder" is required
+  typedSelection.withTrustedValues({});
+  // @ts-expect-error — the trusted value for "userId" is missing
+  typedSelection.withTrustedValues({ cancelOrder: {} });
+  // @ts-expect-error — "sessionId" is not a declared trusted param
+  typedSelection.withTrustedValues({ cancelOrder: { sessionId: "s_1" } });
+  // @ts-expect-error — "getBalance" is not a tool with trusted params
+  typedSelection.withTrustedValues({ getBalance: { userId: "user_123" } });
+
   it("tools can be invoked without the LLM supplying every parameter — the application fills in the rest at runtime", async () => {
     const toolbox = new Toolbox().tool(
       "cancelOrder",
