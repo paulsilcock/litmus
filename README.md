@@ -206,6 +206,9 @@ import { z } from "zod";
 const supportTools = new Toolbox()
   .tool("getCustomerOrders", GetCustomerOrders, GetCustomerOrdersSchema, {
     description: "List a customer's recent orders.",
+    // Never shown to the LLM — bound by the application per request,
+    // so the model can't look up (or refund) someone else's orders.
+    trustedParams: ["customerId"],
   })
   .tool("getOrderDetails", GetOrderDetails, GetOrderDetailsSchema, {
     description: "Get full details for a specific order.",
@@ -249,7 +252,13 @@ export class SupportAgent extends Agent<
         // System tools — use cases. Side effects (notifications,
         // follow-up workflows) fire from domain event handlers, not
         // from the agent.
-        ...toVercelTools(supportTools),
+        ...toVercelTools(
+          supportTools
+            .pick("getCustomerOrders", "getOrderDetails", "issueRefund")
+            .withTrustedValues({
+              getCustomerOrders: { customerId: input.customerId },
+            }),
+        ),
         // Internal tool — pure agent utility, no system interaction.
         calculator: tool({
           description: "Evaluate an arithmetic expression like '49.99 * 0.5'.",
@@ -281,6 +290,8 @@ export class SupportAgent extends Agent<
 Two things to notice. The agent can hallucinate, pick the wrong customer, or fabricate a reason — but every refund still goes through `charge.refund()`. The domain enforces the rules; the LLM can be confidently wrong without storing damage.
 
 And `IssueRefund` doesn't know who's calling it. Human staff in an admin UI hit it via an HTTP route, back-office scripts via the CLI, the AI agent via the tool. One implementation, one test surface, no parallel path to bypass a rule from the "agent side".
+
+Nor does the LLM decide _whose_ orders it's looking at — `customerId` is a trusted param, bound from the authenticated conversation and invisible to the model. Identity and authorization always come from the application, never from model output.
 
 `packages/test-acceptance` is a fully worked example — domain, use cases, entrypoints, ATDD, and evals end-to-end.
 

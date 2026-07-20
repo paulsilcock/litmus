@@ -67,6 +67,104 @@ describe("Toolbox", () => {
   });
 });
 
+describe("tools with trusted parameters", () => {
+  const cancelOrderSchema = z.object({
+    orderId: z.string(),
+    userId: z.string(),
+  });
+
+  let received: unknown;
+
+  class CancelOrder {
+    async handle(input: { orderId: string; userId: string }) {
+      received = input;
+      return { cancelled: true };
+    }
+  }
+
+  // Type-level regression: trusted values must match the declared
+  // trusted params exactly. If the constraint is removed, the
+  // expect-error directives below fail the type check.
+  const typedSelection = new Toolbox()
+    .tool("cancelOrder", CancelOrder, cancelOrderSchema, {
+      description: "Cancel an order",
+      trustedParams: ["userId"],
+    })
+    .pick("cancelOrder");
+  // @ts-expect-error — a binding for "cancelOrder" is required
+  typedSelection.withTrustedValues({});
+  // @ts-expect-error — the trusted value for "userId" is missing
+  typedSelection.withTrustedValues({ cancelOrder: {} });
+  // @ts-expect-error — "sessionId" is not a declared trusted param
+  typedSelection.withTrustedValues({ cancelOrder: { sessionId: "s_1" } });
+  // @ts-expect-error — "getBalance" is not a tool with trusted params
+  typedSelection.withTrustedValues({ getBalance: { userId: "user_123" } });
+
+  it("tools can be invoked without the LLM supplying every parameter — the application fills in the rest at runtime", async () => {
+    const toolbox = new Toolbox().tool(
+      "cancelOrder",
+      CancelOrder,
+      cancelOrderSchema,
+      { description: "Cancel an order", trustedParams: ["userId"] },
+    );
+
+    const entry = toolbox
+      .pick("cancelOrder")
+      .withTrustedValues({ cancelOrder: { userId: "user_123" } })
+      .entries()
+      .get("cancelOrder");
+    expect(entry).toBeDefined();
+
+    // The exposed schema asks for exactly the LLM-decidable fields.
+    expect(entry?.schema.safeParse({ orderId: "order_456" }).success).toBe(
+      true,
+    );
+
+    // The use case still receives the trusted value, filled in by the
+    // application.
+    await entry?.handler.handle({ orderId: "order_456" });
+    expect(received).toEqual({ orderId: "order_456", userId: "user_123" });
+  });
+
+  // Type-level regression: declaring trusted params on a schema whose
+  // fields cannot be removed (e.g. transformed) is a compile error.
+  // Never invoked — registration would (rightly) throw at runtime.
+  const _refusedAtCompileTime = () => {
+    const transformedSchema = z
+      .object({ order_id: z.string(), user_id: z.string() })
+      .transform(({ order_id, user_id }) => ({
+        orderId: order_id,
+        userId: user_id,
+      }));
+    new Toolbox().tool("cancelOrder", CancelOrder, transformedSchema, {
+      description: "Cancel an order",
+      // @ts-expect-error — trusted params cannot be hidden on a transformed schema
+      trustedParams: ["userId"],
+    });
+  };
+  void _refusedAtCompileTime;
+
+  it("a trusted parameter that cannot be hidden from the LLM is refused", () => {
+    // A transformed schema is opaque — its fields cannot be removed, so
+    // the trusted param would reach the LLM. Registration must refuse.
+    const opaqueSchema = z
+      .object({ order_id: z.string(), user_id: z.string() })
+      .transform(({ order_id, user_id }) => ({
+        orderId: order_id,
+        userId: user_id,
+      }));
+
+    expect(() =>
+      new Toolbox().tool("cancelOrder", CancelOrder, opaqueSchema, {
+        description: "Cancel an order",
+        // @ts-expect-error — already a compile error; the runtime refusal
+        // under test here is the backstop for plain-JS callers
+        trustedParams: ["userId"],
+      }),
+    ).toThrow(/cannot be hidden/);
+  });
+});
+
 describe("agent tracing", () => {
   const tracing = useInMemoryTracing();
 

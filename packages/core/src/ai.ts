@@ -1,5 +1,5 @@
 import { container } from "tsyringe";
-import type { ZodType } from "zod";
+import { z, type ZodType } from "zod";
 
 import { Traceable } from "#litmus/tracing.ts";
 import type { HandlerClass } from "#litmus/use-case/handlers.ts";
@@ -90,6 +90,21 @@ export interface Tool {
   handler: {
     handle(input: unknown): Promise<unknown> | AsyncIterable<unknown>;
   };
+  trustedParams?: readonly string[];
+}
+
+function omitTrustedParams(
+  schema: ZodType,
+  trustedParams: readonly string[],
+): ZodType {
+  if (!(schema instanceof z.ZodObject)) {
+    throw new Error(
+      "trusted params require a plain object schema — the framework cannot hide them from the LLM otherwise",
+    );
+  }
+  const shape = { ...schema.shape };
+  for (const key of trustedParams) delete shape[key];
+  return z.object(shape);
 }
 
 /**
@@ -99,8 +114,20 @@ export interface Tool {
  * an agent has access to. Pass to an SDK adapter (e.g.
  * `toVercelTools`) to convert to the vendor-specific format.
  */
-export class ToolSelection {
+export class ToolSelection<
+  TTrusted extends Record<string, Record<string, unknown>> = Record<
+    never,
+    never
+  >,
+> {
   readonly #entries: Map<string, Tool>;
+
+  /**
+   * Type-level only — never exists at runtime. Records which picked
+   * tools still have unbound trusted params, so a selection cannot
+   * reach an adapter until {@link withTrustedValues} is called.
+   */
+  declare readonly unboundTrustedParams: keyof TTrusted;
 
   constructor(entries: Map<string, Tool>) {
     this.#entries = entries;
@@ -108,6 +135,37 @@ export class ToolSelection {
 
   entries(): ReadonlyMap<string, Tool> {
     return this.#entries;
+  }
+
+  /**
+   * Bind runtime values for every trusted param declared by the picked
+   * tools — e.g. the authenticated user id from the current request.
+   *
+   * The returned selection exposes each tool's schema without its
+   * trusted params (the LLM never sees them) and merges the bound
+   * values into the handler input when the tool is invoked. A selection
+   * whose trusted params are unbound cannot be passed to an adapter.
+   */
+  withTrustedValues(values: TTrusted): ToolSelection {
+    const valuesByTool: Record<string, Record<string, unknown> | undefined> =
+      values;
+    const newEntries = new Map<string, Tool>();
+    for (const [name, entry] of this.#entries) {
+      const trusted = valuesByTool[name];
+      if (!trusted || !entry.trustedParams?.length) {
+        newEntries.set(name, entry);
+        continue;
+      }
+      newEntries.set(name, {
+        ...entry,
+        schema: omitTrustedParams(entry.schema, entry.trustedParams),
+        handler: {
+          handle: (input) =>
+            entry.handler.handle(Object.assign({}, input, trusted)),
+        },
+      });
+    }
+    return new ToolSelection(newEntries);
   }
 }
 
@@ -132,14 +190,30 @@ export class ToolSelection {
  *     transaction_id: z.string().describe("The ID of the transaction to refund"),
  *   }).transform(({ transaction_id }) => ({ transactionId: transaction_id })), {
  *     description: "Initiate a refund for a transaction",
+ *   })
+ *   .tool("cancelOrder", CancelOrder, z.object({
+ *     orderId: z.string(),
+ *     userId: z.string(),
+ *   }), {
+ *     description: "Cancel an order",
+ *     // never shown to the LLM; bound by the application per request
+ *     trustedParams: ["userId"],
  *   });
  *
- * // Scope tools per agent
- * const disputeTools = systemTools.pick("getTransactions", "initiateRefund");
+ * // Scope tools per agent, binding trusted values from the request
+ * const disputeTools = systemTools
+ *   .pick("getTransactions", "initiateRefund", "cancelOrder")
+ *   .withTrustedValues({ cancelOrder: { userId: session.userId } });
  * const vercelTools = toVercelTools(disputeTools);
  * ```
  */
-export class Toolbox<TNames extends string = never> {
+export class Toolbox<
+  TNames extends string = never,
+  TTrusted extends Record<string, Record<string, unknown>> = Record<
+    never,
+    never
+  >,
+> {
   readonly #entries: Map<string, Tool>;
 
   constructor(entries?: Map<string, Tool>) {
@@ -155,20 +229,51 @@ export class Toolbox<TNames extends string = never> {
    *   help the LLM generate correct arguments. Use `.transform()` to map
    *   LLM-friendly field names to the handler's expected input shape.
    * @param options.description - Tool description used by the LLM for tool selection.
+   * @param options.trustedParams - Schema fields the LLM must never see
+   *   or supply — e.g. the authenticated user id. Values are bound by the
+   *   application via {@link ToolSelection.withTrustedValues} and merged
+   *   into the handler input server-side. Requires a plain object schema.
    */
-  tool<TName extends string, TInput extends Record<string, unknown>, TOutput>(
+  tool<
+    TName extends string,
+    TInput extends Record<string, unknown>,
+    TOutput,
+    TSchema extends ZodType<TInput>,
+    TKeys extends TSchema extends { shape: Record<string, unknown> }
+      ? keyof TInput & string
+      : never = never,
+  >(
     name: TName,
     Handler: HandlerClass<TInput, TOutput>,
-    schema: ZodType<TInput>,
-    options: { description: string },
-  ): Toolbox<TNames | TName> {
+    schema: TSchema,
+    options: {
+      description: string;
+      trustedParams?: readonly TKeys[];
+    },
+  ): Toolbox<
+    TNames | TName,
+    [TKeys] extends [never]
+      ? TTrusted
+      : TTrusted & { [K in TName]: Pick<TInput, TKeys> }
+  > {
+    if (options.trustedParams?.length && !(schema instanceof z.ZodObject)) {
+      throw new Error(
+        `tool "${name}": trusted params cannot be hidden from the LLM unless the schema is a plain object`,
+      );
+    }
     const newEntries = new Map(this.#entries);
     newEntries.set(name, {
       description: options.description,
       schema,
       handler: container.resolve(Handler) as Tool["handler"],
+      trustedParams: options.trustedParams,
     });
-    return new Toolbox(newEntries);
+    return new Toolbox<
+      TNames | TName,
+      [TKeys] extends [never]
+        ? TTrusted
+        : TTrusted & { [K in TName]: Pick<TInput, TKeys> }
+    >(newEntries);
   }
 
   /**
@@ -177,12 +282,16 @@ export class Toolbox<TNames extends string = never> {
    *
    * Only accepts names that have been registered via {@link tool}.
    */
-  pick(...names: TNames[]): ToolSelection {
+  pick<TPicked extends TNames>(
+    ...names: TPicked[]
+  ): ToolSelection<Pick<TTrusted, Extract<keyof TTrusted, TPicked>>> {
     const newEntries = new Map<string, Tool>();
     for (const name of names) {
       const entry = this.#entries.get(name);
       if (entry) newEntries.set(name, entry);
     }
-    return new ToolSelection(newEntries);
+    return new ToolSelection<Pick<TTrusted, Extract<keyof TTrusted, TPicked>>>(
+      newEntries,
+    );
   }
 }
