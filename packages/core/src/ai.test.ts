@@ -126,6 +126,24 @@ describe("tools with trusted parameters", () => {
     expect(received).toEqual({ orderId: "order_456", userId: "user_123" });
   });
 
+  // Type-level regression: declaring trusted params on a schema whose
+  // fields cannot be removed (e.g. transformed) is a compile error.
+  // Never invoked — registration would (rightly) throw at runtime.
+  const _refusedAtCompileTime = () => {
+    const transformedSchema = z
+      .object({ order_id: z.string(), user_id: z.string() })
+      .transform(({ order_id, user_id }) => ({
+        orderId: order_id,
+        userId: user_id,
+      }));
+    new Toolbox().tool("cancelOrder", CancelOrder, transformedSchema, {
+      description: "Cancel an order",
+      // @ts-expect-error — trusted params cannot be hidden on a transformed schema
+      trustedParams: ["userId"],
+    });
+  };
+  void _refusedAtCompileTime;
+
   it("a trusted parameter that cannot be hidden from the LLM is refused", () => {
     // A transformed schema is opaque — its fields cannot be removed, so
     // the trusted param would reach the LLM. Registration must refuse.
@@ -139,6 +157,8 @@ describe("tools with trusted parameters", () => {
     expect(() =>
       new Toolbox().tool("cancelOrder", CancelOrder, opaqueSchema, {
         description: "Cancel an order",
+        // @ts-expect-error — already a compile error; the runtime refusal
+        // under test here is the backstop for plain-JS callers
         trustedParams: ["userId"],
       }),
     ).toThrow(/cannot be hidden/);

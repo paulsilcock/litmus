@@ -137,6 +137,15 @@ export class ToolSelection<
     return this.#entries;
   }
 
+  /**
+   * Bind runtime values for every trusted param declared by the picked
+   * tools — e.g. the authenticated user id from the current request.
+   *
+   * The returned selection exposes each tool's schema without its
+   * trusted params (the LLM never sees them) and merges the bound
+   * values into the handler input when the tool is invoked. A selection
+   * whose trusted params are unbound cannot be passed to an adapter.
+   */
   withTrustedValues(values: TTrusted): ToolSelection {
     const valuesByTool: Record<string, Record<string, unknown> | undefined> =
       values;
@@ -181,10 +190,20 @@ export class ToolSelection<
  *     transaction_id: z.string().describe("The ID of the transaction to refund"),
  *   }).transform(({ transaction_id }) => ({ transactionId: transaction_id })), {
  *     description: "Initiate a refund for a transaction",
+ *   })
+ *   .tool("cancelOrder", CancelOrder, z.object({
+ *     orderId: z.string(),
+ *     userId: z.string(),
+ *   }), {
+ *     description: "Cancel an order",
+ *     // never shown to the LLM; bound by the application per request
+ *     trustedParams: ["userId"],
  *   });
  *
- * // Scope tools per agent
- * const disputeTools = systemTools.pick("getTransactions", "initiateRefund");
+ * // Scope tools per agent, binding trusted values from the request
+ * const disputeTools = systemTools
+ *   .pick("getTransactions", "initiateRefund", "cancelOrder")
+ *   .withTrustedValues({ cancelOrder: { userId: session.userId } });
  * const vercelTools = toVercelTools(disputeTools);
  * ```
  */
@@ -210,16 +229,23 @@ export class Toolbox<
    *   help the LLM generate correct arguments. Use `.transform()` to map
    *   LLM-friendly field names to the handler's expected input shape.
    * @param options.description - Tool description used by the LLM for tool selection.
+   * @param options.trustedParams - Schema fields the LLM must never see
+   *   or supply — e.g. the authenticated user id. Values are bound by the
+   *   application via {@link ToolSelection.withTrustedValues} and merged
+   *   into the handler input server-side. Requires a plain object schema.
    */
   tool<
     TName extends string,
     TInput extends Record<string, unknown>,
     TOutput,
-    TKeys extends keyof TInput & string = never,
+    TSchema extends ZodType<TInput>,
+    TKeys extends TSchema extends { shape: Record<string, unknown> }
+      ? keyof TInput & string
+      : never = never,
   >(
     name: TName,
     Handler: HandlerClass<TInput, TOutput>,
-    schema: ZodType<TInput>,
+    schema: TSchema,
     options: {
       description: string;
       trustedParams?: readonly TKeys[];
