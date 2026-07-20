@@ -202,6 +202,11 @@ export class Toolbox<TNames extends string = never> {
       trustedParams?: readonly (keyof TInput & string)[];
     },
   ): Toolbox<TNames | TName> {
+    if (options.trustedParams?.length && !(schema instanceof z.ZodObject)) {
+      throw new Error(
+        `tool "${name}": trusted params cannot be hidden from the LLM unless the schema is a plain object`,
+      );
+    }
     const newEntries = new Map(this.#entries);
     newEntries.set(name, {
       description: options.description,
