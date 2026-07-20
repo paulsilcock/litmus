@@ -12,7 +12,30 @@ class GetBalance {
   }
 }
 
+class CancelOrder {
+  async handle(_input: { orderId: string; userId: string }) {
+    return { cancelled: true };
+  }
+}
+
 describe("toVercelTools", () => {
+  // Type-level regression: a selection with unbound trusted params
+  // cannot reach the LLM. If the constraint is removed, the
+  // expect-error directive below fails the type check.
+  const withTrusted = new Toolbox()
+    .tool(
+      "cancelOrder",
+      CancelOrder,
+      z.object({ orderId: z.string(), userId: z.string() }),
+      { description: "Cancel an order", trustedParams: ["userId"] },
+    )
+    .pick("cancelOrder");
+  // @ts-expect-error — trusted values must be bound before conversion
+  toVercelTools(withTrusted);
+  toVercelTools(
+    withTrusted.withTrustedValues({ cancelOrder: { userId: "user_123" } }),
+  );
+
   it("converts a tool selection to vercel-compatible tools", () => {
     const selection = new Toolbox()
       .tool("getBalance", GetBalance, schema, {

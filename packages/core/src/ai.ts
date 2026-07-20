@@ -122,6 +122,13 @@ export class ToolSelection<
 > {
   readonly #entries: Map<string, Tool>;
 
+  /**
+   * Type-level only — never exists at runtime. Records which picked
+   * tools still have unbound trusted params, so a selection cannot
+   * reach an adapter until {@link withTrustedValues} is called.
+   */
+  declare readonly unboundTrustedParams: keyof TTrusted;
+
   constructor(entries: Map<string, Tool>) {
     this.#entries = entries;
   }
