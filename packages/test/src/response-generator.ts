@@ -1,4 +1,9 @@
-import { generateText, type LanguageModel, Output } from "ai";
+import {
+  generateText,
+  type LanguageModel,
+  type ModelMessage,
+  Output,
+} from "ai";
 import { z } from "zod";
 
 export const utteranceSchema = z.object({
@@ -33,16 +38,29 @@ export type ResponseGenerator = (prompt: Prompt) => Promise<Utterance>;
 /** Builds a `ResponseGenerator` backed by the Vercel AI SDK. */
 export function fromVercel(opts: { model: LanguageModel }): ResponseGenerator {
   return async (prompt) => {
-    if (typeof prompt !== "string") {
-      throw new Error("message-array prompts are not supported");
-    }
-
     const result = await generateText({
       model: opts.model,
-      prompt,
+      ...(typeof prompt === "string"
+        ? { prompt }
+        : { messages: toModelMessages(prompt) }),
       output: Output.object({ schema: utteranceSchema }),
     });
 
     return result.output;
   };
+}
+
+function toModelMessages(messages: readonly Message[]): ModelMessage[] {
+  return messages.map((message): ModelMessage => {
+    // The arms are identical, but ModelMessage is a discriminated union —
+    // `{ role: message.role, ... }` doesn't distribute without narrowing.
+    switch (message.role) {
+      case "system":
+        return { role: "system", content: message.content };
+      case "user":
+        return { role: "user", content: message.content };
+      case "assistant":
+        return { role: "assistant", content: message.content };
+    }
+  });
 }
