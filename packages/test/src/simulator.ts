@@ -138,15 +138,7 @@ export abstract class UserSimulator {
         stopWhen: tools ? stepCountIs(this.#maxStepsPerTurn) : undefined,
       });
 
-      let output: z.infer<typeof userResponseSchema>;
-      try {
-        output = result.output;
-      } catch {
-        output = {
-          message: "(Took too many actions without speaking; continuing.)",
-          status: "continue",
-        };
-      }
+      const output = result.output;
 
       await this.sendMessage(output.message);
       this.recordTurn({ role: "user", content: output.message });
