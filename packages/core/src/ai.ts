@@ -109,6 +109,12 @@ export class ToolSelection {
   entries(): ReadonlyMap<string, Tool> {
     return this.#entries;
   }
+
+  withTrustedValues(
+    _values: Record<string, Record<string, unknown>>,
+  ): ToolSelection {
+    throw new Error("not implemented");
+  }
 }
 
 /**
@@ -160,7 +166,10 @@ export class Toolbox<TNames extends string = never> {
     name: TName,
     Handler: HandlerClass<TInput, TOutput>,
     schema: ZodType<TInput>,
-    options: { description: string },
+    options: {
+      description: string;
+      trustedParams?: readonly (keyof TInput & string)[];
+    },
   ): Toolbox<TNames | TName> {
     const newEntries = new Map(this.#entries);
     newEntries.set(name, {
