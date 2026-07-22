@@ -84,13 +84,38 @@ export abstract class Agent<TInput, TOutput = void> extends Traceable {
  * vendor-specific format (e.g. Vercel AI SDK) before being
  * passed to an LLM.
  */
-export interface Tool {
+export interface Tool<TInput = unknown> {
   description: string;
-  schema: ZodType;
+  schema: ZodType<TInput>;
   handler: {
-    handle(input: unknown): Promise<unknown> | AsyncIterable<unknown>;
+    handle(input: TInput): Promise<unknown> | AsyncIterable<unknown>;
   };
 }
+
+/**
+ * A single message in a prompt: role plus text. The common
+ * denominator across AI frameworks, so contracts built on it don't
+ * inherit any one framework's richer message type.
+ */
+export interface Message {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+/** A fully-resolved prompt: either flat text or role-tagged messages. */
+export type Prompt = string | readonly Message[];
+
+/**
+ * Generates a typed output from a fully-resolved prompt, optionally
+ * offering tools the model may invoke along the way. The caller owns
+ * prompt assembly and decides which tools are available per call; a
+ * `GenerationFunction` owns only how the output is produced — which
+ * model, which framework, or none at all in tests.
+ */
+export type GenerationFunction<TOutput> = (
+  prompt: Prompt,
+  tools?: Record<string, Tool<any>>,
+) => Promise<TOutput>;
 
 /**
  * A scoped subset of tools picked from a {@link Toolbox}.
