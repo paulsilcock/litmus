@@ -4,6 +4,7 @@ import {
   type LanguageModel,
   type ModelMessage,
   Output,
+  stepCountIs,
 } from "ai";
 import type { ZodType } from "zod";
 
@@ -29,6 +30,12 @@ import { toVercelTools } from "#litmus-ai/vercel/to-vercel-tools.ts";
 export function vercelGenerator<TOutput>(opts: {
   model: LanguageModel;
   schema: ZodType<TOutput>;
+  /**
+   * Cap on the number of generation steps (tool calls + reasoning) per
+   * invocation. Bounds what would otherwise be an unbounded
+   * tool-calling loop. Defaults to 5.
+   */
+  maxSteps?: number;
 }): GenerationFunction<TOutput> {
   return async (prompt, tools) => {
     const result = await generateText({
@@ -38,6 +45,7 @@ export function vercelGenerator<TOutput>(opts: {
         : { messages: toModelMessages(prompt) }),
       output: Output.object({ schema: opts.schema }),
       tools: tools ? toVercelTools(tools) : undefined,
+      stopWhen: tools ? stepCountIs(opts.maxSteps ?? 5) : undefined,
     });
 
     return result.output;

@@ -1,10 +1,4 @@
-import {
-  generateText,
-  type LanguageModel,
-  Output,
-  stepCountIs,
-  tool,
-} from "ai";
+import type { GenerationFunction, Tool } from "@litmus/core/ai";
 import { z } from "zod";
 
 interface Turn {
@@ -12,28 +6,28 @@ interface Turn {
   content: string;
 }
 
-export type Ability<TSchema extends z.ZodType> = {
-  reason: string;
-  how: TSchema;
-  use: (input: z.infer<TSchema>) => Promise<unknown>;
-};
+export const utteranceSchema = z.object({
+  message: z.string(),
+  status: z.enum(["continue", "goal_met", "abandoned"] as const),
+});
 
-export function ability<TSchema extends z.ZodType>(
-  config: Ability<TSchema>,
-): Ability<TSchema> {
-  return config;
-}
+/** What the simulated user says next, and how the pursuit should proceed. */
+export type Utterance = z.infer<typeof utteranceSchema>;
 
 type BaseOptions = {
-  model: LanguageModel;
-  abilities?: Record<string, Ability<z.ZodType<any>>>;
   /**
-   * Cap on the number of steps (ability calls + reasoning) the
-   * simulator's model is allowed to take inside a single conversational
-   * turn before being forced to produce an utterance. Prevents the
-   * model from looping on ability calls indefinitely. Defaults to 5.
+   * Generates the simulated user's next utterance from the prompt the
+   * simulator assembles each turn. Back it with a model (e.g.
+   * `vercelGenerator({ model, schema: utteranceSchema })` from
+   * `@litmus/ai/vercel`) or a plain function in tests.
    */
-  maxStepsPerTurn?: number;
+  generateResponse: GenerationFunction<Utterance>;
+  /**
+   * Domain actions the simulated user can take beyond talking — e.g.
+   * apply a discount code, look up an order — wired by the test to DSL
+   * methods. Offered to the generator on every turn.
+   */
+  abilities?: Record<string, Tool<any>>;
 } & (
   | { persona: string }
   | { prompt: (turns: readonly Turn[], goal: string) => string }
@@ -54,11 +48,6 @@ export interface PursuitResult {
 function pursuitOutcome(reason: PursuitOutcome): PursuitResult {
   return { met: reason === "goal_met", reason };
 }
-
-const userResponseSchema = z.object({
-  message: z.string(),
-  status: z.enum(["continue", "goal_met", "abandoned"] as const),
-});
 
 function defaultPrompt(
   persona: string,
@@ -83,16 +72,14 @@ Decide your next message and set status to:
 }
 
 export abstract class UserSimulator {
-  readonly #model: LanguageModel;
+  readonly #generateResponse: GenerationFunction<Utterance>;
+  readonly #abilities?: Record<string, Tool<any>>;
   readonly #turns: Turn[] = [];
-  readonly #abilities?: Record<string, Ability<z.ZodType<any>>>;
-  readonly #maxStepsPerTurn: number;
   readonly #buildPrompt: (turns: readonly Turn[], goal: string) => string;
 
   constructor(options: BaseOptions) {
-    this.#model = options.model;
+    this.#generateResponse = options.generateResponse;
     this.#abilities = options.abilities;
-    this.#maxStepsPerTurn = options.maxStepsPerTurn ?? 5;
     this.#buildPrompt =
       "prompt" in options
         ? options.prompt
@@ -115,36 +102,18 @@ export abstract class UserSimulator {
     opts: { maxTurns?: number } = {},
   ): Promise<PursuitResult> {
     const maxTurns = opts.maxTurns ?? 10;
-    const tools = this.#abilities
-      ? Object.fromEntries(
-          Object.entries(this.#abilities).map(([name, ability]) => [
-            name,
-            tool({
-              description: ability.reason,
-              inputSchema: ability.how,
-              execute: ability.use,
-            }),
-          ]),
-        )
-      : undefined;
 
     for (let i = 0; i < maxTurns; i++) {
-      const promptText = this.#buildPrompt(this.#turns, goal);
-      const result = await generateText({
-        model: this.#model,
-        prompt: promptText,
-        output: Output.object({ schema: userResponseSchema }),
-        tools,
-        stopWhen: tools ? stepCountIs(this.#maxStepsPerTurn) : undefined,
-      });
+      const utterance = await this.#generateResponse(
+        this.#buildPrompt(this.#turns, goal),
+        this.#abilities,
+      );
 
-      const output = result.output;
+      await this.sendMessage(utterance.message);
+      this.recordTurn({ role: "user", content: utterance.message });
 
-      await this.sendMessage(output.message);
-      this.recordTurn({ role: "user", content: output.message });
-
-      if (output.status !== "continue") {
-        return pursuitOutcome(output.status);
+      if (utterance.status !== "continue") {
+        return pursuitOutcome(utterance.status);
       }
 
       const reply = await this.receiveMessage();

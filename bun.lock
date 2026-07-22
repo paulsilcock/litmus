@@ -132,6 +132,7 @@
       "name": "@litmus/test",
       "version": "0.0.0",
       "dependencies": {
+        "@litmus/core": "workspace:*",
         "@opentelemetry/api": "^1.9.1",
         "@opentelemetry/context-async-hooks": "^2.7.0",
         "@opentelemetry/core": "^2.7.0",

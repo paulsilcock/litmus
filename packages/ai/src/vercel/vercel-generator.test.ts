@@ -107,4 +107,54 @@ describe("vercelGenerator", () => {
     expect(receivedTools).toContain("Apply a discount code to the cart");
     expect(receivedTools).toContain("code");
   });
+
+  it("tool calls are executed and generation continues to the final output", async () => {
+    const handled: Array<{ code: string }> = [];
+
+    const responses = [
+      {
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: "call_1",
+            toolName: "applyDiscountCode",
+            input: JSON.stringify({ code: "SAVE10" }),
+          },
+        ],
+        finishReason: { unified: "tool-calls" as const, raw: undefined },
+      },
+      {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ answer: "applied" }),
+          },
+        ],
+        finishReason: { unified: "stop" as const, raw: undefined },
+      },
+    ];
+    let callIndex = 0;
+
+    const model = new MockLanguageModelV3({
+      doGenerate: async () => ({ ...mockResult, ...responses[callIndex++] }),
+    });
+
+    const generate = vercelGenerator({ model, schema: outputSchema });
+
+    const output = await generate("Apply the customer's discount code.", {
+      applyDiscountCode: {
+        description: "Apply a discount code to the cart",
+        schema: z.object({ code: z.string() }),
+        handler: {
+          handle: async (input: { code: string }) => {
+            handled.push(input);
+            return { applied: true };
+          },
+        },
+      },
+    });
+
+    expect(handled).toEqual([{ code: "SAVE10" }]);
+    expect(output).toEqual({ answer: "applied" });
+  });
 });
