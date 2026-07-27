@@ -15,7 +15,7 @@ Modern AI apps drift fast. LLM calls scatter through business logic. Evals lag t
 
 **Bounded autonomy.** An `Agent` has a defined scope: the tools it can pick from, the goal it's pursuing. Tools are wrapped use cases, so an agent's reach into the system is the same surface a human or a script would use. The rest of your code never sees an LLM directly.
 
-**TDD-first, including for AI.** Litmus encourages outside-in TDD — [acceptance tests](https://continuous-delivery.co.uk/downloads/ATDD%20Guide%2026-03-21.pdf) on the outside, smaller tests inside. Evaluations are acceptance tests with a probabilistic shell, not a separate testing universe — and they're written the same way, one behaviour at a time as you learn what the system needs to do, never as a battery of guesses up front. The CLI adapter doubles as a fast feedback loop: pipe text at a use case from the terminal and explore an agent's behaviour without standing up a UI.
+**TDD-first, including for AI.** Litmus encourages outside-in TDD — [acceptance tests](https://continuous-delivery.co.uk/downloads/ATDD%20Guide%2026-03-21.pdf) on the outside, smaller tests inside. Evaluations are acceptance tests with a probabilistic shell, not a separate testing universe — and they're written the same way, one behaviour at a time as you learn what the system needs to do. The CLI adapter doubles as a fast feedback loop: pipe text at a use case from the terminal and explore an agent's behaviour without standing up a UI.
 
 ## Architecture
 
@@ -138,7 +138,7 @@ export class IssueRefund extends CommandHandler<
 
 ### Evaluation
 
-When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. The assertion is the same deterministic check of a side effect. The body just runs many times against varied scenarios and asserts a pass rate.
+When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. So are the assertions — here a deterministic check of a side effect, because this goal can be checked that way. The body just runs many times against varied scenarios and asserts a pass rate.
 
 ```ts
 import { evaluate, UserSimulator } from "@litmus/test";
@@ -163,7 +163,8 @@ evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
     });
 
     // The goal, checked deterministically — a replacement order exists.
-    // Nothing here judges tone or phrasing; see "Evaluating AI features".
+    // Properties with no deterministic form need a judge instead;
+    // see "Evaluating AI features".
     await dsl.assertReplacementOrdered({ to: complaint.email });
   },
 );
@@ -290,13 +291,15 @@ And `IssueRefund` doesn't know who's calling it. Human staff in an admin UI hit 
 
 ## Evaluating AI features
 
-**Evals are the same loop, not a specification written up front.** The case against "eval-driven development" is really a case against big design up front — a battery of evals for failure modes nobody has observed, written before the system exists. That was never what driving development with tests meant. TDD is one behaviour at a time, where implementation is itself a form of discovery: each small step teaches you something that changes the next one. Evals run that same loop. A failure you saw yesterday becoming an eval today isn't a departure from eval-driven development, it's the loop working.
+**Write one at a time, as you learn.** Driving development with tests has never meant specifying the finished system in advance. It means writing one test for one behaviour, building until it passes, and letting what you learned there shape the next one — implementation is itself a form of discovery, and small steps are what make it possible to correct course cheaply. Evals are written the same way: the one you can justify today, then the one the system taught you to write. That keeps the design small and every eval grounded in behaviour that turned out to matter.
+
+**Most of a new AI feature isn't the AI.** Shipping one usually means new use cases, new domain rules, new persistence, new entrypoints — ordinary deterministic code, and usually the bulk of the work. That part gets ordinary TDD: fast unit tests, conventional assertions, no sampling and no model calls. Only the non-deterministic boundary needs an eval. Keeping the two apart is what makes the AI-shaped part small enough to reason about, and it leaves most of the feature under a feedback loop that costs nothing to run.
 
 **Day 0: start from a goal, not a guess.** Before there's any real usage you still know one thing — what the feature is for. Write one acceptance test asserting that goal was met from the user's perspective ("a customer can get a refund"), and check it deterministically through a side effect the system already produces. A goal is something you know you need; a failure mode, at this point, is something you'd be inventing. Speculative evals aren't just wasted effort — they encode invented requirements, and the design grows complexity to satisfy behaviour that may never occur in real usage. Starting from the goal gets you to a minimally acceptable implementation faster, and lets the design stay small until something real argues otherwise.
 
 **Then observe.** Every eval after the first is earned by evidence. Production traces are the best source: read them, cluster the failures, and write an eval for a failure you actually saw. If you can't put the feature in front of users yet, put it in front of a domain expert — that's the same loop with an earlier observer, not a licence to speculate. What they reject becomes the next eval, or becomes seeds for `synthesize` to fan out into more scenarios covering a goal you already know matters.
 
-**Prefer deterministic checks; a judge is a narrow escalation.** Deterministic assertions are cheaper, faster, unambiguous, and — unlike a judge — they don't need validating themselves. An LLM judge is another non-deterministic component, which makes it a system under test in its own right: it needs its own evaluation against labels from someone who holds the real quality bar. An unaligned judge is worse than no eval at all, because it applies a standard no expert actually holds, automatically, to every run, and quietly drags the design toward it. When you do reach for one, keep the task narrow and the verdict binary — `llmJudge` enforces a `{ pass, reason }` contract for exactly this reason. "Was the reply empathetic?" can't be answered consistently by two people, let alone by a model. "Did the reply acknowledge the damage before offering a replacement?" can.
+**Prefer deterministic checks; keep judges narrow.** A deterministic assertion is cheaper, faster, unambiguous, and — unlike a judge — doesn't need validating itself, so it's the right default wherever the property can be expressed as one. Plenty can't. Whether a reply acknowledged a problem before proposing a fix, whether a summary introduced a claim its source didn't support — these are real requirements with no deterministic form, and a judge is how you assert them. What matters is remembering that a judge is itself a non-deterministic component, and so a system under test in its own right: it needs its own evaluation against labels from someone who holds the real quality bar. An unaligned judge is worse than no eval, because it applies a standard no expert actually holds, automatically, to every run, and quietly drags the design toward it. Keep each judge to one question with a binary verdict — `llmJudge` enforces a `{ pass, reason }` contract for exactly this reason. "Was the reply empathetic?" can't be answered consistently by two people, let alone by a model. "Did the reply acknowledge the damage before offering a replacement?" can.
 
 ```ts
 import { llmJudge } from "@litmus/test";
