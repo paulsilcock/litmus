@@ -289,9 +289,9 @@ And `IssueRefund` doesn't know who's calling it. Human staff in an admin UI hit 
 
 ## Evaluating AI features
 
-**Write one at a time.** TDD never meant writing every test up front. One behaviour, build until it passes, then decide what's next. Evals work the same way.
+**Small test, minimal implementation, refactor, repeat.** Write one failing test for one behaviour, do the simplest thing that passes it, then improve the design before moving on. The refactor step is what keeps a codebase healthy as it grows, and nothing about an AI feature exempts it. Evals are written in that same loop — the next one comes from what building the last one taught you, not from a list drawn up in advance.
 
-**Most of a new AI feature isn't the AI.** New use cases, domain rules, persistence, entrypoints — ordinary code, usually the bulk of it, and it gets ordinary TDD. Only the non-deterministic boundary needs an eval.
+**A new AI feature is more than LLM calls.** It usually needs new use cases, domain rules, persistence, entrypoints — ordinary code, and usually the bulk of the work. That part gets ordinary TDD. Only the non-deterministic boundary needs an eval.
 
 **Day 0: start from the goal.** With no usage yet, you still know what the feature is for. Write one acceptance test asserting the goal was met from the user's perspective ("a customer can get a refund") and check it deterministically. A failure mode you haven't seen is a guess, and evals for guesses grow the design to satisfy behaviour that may never occur.
 
