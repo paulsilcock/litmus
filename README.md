@@ -5,7 +5,7 @@
 
 Litmus is a TypeScript framework for building reliable AI-powered apps. Most agent frameworks either reinvent or ignore decades of software engineering. Litmus exploits the overlap instead: proven primitives keep the deterministic parts simple, the same primitives make AI components tractable, and one testing discipline covers both deterministic logic and AI behaviour. Agent-as-actor falls out as a natural consequence: AI agents drive the same use cases that fire when a person clicks a button or runs a CLI command — different entrypoint, one system.
 
-> **Agent or workflow?** An "agent" is an LLM choosing its own steps at runtime. It's tempting to personify AI and reach straight for full autonomy, but most features don't need it — at least to begin with. When the steps are known up front, prefer a _workflow_: compose `AiTask`s inside a `CommandHandler` with ordinary control flow. Easier to debug, cheaper, faster, and still tested through the same use case surface. Reach for [`Agent`](#agent) only when the path through the system genuinely can't be enumerated in advance.
+> **Agent or workflow?** An "agent" is an LLM choosing its own steps at runtime. It's tempting to personify AI and reach straight for full autonomy, but most features don't need it — at least to begin with. When the steps are known up front, prefer a _workflow_: compose `AiTask`s inside a `CommandHandler` with ordinary control flow. Easier to debug, cheaper, faster, and still tested through the same use case surface — and easier to evaluate, because a known set of steps gives you a state space you can reason about, where an autonomous loop gives you a different trace every run. Reach for [`Agent`](#agent) only when the path through the system genuinely can't be enumerated in advance.
 
 ## Why Litmus
 
@@ -15,7 +15,7 @@ Modern AI apps drift fast. LLM calls scatter through business logic. Evals lag t
 
 **Bounded autonomy.** An `Agent` has a defined scope: the tools it can pick from, the goal it's pursuing. Tools are wrapped use cases, so an agent's reach into the system is the same surface a human or a script would use. The rest of your code never sees an LLM directly.
 
-**TDD-first, including for AI.** Litmus encourages outside-in TDD — [acceptance tests](https://continuous-delivery.co.uk/downloads/ATDD%20Guide%2026-03-21.pdf) on the outside, smaller tests inside. Evaluations are acceptance tests with a probabilistic shell, not a separate testing universe. The CLI adapter doubles as a fast feedback loop: pipe text at a use case from the terminal and explore an agent's behaviour without standing up a UI.
+**TDD-first, including for AI.** Litmus encourages outside-in TDD — [acceptance tests](https://continuous-delivery.co.uk/downloads/ATDD%20Guide%2026-03-21.pdf) on the outside, smaller tests inside. Evaluations are acceptance tests with a probabilistic shell, not a separate testing universe — and they're written the same way, one behaviour at a time as you learn what the system needs to do, never as a battery of guesses up front. The CLI adapter doubles as a fast feedback loop: pipe text at a use case from the terminal and explore an agent's behaviour without standing up a UI.
 
 ## Architecture
 
@@ -138,7 +138,7 @@ export class IssueRefund extends CommandHandler<
 
 ### Evaluation
 
-When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
+When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. The assertion is the same deterministic check of a side effect. The body just runs many times against varied scenarios and asserts a pass rate.
 
 ```ts
 import { evaluate, UserSimulator } from "@litmus/test";
@@ -157,18 +157,19 @@ evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
       goal: "get a replacement for my damaged book",
     });
 
-    const conversation = await dsl.customerSpeaksToSupport({
+    await dsl.customerSpeaksToSupport({
       email: complaint.email,
       asUser: customer,
     });
 
+    // The goal, checked deterministically — a replacement order exists.
+    // Nothing here judges tone or phrasing; see "Evaluating AI features".
     await dsl.assertReplacementOrdered({ to: complaint.email });
-    await dsl.assertSupportWasEmpathetic(conversation);
   },
 );
 ```
 
-Both deterministic and probabilistic tests run as ordinary tests in CI. Synthesised scenarios are hash-pinned so the suite is reproducible across runs and machines.
+Both deterministic and probabilistic tests run as ordinary tests in CI. Synthesised scenarios are hash-pinned so the suite is reproducible across runs and machines. [Evaluating AI features](#evaluating-ai-features) covers when to write an eval like this one, and what to do when a deterministic assertion can't express what you need.
 
 ### Agent
 
@@ -285,7 +286,33 @@ Two things to notice. The agent can hallucinate, pick the wrong customer, or fab
 
 And `IssueRefund` doesn't know who's calling it. Human staff in an admin UI hit it via an HTTP route, back-office scripts via the CLI, the AI agent via the tool. One implementation, one test surface, no parallel path to bypass a rule from the "agent side".
 
-`packages/test-acceptance` is a fully worked example — domain, use cases, entrypoints, ATDD, and evals end-to-end.
+`packages/test-acceptance` is a worked example — domain, use cases, entrypoints, and ATDD end-to-end.
+
+## Evaluating AI features
+
+**Evals are the same loop, not a specification written up front.** The case against "eval-driven development" is really a case against big design up front — a battery of evals for failure modes nobody has observed, written before the system exists. That was never what driving development with tests meant. TDD is one behaviour at a time, where implementation is itself a form of discovery: each small step teaches you something that changes the next one. Evals run that same loop. A failure you saw yesterday becoming an eval today isn't a departure from eval-driven development, it's the loop working.
+
+**Day 0: start from a goal, not a guess.** Before there's any real usage you still know one thing — what the feature is for. Write one acceptance test asserting that goal was met from the user's perspective ("a customer can get a refund"), and check it deterministically through a side effect the system already produces. A goal is something you know you need; a failure mode, at this point, is something you'd be inventing. Speculative evals aren't just wasted effort — they encode invented requirements, and the design grows complexity to satisfy behaviour that may never occur in real usage. Starting from the goal gets you to a minimally acceptable implementation faster, and lets the design stay small until something real argues otherwise.
+
+**Then observe.** Every eval after the first is earned by evidence. Production traces are the best source: read them, cluster the failures, and write an eval for a failure you actually saw. If you can't put the feature in front of users yet, put it in front of a domain expert — that's the same loop with an earlier observer, not a licence to speculate. What they reject becomes the next eval, or becomes seeds for `synthesize` to fan out into more scenarios covering a goal you already know matters.
+
+**Prefer deterministic checks; a judge is a narrow escalation.** Deterministic assertions are cheaper, faster, unambiguous, and — unlike a judge — they don't need validating themselves. An LLM judge is another non-deterministic component, which makes it a system under test in its own right: it needs its own evaluation against labels from someone who holds the real quality bar. An unaligned judge is worse than no eval at all, because it applies a standard no expert actually holds, automatically, to every run, and quietly drags the design toward it. When you do reach for one, keep the task narrow and the verdict binary — `llmJudge` enforces a `{ pass, reason }` contract for exactly this reason. "Was the reply empathetic?" can't be answered consistently by two people, let alone by a model. "Did the reply acknowledge the damage before offering a replacement?" can.
+
+```ts
+import { llmJudge } from "@litmus/test";
+
+// One question, pass/fail, checkable by a human — so it can be
+// aligned against expert labels before anything depends on it.
+const acknowledgedDamage = llmJudge<string>({
+  model,
+  rubric:
+    "The reply acknowledges the damaged book before offering a replacement.",
+});
+```
+
+**Outside-in, then inward.** The system tier — a whole use case through the DSL, as above — is coarse: it tells you the goal was or wasn't met, and acts as a regression net. When a failure needs localising, drop to the component tier and evaluate a single `AiTask` directly. For multi-turn behaviour the two tiers want different things: simulate the user at the boundary with `UserSimulator`, but at the component tier fix the conversation so far as ordinary input, so an observed failure replays deterministically and cheaply instead of being re-improvised every run. That's why the agent above reads history through a repository rather than a tool — the conversation prefix is infrastructure, and infrastructure is easy to fake.
+
+**When a plateau is architectural.** Sometimes a failure cluster stops responding to prompt changes. That's a signal to change structure rather than keep rewording: decompose into smaller `AiTask`s, push rules into deterministic domain code where they can't be got wrong, fix retrieval, and fine-tune last. The trigger matters as much as the ladder — restructure against a measured cluster that resisted prompting, never against a hunch. Rearchitecting speculatively is the same mistake as writing speculative evals, one level up and considerably more expensive.
 
 ## Packages
 
