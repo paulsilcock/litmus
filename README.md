@@ -63,7 +63,7 @@ Domain events name something important that happened in the domain (`OrderPlaced
 
 ### Acceptance test
 
-This is the bookshop's outermost test — it boots the real app and exercises a customer purchase the way a customer would.
+This is the outermost test of an example bookshop — it boots the real app and exercises a customer purchase the way a customer would.
 
 The `dsl.*` calls are a small domain-specific language — methods named in the user's vocabulary. A protocol driver underneath translates each call into the action a real user would take (clicks in a browser, HTTP requests, CLI invocations). When the implementation changes — a new UI, a different transport, a refactored endpoint — only the driver moves; test code stays stable because it speaks in domain terms, not implementation terms.
 
@@ -94,7 +94,7 @@ it("customer can purchase a book", async () => {
 
 ### Use case
 
-Switching to a different feature — issuing a refund — here's what a use case looks like in code. A `CommandHandler` (or `QueryHandler`) with the input schema co-located, so HTTP routes, CLI commands, and agent tools all share one source of truth.
+Under the DSL, the work happens in use cases. Here's one from later in the same app — issuing a refund — a `CommandHandler` (or `QueryHandler`) with its input schema co-located, so HTTP routes, CLI commands, and agent tools all share one source of truth.
 
 ```ts
 import { CommandHandler } from "@litmus/core";
@@ -135,40 +135,6 @@ export class IssueRefund extends CommandHandler<
   }
 }
 ```
-
-### Evaluation
-
-When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
-
-```ts
-import { evaluate, UserSimulator } from "@litmus/test";
-
-evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
-  "customer gets a replacement when their book arrived damaged",
-  async (complaint) => {
-    await dsl.aCustomerHasOrdered({
-      email: complaint.email,
-      title: complaint.title,
-    });
-
-    const customer = new UserSimulator({
-      model,
-      persona: complaint.persona,
-      goal: "get a replacement for my damaged book",
-    });
-
-    await dsl.customerSpeaksToSupport({
-      email: complaint.email,
-      asUser: customer,
-    });
-
-    // The goal, checked deterministically — a replacement order exists.
-    await dsl.assertReplacementOrdered({ to: complaint.email });
-  },
-);
-```
-
-Both deterministic and probabilistic tests run as ordinary tests in CI. Synthesised scenarios are hash-pinned so the suite is reproducible across runs and machines. [Evaluating AI features](#evaluating-ai-features) covers when to write an eval like this one.
 
 ### Agent
 
@@ -284,6 +250,42 @@ export class SupportAgent extends Agent<
 Two things to notice. The agent can hallucinate, pick the wrong customer, or fabricate a reason — but every refund still goes through `charge.refund()`. The domain enforces the rules; the LLM can be confidently wrong without storing damage.
 
 And `IssueRefund` doesn't know who's calling it. Human staff in an admin UI hit it via an HTTP route, back-office scripts via the CLI, the AI agent via the tool. One implementation, one test surface, no parallel path to bypass a rule from the "agent side".
+
+### Evaluation
+
+That agent is non-deterministic, but testing it doesn't need a separate discipline. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
+
+```ts
+import { evaluate, UserSimulator } from "@litmus/test";
+
+evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
+  "customer gets a replacement when their book arrived damaged",
+  async (complaint) => {
+    await dsl.aCustomerHasOrdered({
+      email: complaint.email,
+      title: complaint.title,
+    });
+
+    const customer = new UserSimulator({
+      model,
+      persona: complaint.persona,
+      goal: "get a replacement for my damaged book",
+    });
+
+    await dsl.customerSpeaksToSupport({
+      email: complaint.email,
+      asUser: customer,
+    });
+
+    // The goal, checked deterministically — a replacement order exists.
+    await dsl.assertReplacementOrdered({ to: complaint.email });
+  },
+);
+```
+
+Both deterministic and probabilistic tests run as ordinary tests in CI. Synthesised scenarios are hash-pinned so the suite is reproducible across runs and machines.
+
+Notice the eval asserts a goal the customer cares about, not a list of ways the agent might misbehave. Writing those up front is the most common way eval suites go wrong. See [Evaluating AI features](#evaluating-ai-features).
 
 `packages/test-acceptance` is a worked example — domain, use cases, entrypoints, and ATDD end-to-end.
 
