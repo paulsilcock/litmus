@@ -1,8 +1,8 @@
-import { useInMemoryTracing } from "@litmus/test";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { describe, expect, it } from "vite-plus/test";
 
 import { DomainError } from "#litmus/domain/domain-error.ts";
+import { captureSpans } from "#litmus/test-support/tracing.ts";
 import { CommandHandler } from "#litmus/use-case/handlers.ts";
 
 describe("use case handlers without tracing configured", () => {
@@ -23,7 +23,7 @@ describe("use case handlers without tracing configured", () => {
 });
 
 describe("use case handlers with tracing configured", () => {
-  const tracing = useInMemoryTracing();
+  const tracing = captureSpans();
 
   it("each handler invocation is individually observable", async () => {
     class PlaceOrder extends CommandHandler<
