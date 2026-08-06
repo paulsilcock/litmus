@@ -253,7 +253,7 @@ And `IssueRefund` doesn't know who's calling it. Human staff in an admin UI hit 
 
 ### Evaluation
 
-That agent is non-deterministic, but testing it doesn't need a separate discipline. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
+That agent is non-deterministic: the same scenario can pass on one run and fail on the next. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
 
 ```ts
 import { evaluate, UserSimulator } from "@litmus/test";
@@ -298,6 +298,8 @@ Notice the eval asserts a goal the customer cares about, not a list of ways the 
 **Day 0: start from the goal.** With no usage yet, you still know what the feature is for. Write one acceptance test asserting the goal was met from the user's perspective ("a customer can get a refund") and check it deterministically. A failure mode you haven't seen is a guess, and evals for guesses grow the design to satisfy behaviour that may never occur.
 
 **Then observe.** Later evals come from failures you've seen: read traces, cluster them, write an eval for one. With no users yet, a domain expert reviewing output is the same loop with an earlier observer. What they reject becomes an eval, or seeds for `synthesize`.
+
+**Scenario sets.** `synthesize` fans hand-written seeds out into a larger set. Seeds describe situations the system will meet, not the responses it should give — the assertions define correctness. Cover the axes that actually vary (user type, complexity, edge cases); a gap in the seeds is a gap in coverage. Start with a handful while the prompt is still moving, and scale up once the eval is stable — more scenarios surface rare failures, more samples per scenario measure reliability on a single input. Commit the generated files.
 
 **Deterministic first, judges where you must.** Deterministic assertions are cheap, fast, and need no validating, so use one wherever the property allows. Some don't — whether a reply acknowledged a problem before proposing a fix, whether a summary invented a claim — and those need a judge. A judge is another non-deterministic component, so it needs its own evaluation against labels from someone who holds the real quality bar; an unaligned one applies a standard no expert holds, on every run. Keep each judge to one question with a binary verdict. "Was the reply empathetic?" won't get a consistent answer from two people. "Did the reply acknowledge the damage before offering a replacement?" will.
 
