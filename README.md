@@ -285,6 +285,8 @@ evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
 
 Both deterministic and probabilistic tests run as ordinary tests in CI. Synthesised scenarios are hash-pinned so the suite is reproducible across runs and machines.
 
+This one is expensive, though: it boots the app, drives a simulated user through a whole conversation, and repeats that twenty times. Keep a handful of these at most — most checks belong closer to the component that failed.
+
 Notice the eval asserts a goal the customer cares about, not a list of ways the agent might misbehave. Writing those up front is the most common way eval suites go wrong. See [Evaluating AI features](#evaluating-ai-features).
 
 `packages/test-acceptance` is a worked example — domain, use cases, entrypoints, and ATDD end-to-end.
@@ -301,7 +303,7 @@ Notice the eval asserts a goal the customer cares about, not a list of ways the 
 
 **Scenario sets.** `synthesize` fans hand-written seeds out into a larger set. Seeds describe situations the system will meet, not the responses it should give — the assertions define correctness. Cover the axes that actually vary (user type, complexity, edge cases); a gap in the seeds is a gap in coverage. Start with a handful while the prompt is still moving, and scale up once the eval is stable — more scenarios surface rare failures, more samples per scenario measure reliability on a single input. Commit the generated files.
 
-**Deterministic first, judges where you must.** Deterministic assertions are cheap, fast, and need no validating, so use one wherever the property allows. Some don't — whether a reply acknowledged a problem before proposing a fix, whether a summary invented a claim — and those need a judge. A judge is another non-deterministic component, so it needs its own evaluation against labels from someone who holds the real quality bar; an unaligned one applies a standard no expert holds, on every run. Keep each judge to one question with a binary verdict. "Was the reply empathetic?" won't get a consistent answer from two people. "Did the reply acknowledge the damage before offering a replacement?" will.
+**Deterministic first, judges where you must.** Deterministic assertions are cheap, fast, and need no validating, so use one wherever the property allows. Some don't — whether a reply acknowledged a problem before proposing a fix, whether a summary invented a claim — and those need a judge. A judge is another non-deterministic component, so it needs its own evaluation against labels from someone who holds the real quality bar — on the order of a hundred labelled examples, kept current as the product moves. Reach for one deliberately: an unaligned judge applies a standard no expert holds, on every run. Keep each judge to one question with a binary verdict. "Was the reply empathetic?" won't get a consistent answer from two people. "Did the reply acknowledge the damage before offering a replacement?" will.
 
 ```ts
 import { llmJudge } from "@litmus/test";
@@ -314,7 +316,7 @@ const acknowledgedDamage = llmJudge<string>({
 });
 ```
 
-**Outside-in, then inward.** The system tier tells you whether the goal was met. To localise a failure, evaluate a single `AiTask`. For multi-turn behaviour, simulate the user at the boundary with `UserSimulator`; at the component tier, fix the conversation so far as input so a known failure replays deterministically.
+**Outside-in, then inward.** A system-tier eval answers whether the goal was met, and it's the most expensive test you can write — a booted app, a simulated conversation, many samples. Keep a few; put the rest closer to the failure, on a single `AiTask`. Most failures don't need the full conversation either: reproduce the simplest version first, and if one turn still fails, context was never the problem. When it genuinely is, replay the real first N-1 turns of the conversation that failed and test what comes next. A real prefix beats a re-simulated one, and it replays deterministically.
 
 **Plateaus are architectural.** When a failure cluster stops responding to prompt changes, change the structure: decompose into smaller `AiTask`s, push rules into domain code, fix retrieval, fine-tune last. Do it against a measured cluster, not a hunch.
 
