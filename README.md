@@ -141,7 +141,8 @@ export class IssueRefund extends CommandHandler<
 When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
 
 ```ts
-import { evaluate, UserSimulator } from "@litmus/test";
+import { vercelGenerator } from "@litmus/ai/vercel";
+import { evaluate, UserSimulator, utteranceSchema } from "@litmus/test";
 
 evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
   "customer gets a replacement when their book arrived damaged",
@@ -151,19 +152,17 @@ evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
       title: complaint.title,
     });
 
-    const customer = new UserSimulator({
-      model,
+    const customer = UserSimulator.text({
+      generateResponse: vercelGenerator({ model, schema: utteranceSchema }),
       persona: complaint.persona,
-      goal: "get a replacement for my damaged book",
+      send: (message) => dsl.customerSaysToSupport(message),
+      receive: () => dsl.supportReplies(),
     });
 
-    const conversation = await dsl.customerSpeaksToSupport({
-      email: complaint.email,
-      asUser: customer,
-    });
+    await customer.pursueGoal("get a replacement for my damaged book");
 
     await dsl.assertReplacementOrdered({ to: complaint.email });
-    await dsl.assertSupportWasEmpathetic(conversation);
+    await dsl.assertSupportWasEmpathetic(await customer.transcript());
   },
 );
 ```

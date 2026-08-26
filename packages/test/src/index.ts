@@ -10,7 +10,13 @@ export {
   llmJudge,
   type LlmJudgeConfig,
 } from "#litmus-test/grader.ts";
-export { UserSimulator } from "#litmus-test/simulator.ts";
+export {
+  type PursuitResult,
+  TextSimulator,
+  UserSimulator,
+  type Utterance,
+  utteranceSchema,
+} from "#litmus-test/simulator.ts";
 export { synthesize, type SynthesizeOptions } from "#litmus-test/synthesize.ts";
 export { useInMemoryTracing } from "#litmus-test/tracing.ts";
 export { evaluate } from "#litmus-test/evaluate/index.ts";

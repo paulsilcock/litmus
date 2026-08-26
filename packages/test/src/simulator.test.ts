@@ -1,310 +1,213 @@
-import { tool } from "ai";
-import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
-import { UserSimulator } from "#litmus-test/simulator.ts";
+import { UserSimulator, type Utterance } from "#litmus-test/simulator.ts";
 
-const mockResult = {
-  usage: {
-    inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
-    outputTokens: { total: 5, text: 5, reasoning: 0 },
-  },
-  warnings: [],
-};
+function scripted(...utterances: Utterance[]) {
+  let index = 0;
+  return async (): Promise<Utterance> => {
+    const utterance = utterances[index++];
+    if (!utterance) throw new Error("ran out of scripted utterances");
+    return utterance;
+  };
+}
 
 describe("UserSimulator", () => {
-  it("uses the provided prompt builder as-is when given", async () => {
-    let captured = "";
-    const model = new MockLanguageModelV3({
-      doGenerate: async ({ prompt }) => {
-        captured = JSON.stringify(prompt);
-        return {
-          ...mockResult,
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ message: "hi", done: true }),
-            },
-          ],
-          finishReason: { unified: "stop", raw: undefined },
-        };
+  it("the simulated user can send scripted messages", async () => {
+    const sent: string[] = [];
+    let generateCalls = 0;
+
+    const customer = UserSimulator.text({
+      generateResponse: async () => {
+        generateCalls++;
+        return { message: "", status: "continue" };
       },
+      persona: "a customer",
+      send: async (message) => {
+        sent.push(message);
+      },
+      receive: async () => "ok",
     });
 
-    const simulator = new UserSimulator({
-      model,
-      prompt: () => "custom-prompt-text",
-    });
+    await customer.write("I want to cancel my subscription");
 
-    await simulator.run({ onMessage: async () => "ok" });
-
-    expect(captured).toContain("custom-prompt-text");
+    expect(sent).toEqual(["I want to cancel my subscription"]);
+    expect(generateCalls).toBe(0);
   });
 
-  it("ends the conversation once the user has the answer they were looking for", async () => {
-    const responses = [
-      { message: "What's my balance?", done: false },
-      { message: "Thanks!", done: true },
-    ];
-    let callIndex = 0;
+  it("the simulated user can read the system's replies", async () => {
+    let generateCalls = 0;
 
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockResult,
-        content: [
-          { type: "text", text: JSON.stringify(responses[callIndex++]) },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
+    const customer = UserSimulator.text({
+      generateResponse: async () => {
+        generateCalls++;
+        return { message: "", status: "continue" };
+      },
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "Hello, how can I help?",
+    });
+
+    const reply = await customer.read();
+
+    expect(reply).toBe("Hello, how can I help?");
+    expect(generateCalls).toBe(0);
+  });
+
+  it("the conversation ends when the simulated user reaches their goal", async () => {
+    const customer = UserSimulator.text({
+      generateResponse: scripted({ message: "Thanks!", status: "goal_met" }),
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "ok",
+    });
+
+    const result = await customer.pursueGoal("get a refund");
+
+    expect(result).toEqual({ met: true, reason: "goal_met" });
+  });
+
+  it("the conversation ends after max turns when the simulated user can't reach their goal", async () => {
+    const customer = UserSimulator.text({
+      generateResponse: async () => ({
+        message: "still trying",
+        status: "continue",
       }),
+      persona: "a determined customer",
+      send: async () => {},
+      receive: async () => "no",
     });
 
-    const simulator = new UserSimulator({
-      model,
-      persona: "Customer checking their account",
-      goal: "Find out my account balance",
+    const result = await customer.pursueGoal("get a refund", { maxTurns: 3 });
+
+    expect(result).toEqual({ met: false, reason: "max_turns" });
+  });
+
+  it("the simulated user abandons a goal it judges unreachable", async () => {
+    const customer = UserSimulator.text({
+      generateResponse: scripted({
+        message: "Never mind, this isn't going to work",
+        status: "abandoned",
+      }),
+      persona: "a discouraged customer",
+      send: async () => {},
+      receive: async () => "we can't help with that",
     });
 
-    const onMessage = async (message: string) => {
-      if (message.toLowerCase().includes("balance")) return "$1250";
-      return "OK";
-    };
+    const result = await customer.pursueGoal("get a refund");
 
-    const conversation = await simulator.run({ onMessage });
+    expect(result).toEqual({ met: false, reason: "abandoned" });
+  });
 
-    expect(conversation.turns).toEqual([
-      { role: "user", content: "What's my balance?" },
-      { role: "assistant", content: "$1250" },
-      { role: "user", content: "Thanks!" },
+  it("the conversation transcript includes turns from an autonomous pursuit", async () => {
+    const customer = UserSimulator.text({
+      generateResponse: scripted(
+        { message: "I'd like a refund please", status: "continue" },
+        { message: "Thanks, got my refund!", status: "goal_met" },
+      ),
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "Here is your refund",
+    });
+
+    await customer.pursueGoal("get a refund");
+
+    const transcript = await customer.transcript();
+
+    expect(transcript).toEqual([
+      { role: "user", content: "I'd like a refund please" },
+      { role: "assistant", content: "Here is your refund" },
+      { role: "user", content: "Thanks, got my refund!" },
     ]);
-    expect(conversation.outcome).toBe("goal_met");
   });
 
-  it("gives up after max turns when the user never reaches their goal", async () => {
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockResult,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ message: "still trying", done: false }),
-          },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
+  it("the simulated user exposes the conversation transcript", async () => {
+    const customer = UserSimulator.text({
+      generateResponse: async () => {
+        throw new Error("no generation expected in this test");
+      },
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "Hello there",
     });
 
-    const simulator = new UserSimulator({
-      model,
-      persona: "Stubborn customer",
-      goal: "Get a refund",
-      maxTurns: 3,
-    });
+    await customer.write("hi");
+    await customer.read();
 
-    const onMessage = async () => "I can't help with that";
+    const transcript = await customer.transcript();
 
-    const conversation = await simulator.run({ onMessage });
-
-    expect(conversation.outcome).toBe("max_turns");
-    expect(conversation.turns).toHaveLength(6);
-    expect(conversation.turns.filter((t) => t.role === "user")).toHaveLength(3);
-    expect(
-      conversation.turns.filter((t) => t.role === "assistant"),
-    ).toHaveLength(3);
+    expect(transcript).toEqual([
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "Hello there" },
+    ]);
   });
 
-  it("ends the conversation when the system terminates it", async () => {
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockResult,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ message: "you're useless", done: false }),
-          },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
-    });
-
-    const simulator = new UserSimulator({
-      model,
-      persona: "Abusive customer",
-      goal: "Win the argument",
-    });
-
-    const onMessage = async () => ({
-      done: true,
-      reason: "abusive language",
-    });
-
-    const conversation = await simulator.run({ onMessage });
-
-    expect(conversation.outcome).toBe("terminated");
-    expect(conversation.turns).toHaveLength(1);
-    expect(conversation.turns[0]).toEqual({
-      role: "user",
-      content: "you're useless",
-    });
-  });
-
-  it("uses the provided opening message instead of generating one", async () => {
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockResult,
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ message: "Great, thanks!", done: true }),
-          },
-        ],
-        finishReason: { unified: "stop", raw: undefined },
-      }),
-    });
-
-    const simulator = new UserSimulator({
-      model,
-      persona: "Customer",
-      goal: "Get my balance",
-    });
-
-    const conversation = await simulator.run({
-      opening: "What's my balance?",
-      onMessage: async () => "$1250",
-    });
-
-    expect(conversation.turns[0]).toEqual({
-      role: "user",
-      content: "What's my balance?",
-    });
-    expect(conversation.turns[1]).toEqual({
-      role: "assistant",
-      content: "$1250",
-    });
-  });
-
-  it("when the SUT speaks first, its opening is recorded and informs the user's first reply", async () => {
-    // `awaitOpening` is how the test author tells the simulator
-    // "wait for the SUT to greet, then start". In a real test this
-    // callback would invoke a DSL/driver method that knows how to
-    // detect the SUT's first message; here we stub it.
+  it("a simulated user remembers prior conversation when interacting", async () => {
     let capturedPrompt = "";
-    const model = new MockLanguageModelV3({
-      doGenerate: async ({ prompt }) => {
+
+    const customer = UserSimulator.text({
+      generateResponse: async (prompt) => {
         capturedPrompt = JSON.stringify(prompt);
-        return {
-          ...mockResult,
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                message: "I'd like to book a flight",
-                done: true,
-              }),
-            },
-          ],
-          finishReason: { unified: "stop", raw: undefined },
-        };
+        return { message: "ok", status: "goal_met" };
       },
+      persona: "a customer",
+      send: async () => {},
+      receive: async () => "We can offer store credit",
     });
 
-    const simulator = new UserSimulator({
-      model,
-      persona: "Customer needing to book a flight",
-      goal: "Book a flight to Tokyo",
-    });
+    await customer.write("I bought a faulty product");
+    await customer.read();
+    await customer.pursueGoal("get a refund");
 
-    const conversation = await simulator.run({
-      // Stand-in for `dsl.agent.respondsWith()` — anything that
-      // resolves once the SUT has spoken.
-      awaitOpening: async () => "Hello, how can I help you today?",
-      onMessage: async () => ({ done: true, reason: "test complete" }),
-    });
-
-    expect(conversation.turns).toEqual([
-      { role: "assistant", content: "Hello, how can I help you today?" },
-      { role: "user", content: "I'd like to book a flight" },
-    ]);
-    // The opening reaches the prompt context, so the user's reply
-    // is grounded in what the SUT actually said.
-    expect(capturedPrompt).toContain("Hello, how can I help you today?");
+    expect(capturedPrompt).toContain("I bought a faulty product");
+    expect(capturedPrompt).toContain("We can offer store credit");
   });
 
-  it("simulated user can take actions via tools before responding", async () => {
-    const toolCalls: Array<{ code: string }> = [];
+  it("a custom prompt overrides the persona-and-goal default", async () => {
+    let capturedPrompt = "";
 
-    const responses = [
-      {
-        content: [
-          {
-            type: "tool-call" as const,
-            toolCallId: "call_1",
-            toolName: "apply_discount",
-            input: JSON.stringify({ code: "SAVE10" }),
-          },
-        ],
-        finishReason: { unified: "tool-calls" as const, raw: undefined },
+    const customer = UserSimulator.text({
+      generateResponse: async (prompt) => {
+        capturedPrompt = JSON.stringify(prompt);
+        return { message: "ok", status: "goal_met" };
       },
-      {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              message: "I've applied my discount code, what's the total?",
-              done: false,
-            }),
-          },
-        ],
-        finishReason: { unified: "stop" as const, raw: undefined },
-      },
-      {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({ message: "Thanks!", done: true }),
-          },
-        ],
-        finishReason: { unified: "stop" as const, raw: undefined },
-      },
-    ];
-    let callIndex = 0;
-
-    const model = new MockLanguageModelV3({
-      doGenerate: async () => ({
-        ...mockResult,
-        ...responses[callIndex++],
-      }),
+      prompt: () => "custom-prompt-text",
+      send: async () => {},
+      receive: async () => "ok",
     });
 
-    const simulator = new UserSimulator({
-      model,
-      persona: "Bargain hunter",
-      goal: "Apply discount code and check total",
-      tools: {
-        apply_discount: tool({
-          description: "Apply a discount code",
-          inputSchema: z.object({ code: z.string() }),
-          execute: async ({ code }) => {
-            toolCalls.push({ code });
-            return { applied: true };
-          },
-        }),
+    await customer.pursueGoal("some goal");
+
+    expect(capturedPrompt).toContain("custom-prompt-text");
+  });
+
+  it("the simulated user's abilities are available on every turn of a pursuit", async () => {
+    const offeredTools: string[][] = [];
+
+    const customer = UserSimulator.text({
+      generateResponse: async (_prompt, tools) => {
+        offeredTools.push(Object.keys(tools ?? {}));
+        return offeredTools.length < 2
+          ? { message: "looking...", status: "continue" }
+          : { message: "Done!", status: "goal_met" };
       },
+      persona: "a customer",
+      abilities: {
+        applyDiscountCode: {
+          description: "Apply a discount code to their cart",
+          schema: z.object({ code: z.string() }),
+          handler: { handle: async () => ({ applied: true }) },
+        },
+      },
+      send: async () => {},
+      receive: async () => "ok",
     });
 
-    const conversation = await simulator.run({
-      onMessage: async () => "$45.00",
-    });
+    await customer.pursueGoal("apply discount and confirm");
 
-    expect(toolCalls).toEqual([{ code: "SAVE10" }]);
-    expect(conversation.turns).toEqual([
-      {
-        role: "user",
-        content: "I've applied my discount code, what's the total?",
-      },
-      { role: "assistant", content: "$45.00" },
-      { role: "user", content: "Thanks!" },
+    expect(offeredTools).toEqual([
+      ["applyDiscountCode"],
+      ["applyDiscountCode"],
     ]);
-    expect(conversation.outcome).toBe("goal_met");
   });
 });

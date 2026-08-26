@@ -47,7 +47,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@litmus/test": "workspace:*",
     "@opentelemetry/context-async-hooks": "^2.7.0",
     "@opentelemetry/sdk-trace-base": "^2.7.0",
     "@types/node": "catalog:",
