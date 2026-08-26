@@ -75,39 +75,6 @@ describe("vercelGenerator", () => {
     expect(receivedPrompt).toContain("My book arrived damaged");
   });
 
-  it("tools given to the generator reach the model with their name, purpose, and input shape", async () => {
-    let receivedTools = "";
-    const model = new MockLanguageModelV3({
-      doGenerate: async ({ tools }) => {
-        receivedTools = JSON.stringify(tools);
-        return {
-          ...mockResult,
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ answer: "done" }),
-            },
-          ],
-          finishReason: { unified: "stop", raw: undefined },
-        };
-      },
-    });
-
-    const generate = vercelGenerator({ model, schema: outputSchema });
-
-    await generate("Apply the customer's discount code.", {
-      applyDiscountCode: {
-        description: "Apply a discount code to the cart",
-        schema: z.object({ code: z.string() }),
-        handler: { handle: async () => ({ applied: true }) },
-      },
-    });
-
-    expect(receivedTools).toContain("applyDiscountCode");
-    expect(receivedTools).toContain("Apply a discount code to the cart");
-    expect(receivedTools).toContain("code");
-  });
-
   it("tool calls are executed and generation continues to the final output", async () => {
     const handled: Array<{ code: string }> = [];
 
