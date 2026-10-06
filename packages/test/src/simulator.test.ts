@@ -115,9 +115,9 @@ describe("UserSimulator", () => {
     const transcript = await customer.transcript();
 
     expect(transcript).toEqual([
-      { role: "user", content: "I'd like a refund please" },
-      { role: "assistant", content: "Here is your refund" },
-      { role: "user", content: "Thanks, got my refund!" },
+      { speaker: "simulatedUser", content: "I'd like a refund please" },
+      { speaker: "systemUnderTest", content: "Here is your refund" },
+      { speaker: "simulatedUser", content: "Thanks, got my refund!" },
     ]);
   });
 
@@ -137,8 +137,8 @@ describe("UserSimulator", () => {
     const transcript = await customer.transcript();
 
     expect(transcript).toEqual([
-      { role: "user", content: "hi" },
-      { role: "assistant", content: "Hello there" },
+      { speaker: "simulatedUser", content: "hi" },
+      { speaker: "systemUnderTest", content: "Hello there" },
     ]);
   });
 
@@ -179,6 +179,32 @@ describe("UserSimulator", () => {
     await customer.pursueGoal("some goal");
 
     expect(capturedPrompt).toContain("custom-prompt-text");
+  });
+
+  it("a custom prompt can respond to what the system under test just said", async () => {
+    let received: unknown;
+
+    const customer = UserSimulator.text({
+      generateResponse: async () => ({ message: "ok", status: "goal_met" }),
+      prompt: (input) => {
+        received = input;
+        return "custom";
+      },
+      send: async () => {},
+      receive: async () => "We can offer store credit",
+    });
+
+    await customer.write("I bought a faulty product");
+    await customer.read();
+    await customer.pursueGoal("get a refund");
+
+    expect(received).toEqual({
+      newReply: "We can offer store credit",
+      previousTurns: [
+        { speaker: "simulatedUser", content: "I bought a faulty product" },
+      ],
+      goal: "get a refund",
+    });
   });
 
   it("the simulated user's abilities are available on every turn of a pursuit", async () => {

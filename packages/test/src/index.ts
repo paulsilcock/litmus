@@ -10,7 +10,9 @@ export {
   llmJudge,
   type LlmJudgeConfig,
 } from "#litmus-test/grader.ts";
+export { type Turn } from "#litmus-test/conversation.ts";
 export {
+  type PromptInput,
   type PursuitResult,
   TextSimulator,
   UserSimulator,

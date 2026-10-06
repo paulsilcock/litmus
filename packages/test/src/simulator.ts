@@ -1,10 +1,7 @@
 import type { GenerationFunction, Tool } from "@litmus/core/ai";
 import { z } from "zod";
 
-interface Turn {
-  role: "user" | "assistant";
-  content: string;
-}
+import { Conversation, type Turn } from "#litmus-test/conversation.ts";
 
 export const utteranceSchema = z.object({
   message: z.string(),
@@ -13,6 +10,18 @@ export const utteranceSchema = z.object({
 
 /** What the simulated user says next, and how the pursuit should proceed. */
 export type Utterance = z.infer<typeof utteranceSchema>;
+
+/**
+ * What a prompt is built from on each turn of a pursuit. `newReply` is
+ * what the system under test just said, and is not repeated in
+ * `previousTurns`; it's empty when the simulated user spoke last or the
+ * conversation hasn't started.
+ */
+export interface PromptInput {
+  newReply: string;
+  previousTurns: readonly Turn[];
+  goal: string;
+}
 
 type BaseOptions = {
   /**
@@ -29,8 +38,17 @@ type BaseOptions = {
    */
   abilities?: Record<string, Tool<any>>;
 } & (
-  | { persona: string }
-  | { prompt: (turns: readonly Turn[], goal: string) => string }
+  | {
+      /** Who the simulated user is. Used to build the default prompt. */
+      persona: string;
+    }
+  | {
+      /**
+       * Replaces the default prompt entirely. Called on every turn of a
+       * pursuit with the conversation so far.
+       */
+      prompt: (input: PromptInput) => string;
+    }
 );
 
 export type TextOptions = BaseOptions & {
@@ -51,11 +69,16 @@ function pursuitOutcome(reason: PursuitOutcome): PursuitResult {
 
 function defaultPrompt(
   persona: string,
-  goal: string,
-  turns: readonly Turn[],
+  { newReply, previousTurns, goal }: PromptInput,
 ): string {
-  const history = turns
-    .map((t) => `${t.role === "user" ? "You" : "Assistant"}: ${t.content}`)
+  const said: readonly Turn[] = newReply
+    ? [...previousTurns, { speaker: "systemUnderTest", content: newReply }]
+    : previousTurns;
+  const history = said
+    .map(
+      (t) =>
+        `${t.speaker === "simulatedUser" ? "You" : "Assistant"}: ${t.content}`,
+    )
     .join("\n");
 
   return `You are simulating a user with the following persona: ${persona}
@@ -74,8 +97,8 @@ Decide your next message and set status to:
 export abstract class UserSimulator {
   readonly #generateResponse: GenerationFunction<Utterance>;
   readonly #abilities?: Record<string, Tool<any>>;
-  readonly #turns: Turn[] = [];
-  readonly #buildPrompt: (turns: readonly Turn[], goal: string) => string;
+  readonly #conversation = new Conversation();
+  readonly #buildPrompt: (input: PromptInput) => string;
 
   constructor(options: BaseOptions) {
     this.#generateResponse = options.generateResponse;
@@ -83,18 +106,22 @@ export abstract class UserSimulator {
     this.#buildPrompt =
       "prompt" in options
         ? options.prompt
-        : (turns, goal) => defaultPrompt(options.persona, goal, turns);
+        : (input) => defaultPrompt(options.persona, input);
   }
 
   protected abstract sendMessage(message: string): Promise<void>;
   protected abstract receiveMessage(): Promise<string>;
 
   protected recordTurn(turn: Turn): void {
-    this.#turns.push(turn);
+    this.#conversation.add(turn);
   }
 
+  /**
+   * Everything said so far by the simulated user and the system under
+   * test, in order — scripted and autonomous turns alike.
+   */
   async transcript(): Promise<readonly Turn[]> {
-    return [...this.#turns];
+    return this.#conversation.turns();
   }
 
   async pursueGoal(
@@ -105,19 +132,23 @@ export abstract class UserSimulator {
 
     for (let i = 0; i < maxTurns; i++) {
       const utterance = await this.#generateResponse(
-        this.#buildPrompt(this.#turns, goal),
+        this.#buildPrompt({
+          newReply: this.#conversation.latestReply(),
+          previousTurns: this.#conversation.previousTurns(),
+          goal,
+        }),
         this.#abilities,
       );
 
       await this.sendMessage(utterance.message);
-      this.recordTurn({ role: "user", content: utterance.message });
+      this.recordTurn({ speaker: "simulatedUser", content: utterance.message });
 
       if (utterance.status !== "continue") {
         return pursuitOutcome(utterance.status);
       }
 
       const reply = await this.receiveMessage();
-      this.recordTurn({ role: "assistant", content: reply });
+      this.recordTurn({ speaker: "systemUnderTest", content: reply });
     }
 
     return pursuitOutcome("max_turns");
@@ -148,12 +179,12 @@ export class TextSimulator extends UserSimulator {
 
   async write(message: string): Promise<void> {
     await this.#send(message);
-    this.recordTurn({ role: "user", content: message });
+    this.recordTurn({ speaker: "simulatedUser", content: message });
   }
 
   async read(): Promise<string> {
     const reply = await this.#receive();
-    this.recordTurn({ role: "assistant", content: reply });
+    this.recordTurn({ speaker: "systemUnderTest", content: reply });
     return reply;
   }
 }
