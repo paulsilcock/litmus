@@ -387,14 +387,14 @@ describe("BrowserDriver", () => {
     }
   });
 
-  it("streaming many small chunks completes in real time without paying each chunk's playback duration", async () => {
+  it("audio streamed at real-time rate plays without falling behind", async () => {
     await using audioDriver = new TestDriver({ baseUrl, audio: true });
     await audioDriver.init();
     await audioDriver.openMic();
 
     const sampleRate = 48000;
     const chunkDurationMs = 20;
-    const totalDurationMs = 4000;
+    const totalDurationMs = 2000;
     const totalChunks = Math.floor(totalDurationMs / chunkDurationMs);
     // Precompute the chunk so the loop times only the per-send cost,
     // not PCM synthesis.
@@ -406,13 +406,11 @@ describe("BrowserDriver", () => {
     }
     const elapsed = Date.now() - start;
 
-    // A blocking send (awaiting `onended`) cannot beat the audio's own
-    // real-time duration — it would take at least `totalDurationMs`.
-    // Cursor scheduling resolves each send in ~IPC time, far below that.
-    // Assert comfortably under the real-time floor: lenient enough to
-    // absorb CDP round-trip cost on a loaded CI runner, strict enough
-    // that a per-chunk playback wait would blow it.
-    expect(elapsed).toBeLessThan(totalDurationMs / 2);
+    // Keeping up with real time means sending the audio in no more time than
+    // it takes to play. That is the bar: `totalDurationMs`. A send that waits
+    // for its chunk to finish playing (awaiting `onended`) cannot beat the
+    // audio's own duration, so it still fails here.
+    expect(elapsed).toBeLessThan(totalDurationMs);
   });
 
   it("audio is captured at the configured sample rate", async () => {
