@@ -103,7 +103,7 @@ export function register({
  * of batches), then add a fixed slack so vitest doesn't time out the
  * test before our own per-run timeouts surface a clear error.
  */
-function totalTimeout(
+export function totalTimeout(
   perRun: number | undefined,
   runs: number,
   concurrent: boolean,
@@ -114,6 +114,6 @@ function totalTimeout(
   // surfaces as the failure cause rather than vitest's own cap.
   const SLACK_MS = 10_000;
   return concurrent
-    ? perRun * Math.ceil(runs / concurrency) + SLACK_MS
+    ? perRun * Math.max(1, Math.ceil(runs / concurrency)) + SLACK_MS
     : perRun * runs + SLACK_MS;
 }
