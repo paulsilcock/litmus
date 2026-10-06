@@ -1,8 +1,8 @@
-import { useInMemoryTracing } from "@litmus/test";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
 import { Agent, Toolbox } from "#litmus/ai.ts";
+import { captureSpans } from "#litmus/test-support/tracing.ts";
 
 const schema = z.object({ id: z.string() });
 
@@ -68,7 +68,7 @@ describe("Toolbox", () => {
 });
 
 describe("agent tracing", () => {
-  const tracing = useInMemoryTracing();
+  const tracing = captureSpans();
 
   it("each agent run is individually observable", async () => {
     class DisputeAgent extends Agent<{ message: string }, string> {

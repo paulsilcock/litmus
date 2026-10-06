@@ -1,12 +1,11 @@
-import type { ToolSelection } from "@litmus/core/ai";
+import { type Tool as SystemTool, ToolSelection } from "@litmus/core/ai";
 import { tool, type Tool } from "ai";
 
 /**
- * Converts a {@link ToolSelection} to a record of Vercel AI SDK
+ * Converts system tools — a {@link ToolSelection} from
+ * {@link Toolbox.pick}, or a plain record of tools — to Vercel AI SDK
  * compatible tools, suitable for passing to `generateText` or
  * `streamText`.
- *
- * @param selection - A scoped subset of tools from {@link Toolbox.pick}.
  *
  * @example
  * ```typescript
@@ -22,9 +21,16 @@ import { tool, type Tool } from "ai";
  * });
  * ```
  */
-export function toVercelTools(selection: ToolSelection): Record<string, Tool> {
+export function toVercelTools(
+  systemTools: ToolSelection | Record<string, SystemTool<any>>,
+): Record<string, Tool> {
+  const entries =
+    systemTools instanceof ToolSelection
+      ? systemTools.entries()
+      : Object.entries(systemTools);
+
   const tools: Record<string, Tool> = {};
-  for (const [name, entry] of selection.entries()) {
+  for (const [name, entry] of entries) {
     tools[name] = tool({
       description: entry.description,
       inputSchema: entry.schema,

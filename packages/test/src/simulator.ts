@@ -1,71 +1,84 @@
-import {
-  generateText,
-  type LanguageModel,
-  Output,
-  stepCountIs,
-  type ToolSet,
-} from "ai";
+import type { GenerationFunction, Tool } from "@litmus/core/ai";
 import { z } from "zod";
 
-type UserSimulatorOptions =
+import { Conversation, type Turn } from "#litmus-test/conversation.ts";
+
+export const utteranceSchema = z.object({
+  message: z.string(),
+  status: z.enum(["continue", "goal_met", "abandoned"] as const),
+});
+
+/** What the simulated user says next, and how the pursuit should proceed. */
+export type Utterance = z.infer<typeof utteranceSchema>;
+
+/**
+ * What a prompt is built from on each turn of a pursuit. `newReply` is
+ * what the system under test just said, and is not repeated in
+ * `previousTurns`; it's empty when the simulated user spoke last or the
+ * conversation hasn't started.
+ */
+export interface PromptInput {
+  newReply: string;
+  previousTurns: readonly Turn[];
+  goal: string;
+}
+
+type BaseOptions = {
+  /**
+   * Generates the simulated user's next utterance from the prompt the
+   * simulator assembles each turn. Back it with a model (e.g.
+   * `vercelGenerator({ model, schema: utteranceSchema })` from
+   * `@litmus/ai/vercel`) or a plain function in tests.
+   */
+  generateResponse: GenerationFunction<Utterance>;
+  /**
+   * Domain actions the simulated user can take beyond talking — e.g.
+   * apply a discount code, look up an order — wired by the test to DSL
+   * methods. Offered to the generator on every turn.
+   */
+  abilities?: Record<string, Tool<any>>;
+} & (
   | {
-      model: LanguageModel;
+      /** Who the simulated user is. Used to build the default prompt. */
       persona: string;
-      goal: string;
-      maxTurns?: number;
-      tools?: ToolSet;
     }
   | {
-      model: LanguageModel;
-      prompt: (turns: readonly Turn[]) => string;
-      maxTurns?: number;
-      tools?: ToolSet;
-    };
+      /**
+       * Replaces the default prompt entirely. Called on every turn of a
+       * pursuit with the conversation so far.
+       */
+      prompt: (input: PromptInput) => string;
+    }
+);
 
-/** Response from the message callback — either a text reply or a termination signal. */
-type MessageResponse = string | { done: boolean; reason: string };
+export type TextOptions = BaseOptions & {
+  send: (message: string) => Promise<void>;
+  receive: () => Promise<string>;
+};
 
-/** Callback invoked when the simulated user sends a message. */
-type OnMessageCallback = (message: string) => Promise<MessageResponse>;
+type PursuitOutcome = "goal_met" | "abandoned" | "max_turns";
 
-interface RunInput {
-  /** Optional first message. If omitted, the LLM generates one from the persona and goal. */
-  opening?: string;
-  /**
-   * Async callback that resolves once the SUT has emitted its first
-   * message. The returned string is recorded as the assistant's
-   * opening turn and included in the prompt context for the user's
-   * first reply. Use this when the SUT initiates the conversation —
-   * typically wired through a DSL/driver method that knows how to
-   * detect the SUT's first response.
-   */
-  awaitOpening?: () => Promise<string>;
-  /** Called each time the simulated user sends a message. Return a string to continue, or `{ done, reason }` to end the conversation. */
-  onMessage: OnMessageCallback;
+export interface PursuitResult {
+  met: boolean;
+  reason: PursuitOutcome;
 }
 
-interface Turn {
-  role: "user" | "assistant";
-  content: string;
+function pursuitOutcome(reason: PursuitOutcome): PursuitResult {
+  return { met: reason === "goal_met", reason };
 }
-
-interface Conversation {
-  turns: Turn[];
-  outcome: "goal_met" | "max_turns" | "terminated";
-}
-
-const userResponseSchema = z.object({
-  message: z.string(),
-  done: z.boolean(),
-});
 
 function defaultPrompt(
   persona: string,
-  goal: string,
-  turns: readonly Turn[],
+  { newReply, previousTurns, goal }: PromptInput,
 ): string {
-  const history = turns
-    .map((t) => `${t.role === "user" ? "You" : "Assistant"}: ${t.content}`)
+  const said: readonly Turn[] = newReply
+    ? [...previousTurns, { speaker: "systemUnderTest", content: newReply }]
+    : previousTurns;
+  const history = said
+    .map(
+      (t) =>
+        `${t.speaker === "simulatedUser" ? "You" : "Assistant"}: ${t.content}`,
+    )
     .join("\n");
 
   return `You are simulating a user with the following persona: ${persona}
@@ -75,103 +88,103 @@ Your goal: ${goal}
 Conversation so far:
 ${history || "(none yet)"}
 
-Decide your next message and whether your goal has been met.`;
+Decide your next message and set status to:
+- "goal_met" if your goal has been achieved
+- "abandoned" if you judge the goal is unreachable (e.g. the system keeps refusing or is unable to help)
+- "continue" to keep the conversation going`;
 }
 
-/**
- * Simulates a user interacting with whatever is being tested —
- * an agent, a use case, or a full system. Uses an LLM to generate
- * realistic user messages driving multi-turn conversations.
- *
- * Two modes:
- * - **Persona/goal** (simple): supply `persona` and `goal`; the
- *   simulator builds a default prompt per turn.
- * - **Prompt** (full control): supply `prompt: (turns) => string`;
- *   you own the entire prompt. The simulator still enforces the
- *   `{ message, done }` output contract.
- *
- * @example
- * ```typescript
- * const simulator = new UserSimulator({
- *   model: anthropic("claude-haiku-4-5-20251001"),
- *   persona: "Impatient customer who types in lowercase",
- *   goal: "Get a refund for a duplicate charge",
- * });
- *
- * const conversation = await simulator.run({
- *   onMessage: async (message) => agent.run(message),
- * });
- *
- * expect(conversation.outcome).toBe("goal_met");
- * ```
- */
-export class UserSimulator {
-  readonly #model: LanguageModel;
-  readonly #buildPrompt: (turns: readonly Turn[]) => string;
-  readonly #maxTurns: number;
-  readonly #tools: ToolSet | undefined;
+export abstract class UserSimulator {
+  readonly #generateResponse: GenerationFunction<Utterance>;
+  readonly #abilities?: Record<string, Tool<any>>;
+  readonly #conversation = new Conversation();
+  readonly #buildPrompt: (input: PromptInput) => string;
 
-  constructor(options: UserSimulatorOptions) {
-    this.#model = options.model;
-    this.#maxTurns = options.maxTurns ?? 10;
-    this.#tools = options.tools;
+  constructor(options: BaseOptions) {
+    this.#generateResponse = options.generateResponse;
+    this.#abilities = options.abilities;
     this.#buildPrompt =
       "prompt" in options
         ? options.prompt
-        : (turns) => defaultPrompt(options.persona, options.goal, turns);
+        : (input) => defaultPrompt(options.persona, input);
+  }
+
+  protected abstract sendMessage(message: string): Promise<void>;
+  protected abstract receiveMessage(): Promise<string>;
+
+  protected recordTurn(turn: Turn): void {
+    this.#conversation.add(turn);
   }
 
   /**
-   * Run the simulation. The simulated user sends messages via
-   * the LLM, and `onMessage` passes each message to whatever
-   * is being tested and returns its response.
-   *
-   * @param input.opening - Optional first message from the user.
-   * @param input.onMessage - Callback that receives user messages
-   *   and returns a response. Return a string to continue the
-   *   conversation, or `{ done, reason }` to terminate it.
-   * @returns The conversation transcript and outcome.
+   * Everything said so far by the simulated user and the system under
+   * test, in order — scripted and autonomous turns alike.
    */
-  async run(input: RunInput): Promise<Conversation> {
-    const turns: Turn[] = [];
+  async transcript(): Promise<readonly Turn[]> {
+    return this.#conversation.turns();
+  }
 
-    if (input.awaitOpening) {
-      const opening = await input.awaitOpening();
-      turns.push({ role: "assistant", content: opening });
+  async pursueGoal(
+    goal: string,
+    opts: { maxTurns?: number } = {},
+  ): Promise<PursuitResult> {
+    const maxTurns = opts.maxTurns ?? 10;
+
+    for (let i = 0; i < maxTurns; i++) {
+      const utterance = await this.#generateResponse(
+        this.#buildPrompt({
+          newReply: this.#conversation.latestReply(),
+          previousTurns: this.#conversation.previousTurns(),
+          goal,
+        }),
+        this.#abilities,
+      );
+
+      await this.sendMessage(utterance.message);
+      this.recordTurn({ speaker: "simulatedUser", content: utterance.message });
+
+      if (utterance.status !== "continue") {
+        return pursuitOutcome(utterance.status);
+      }
+
+      const reply = await this.receiveMessage();
+      this.recordTurn({ speaker: "systemUnderTest", content: reply });
     }
 
-    for (let i = 0; i < this.#maxTurns; i++) {
-      let userMessage: string;
-      let done: boolean;
+    return pursuitOutcome("max_turns");
+  }
 
-      if (i === 0 && input.opening) {
-        userMessage = input.opening;
-        done = false;
-      } else {
-        const result = await generateText({
-          model: this.#model,
-          prompt: this.#buildPrompt(turns),
-          output: Output.object({ schema: userResponseSchema }),
-          tools: this.#tools,
-          stopWhen: this.#tools ? stepCountIs(this.#maxTurns) : undefined,
-        });
-        userMessage = result.output.message;
-        done = result.output.done;
-      }
+  static text(options: TextOptions): TextSimulator {
+    return new TextSimulator(options);
+  }
+}
 
-      turns.push({ role: "user", content: userMessage });
+export class TextSimulator extends UserSimulator {
+  readonly #send: (message: string) => Promise<void>;
+  readonly #receive: () => Promise<string>;
 
-      if (done) {
-        return { turns, outcome: "goal_met" };
-      }
+  constructor(options: TextOptions) {
+    super(options);
+    this.#send = options.send;
+    this.#receive = options.receive;
+  }
 
-      const response = await input.onMessage(userMessage);
-      if (typeof response !== "string") {
-        return { turns, outcome: "terminated" };
-      }
-      turns.push({ role: "assistant", content: response });
-    }
+  protected async sendMessage(message: string): Promise<void> {
+    return this.#send(message);
+  }
 
-    return { turns, outcome: "max_turns" };
+  protected async receiveMessage(): Promise<string> {
+    return this.#receive();
+  }
+
+  async write(message: string): Promise<void> {
+    await this.#send(message);
+    this.recordTurn({ speaker: "simulatedUser", content: message });
+  }
+
+  async read(): Promise<string> {
+    const reply = await this.#receive();
+    this.recordTurn({ speaker: "systemUnderTest", content: reply });
+    return reply;
   }
 }

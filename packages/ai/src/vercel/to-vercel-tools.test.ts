@@ -27,6 +27,28 @@ describe("toVercelTools", () => {
     expect(tools.getBalance).toHaveProperty("execute");
   });
 
+  it("tools supplied as a plain record convert the same as a selection", async () => {
+    const tools = toVercelTools({
+      getBalance: {
+        description: "Get account balance",
+        schema,
+        handler: new GetBalance(),
+      },
+    });
+
+    expect(tools).toHaveProperty("getBalance");
+    const execute = tools.getBalance!.execute;
+    expect(execute).toBeDefined();
+
+    if (execute) {
+      const result = await execute(
+        { id: "acc_123" },
+        { toolCallId: "call_1", messages: [] },
+      );
+      expect(result).toEqual({ balance: 100 });
+    }
+  });
+
   it("tool execute delegates to the handler", async () => {
     const selection = new Toolbox()
       .tool("getBalance", GetBalance, schema, {
