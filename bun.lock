@@ -147,6 +147,7 @@
         "@types/node": "catalog:",
         "@types/ws": "catalog:",
         "ai": "catalog:",
+        "cloudflared": "catalog:",
         "hono": "catalog:",
         "playwright": "catalog:",
         "reflect-metadata": "catalog:",
@@ -154,8 +155,12 @@
       },
       "peerDependencies": {
         "ai": "catalog:",
+        "cloudflared": "catalog:",
         "playwright": "catalog:",
       },
+      "optionalPeers": [
+        "cloudflared",
+      ],
     },
     "packages/test-acceptance": {
       "name": "@litmus/test-acceptance",
@@ -191,6 +196,7 @@
     "@types/node": "25.5.0",
     "@types/ws": "8.18.1",
     "ai": "6.0.0",
+    "cloudflared": "0.7.3",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
     "hono": "4.12.10",
@@ -459,6 +465,8 @@
     "buffer-from": ["buffer-from@1.1.2", "", {}, "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ=="],
 
     "cac": ["cac@7.0.0", "", {}, "sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ=="],
+
+    "cloudflared": ["cloudflared@0.7.3", "", { "bin": { "cloudflared": "./lib/cloudflared.js" } }, "sha512-dR4QMS4PbD287QqOV/vAoE1BcQCXphLOVrN9vjNUgkLrPDA5qxn9Dz0VId0P7/Czj4Mxu3hoLgbrVx5OtOWr5Q=="],
 
     "cross-spawn": ["cross-spawn@7.0.6", "", { "dependencies": { "path-key": "^3.1.0", "shebang-command": "^2.0.0", "which": "^2.0.1" } }, "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA=="],
 
