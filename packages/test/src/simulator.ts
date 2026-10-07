@@ -2,6 +2,10 @@ import type { GenerationFunction, Tool } from "@litmus/core/ai";
 import { z } from "zod";
 
 import { Conversation, type Turn } from "#litmus-test/conversation.ts";
+import {
+  type VoiceOptions,
+  VoiceSimulator,
+} from "#litmus-test/voice-simulator.ts";
 
 export const utteranceSchema = z.object({
   message: z.string(),
@@ -156,6 +160,11 @@ export abstract class UserSimulator {
 
   static text(options: TextOptions): TextSimulator {
     return new TextSimulator(options);
+  }
+
+  /** A simulated user that speaks, through a voice model. */
+  static voice(options: VoiceOptions): VoiceSimulator {
+    return new VoiceSimulator(options);
   }
 }
 

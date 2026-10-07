@@ -20,5 +20,9 @@ export {
   utteranceSchema,
 } from "#litmus-test/simulator.ts";
 export { synthesize, type SynthesizeOptions } from "#litmus-test/synthesize.ts";
+export {
+  type VoiceOptions,
+  VoiceSimulator,
+} from "#litmus-test/voice-simulator.ts";
 export { useInMemoryTracing } from "#litmus-test/tracing.ts";
 export { evaluate } from "#litmus-test/evaluate/index.ts";

@@ -102,6 +102,12 @@ export interface Message {
   content: string;
 }
 
+/** Audio as raw samples at a given rate. */
+export interface Audio {
+  samples: number[];
+  sampleRate: number;
+}
+
 /** A fully-resolved prompt: either flat text or role-tagged messages. */
 export type Prompt = string | readonly Message[];
 
@@ -116,6 +122,39 @@ export type GenerationFunction<TOutput> = (
   prompt: Prompt,
   tools?: Record<string, Tool<any>>,
 ) => Promise<TOutput>;
+
+/**
+ * Something the simulated user does: speaks, hears, or finishes its turn —
+ * saying whether that turn met its goal.
+ */
+export type SimulatedUserAction =
+  | { type: "speak"; audio: Audio }
+  | { type: "said"; text: string }
+  | { type: "hearing" }
+  | { type: "heard"; text: string }
+  | { type: "unclear"; reason: string }
+  | { type: "finishedTurn"; goalMet: boolean };
+
+/** A voice model that can play a simulated user in a spoken conversation. */
+export interface VoiceModel {
+  /** The sample rate, in Hz, of the audio the model can listen to. */
+  readonly inputSampleRate: number;
+  /** Opens a conversation, with the model playing `persona`. */
+  connect(who: { persona: string }): Promise<VoiceSession>;
+}
+
+/** An open conversation with the model, lasting until it's disposed. */
+export interface VoiceSession extends AsyncDisposable {
+  /**
+   * What the simulated user does, for as long as the session is open.
+   * Throws if the conversation fails.
+   */
+  actions(): AsyncIterable<SimulatedUserAction>;
+  /** Passes on a chunk of what the system under test says. */
+  listenTo(audio: Audio): void;
+  /** Gives the simulated user a goal, and has it start working towards it. */
+  pursue(goal: string): void;
+}
 
 /**
  * A scoped subset of tools picked from a {@link Toolbox}.
