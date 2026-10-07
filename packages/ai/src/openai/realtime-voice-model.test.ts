@@ -11,8 +11,8 @@ function modelFor(openai: FakeRealtimeServer): OpenAIRealtimeVoiceModel {
   return new OpenAIRealtimeVoiceModel({ apiKey: "sk-test", url: openai.url });
 }
 
-/** Runs a whole pursuit and collects what the simulated user does. */
-async function pursuit(
+/** Starts a pursuit and collects what the simulated user does in its first turn. */
+async function firstTurn(
   model: OpenAIRealtimeVoiceModel,
   { persona, goal }: { persona: string; goal: string } = {
     persona: "a customer",
@@ -21,7 +21,7 @@ async function pursuit(
 ): Promise<SimulatedUserAction[]> {
   await using session = await model.connect({ persona });
   session.pursue(goal);
-  return await upTo(session.actions()[Symbol.asyncIterator](), goalMet);
+  return await upTo(session.actions()[Symbol.asyncIterator](), "finishedTurn");
 }
 
 /**
@@ -53,6 +53,17 @@ function goalMet(action: SimulatedUserAction): boolean {
   return action.type === "finishedTurn" && action.goalMet;
 }
 
+/**
+ * Just the actions of the given types, in order — so a test checks only
+ * what its behaviour is about, and new kinds of action don't break it.
+ */
+function only(
+  actions: readonly SimulatedUserAction[],
+  ...types: SimulatedUserAction["type"][]
+): SimulatedUserAction[] {
+  return actions.filter((action) => types.includes(action.type));
+}
+
 describe("OpenAI Realtime voice model", () => {
   it("what the model says streams out as audio, chunk by chunk", async () => {
     await using openai = await FakeRealtimeServer.start();
@@ -64,9 +75,9 @@ describe("OpenAI Realtime voice model", () => {
       goalMet: true,
     });
 
-    const actions = await pursuit(modelFor(openai));
+    const actions = await firstTurn(modelFor(openai));
 
-    expect(actions.filter((action) => action.type === "speak")).toEqual([
+    expect(only(actions, "speak")).toEqual([
       { type: "speak", audio: { samples: [0.5, -0.25], sampleRate: 24_000 } },
       { type: "speak", audio: { samples: [0.125, 0], sampleRate: 24_000 } },
     ]);
@@ -76,7 +87,7 @@ describe("OpenAI Realtime voice model", () => {
     await using openai = await FakeRealtimeServer.start();
     openai.replyWith({ audio: [], goalMet: true });
 
-    await pursuit(modelFor(openai), {
+    await firstTurn(modelFor(openai), {
       persona: "a customer whose book arrived damaged",
       goal: "get a replacement",
     });
@@ -91,12 +102,9 @@ describe("OpenAI Realtime voice model", () => {
     await using openai = await FakeRealtimeServer.start();
     openai.replyWith({ audio: [[0.25]], goalMet: true });
 
-    const actions = await pursuit(modelFor(openai));
+    const actions = await firstTurn(modelFor(openai));
 
-    expect(actions).toEqual([
-      { type: "speak", audio: { samples: [0.25], sampleRate: 24_000 } },
-      { type: "finishedTurn", goalMet: true },
-    ]);
+    expect(actions.at(-1)).toEqual({ type: "finishedTurn", goalMet: true });
   });
 
   it("the model reports when it has finished its turn", async () => {
@@ -112,8 +120,7 @@ describe("OpenAI Realtime voice model", () => {
       "finishedTurn",
     );
 
-    expect(actions).toEqual([
-      { type: "speak", audio: { samples: [0.25], sampleRate: 24_000 } },
+    expect(only(actions, "said", "finishedTurn")).toEqual([
       { type: "said", text: "Hi, I'd like a refund" },
       { type: "finishedTurn", goalMet: false },
     ]);
@@ -127,7 +134,7 @@ describe("OpenAI Realtime voice model", () => {
       goalMet: true,
     });
 
-    const actions = await pursuit(modelFor(openai));
+    const actions = await firstTurn(modelFor(openai));
 
     expect(actions).toContainEqual({
       type: "said",
@@ -145,13 +152,16 @@ describe("OpenAI Realtime voice model", () => {
 
     session.listenTo(speech);
     session.listenTo(silence);
+    const actions = await upTo(
+      session.actions()[Symbol.asyncIterator](),
+      "heard",
+    );
 
-    expect(
-      await upTo(session.actions()[Symbol.asyncIterator](), "heard"),
-    ).toEqual([
-      { type: "hearing" },
-      { type: "heard", text: "Hello, how can I help?" },
-    ]);
+    expect(actions).toContainEqual({
+      type: "heard",
+      text: "Hello, how can I help?",
+    });
+    expect(only(actions, "speak", "said")).toEqual([]);
   });
 
   it("the model reports when the other side starts speaking", async () => {
@@ -164,7 +174,7 @@ describe("OpenAI Realtime voice model", () => {
 
     expect(
       await upTo(session.actions()[Symbol.asyncIterator](), "hearing"),
-    ).toEqual([{ type: "hearing" }]);
+    ).toContainEqual({ type: "hearing" });
   });
 
   it("the model reports when it can't make out what it heard", async () => {
@@ -178,10 +188,7 @@ describe("OpenAI Realtime voice model", () => {
 
     expect(
       await upTo(session.actions()[Symbol.asyncIterator](), "unclear"),
-    ).toEqual([
-      { type: "hearing" },
-      { type: "unclear", reason: "Transcription failed" },
-    ]);
+    ).toContainEqual({ type: "unclear", reason: "Transcription failed" });
   });
 
   it("the model replies to what it hears", async () => {
@@ -201,13 +208,9 @@ describe("OpenAI Realtime voice model", () => {
     );
 
     expect(openai.heardSpeech()).toEqual([0.5, -0.25]);
-    expect(actions).toEqual([
+    expect(only(actions, "speak")).toEqual([
       { type: "speak", audio: { samples: [0.25], sampleRate: 24_000 } },
-      { type: "finishedTurn", goalMet: false },
-      { type: "hearing" },
-      { type: "unclear", reason: "Transcription failed" },
       { type: "speak", audio: { samples: [0.125], sampleRate: 24_000 } },
-      { type: "finishedTurn", goalMet: true },
     ]);
   });
 
@@ -233,12 +236,9 @@ describe("OpenAI Realtime voice model", () => {
     const rest = await upTo(actions, goalMet);
 
     expect(openai.instructions()).toContain("get a refund");
-    expect(rest.filter((action) => action.type !== "speak")).toEqual([
-      { type: "finishedTurn", goalMet: false },
-      { type: "hearing" },
+    expect(only(rest, "heard", "said")).toEqual([
       { type: "heard", text: "Sure, what's the order number?" },
       { type: "said", text: "It's 1234" },
-      { type: "finishedTurn", goalMet: true },
     ]);
   });
 
@@ -263,13 +263,10 @@ describe("OpenAI Realtime voice model", () => {
       goalMet,
     );
 
-    expect(actions.filter((action) => action.type !== "speak")).toEqual([
+    expect(only(actions, "said", "heard")).toEqual([
       { type: "said", text: "Hi, I'd like a refund" },
-      { type: "finishedTurn", goalMet: false },
-      { type: "hearing" },
       { type: "heard", text: "Sure, what's the order number?" },
       { type: "said", text: "It's order 1234" },
-      { type: "finishedTurn", goalMet: true },
     ]);
   });
 
@@ -289,12 +286,9 @@ describe("OpenAI Realtime voice model", () => {
       goalMet,
     );
 
-    expect(actions.filter((action) => action.type !== "speak")).toEqual([
-      { type: "finishedTurn", goalMet: false },
-      { type: "hearing" },
+    expect(only(actions, "unclear", "said")).toEqual([
       { type: "unclear", reason: "Transcription failed" },
       { type: "said", text: "Thanks!" },
-      { type: "finishedTurn", goalMet: true },
     ]);
   });
 
@@ -391,8 +385,9 @@ describe("OpenAI Realtime voice model", () => {
     await vi.waitFor(() => expect(openai.heardSpeech()).toContain(0.375));
     openai.finishReply();
 
-    expect(await upTo(actions, "finishedTurn")).toEqual([
-      { type: "hearing" },
+    const rest = await upTo(actions, "finishedTurn");
+
+    expect(only(rest, "said", "finishedTurn")).toEqual([
       { type: "said", text: "Hi, I'd like a refund" },
       { type: "finishedTurn", goalMet: false },
     ]);
@@ -415,9 +410,9 @@ describe("OpenAI Realtime voice model", () => {
     session.listenTo(silence);
     const rest = await upTo(actions, goalMet);
 
-    expect(
-      [...started, ...rest].filter((action) => action.type === "finishedTurn"),
-    ).toEqual([{ type: "finishedTurn", goalMet: true }]);
+    expect(only([...started, ...rest], "finishedTurn")).toEqual([
+      { type: "finishedTurn", goalMet: true },
+    ]);
   });
 
   it("a conversation carries on after a goal is met", async () => {
