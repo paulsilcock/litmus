@@ -41,12 +41,14 @@
     "@opentelemetry/context-async-hooks": "^2.7.0",
     "@opentelemetry/core": "^2.7.0",
     "@opentelemetry/sdk-trace-base": "^2.7.0",
+    "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@hono/node-server": "catalog:",
     "@litmus/ai": "workspace:*",
     "@types/node": "catalog:",
+    "@types/ws": "catalog:",
     "ai": "catalog:",
     "hono": "catalog:",
     "playwright": "catalog:",
