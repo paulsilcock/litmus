@@ -16,9 +16,11 @@
       "version": "0.0.0",
       "dependencies": {
         "@litmus/core": "workspace:*",
+        "ws": "catalog:",
       },
       "devDependencies": {
         "@types/node": "catalog:",
+        "@types/ws": "catalog:",
         "ai": "catalog:",
         "vite-plus": "catalog:",
         "zod": "catalog:",
@@ -140,6 +142,7 @@
       },
       "devDependencies": {
         "@hono/node-server": "catalog:",
+        "@litmus/ai": "workspace:*",
         "@types/node": "catalog:",
         "ai": "catalog:",
         "hono": "catalog:",
@@ -184,6 +187,7 @@
     "@electric-sql/pglite": "0.4.2",
     "@hono/node-server": "1.19.13",
     "@types/node": "25.5.0",
+    "@types/ws": "8.18.1",
     "ai": "6.0.0",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
@@ -194,6 +198,7 @@
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
     "vite-plus": "0.1.15",
     "vitest": "npm:@voidzero-dev/vite-plus-test@latest",
+    "ws": "8.20.0",
     "zod": "4.4.3",
   },
   "packages": {
@@ -400,6 +405,8 @@
     "@types/deep-eql": ["@types/deep-eql@4.0.2", "", {}, "sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw=="],
 
     "@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw=="],
+
+    "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
 
     "@types/yargs-parser": ["@types/yargs-parser@21.0.3", "", {}, "sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ=="],
 
