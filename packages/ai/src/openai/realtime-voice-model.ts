@@ -92,7 +92,7 @@ export class RealtimeVoiceSession implements VoiceSession {
         audio: {
           input: {
             // Transcribe what the simulated user hears, so it can be recorded.
-            transcription: { model: "gpt-4o-mini-transcribe" },
+            transcription: { model: "gpt-4o-transcribe" },
             // Detect turns by whether the speaker sounds finished, not just
             // by a pause, so the simulated user doesn't reply mid-sentence.
             // Reply only when asked: before a goal it just listens.
@@ -162,8 +162,19 @@ export class RealtimeVoiceSession implements VoiceSession {
     this.#socket.send(JSON.stringify(request));
   }
 
-  /** Asks for the simulated user's next turn. */
+  /**
+   * Asks for the simulated user's next turn — reminding it, last thing
+   * before it replies, which side of the conversation it's on.
+   */
   #reply(): void {
+    this.#send({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "system",
+        content: [{ type: "input_text", text: REPLY_REMINDER }],
+      },
+    });
     this.#send({ type: "response.create" });
     this.#replying = true;
   }
@@ -262,25 +273,19 @@ const GOAL_MET_TOOL = {
   parameters: { type: "object", properties: {} },
 };
 
+/** Sent before every reply: the model's training pulls it towards helping. */
+const REPLY_REMINDER =
+  "Stay in character as the person described in your instructions. You're not an assistant: you're the one who wants something, not the one helping.";
+
 function instructionsFor(brief: Brief): string {
   return [
-    "You are role-playing a CALLER phoning a company's voice line. You are not the company, not its support agent, and not an AI assistant.",
-    "",
-    "The other voice on the line is the company's agent. They answer questions; you ask them.",
-    "",
-    `Who you are: ${brief.persona}`,
-    ...(brief.goal === undefined
-      ? []
-      : [`What you want from the call: ${brief.goal}`]),
-    "",
-    "Rules:",
-    "- Speak only as the caller, about your own needs.",
-    "- You don't know the answers you're calling about. Never answer your own questions or explain the company's products — the agent has to tell you.",
-    '- Never greet callers, offer help, or say things like "glad you called" or "how can I help" — that\'s the agent\'s job, not yours.',
-    "- Keep each turn to one or two short sentences, like a real caller.",
-    "- If nobody has spoken yet, start by saying why you're calling.",
-    "- Once you've got what you wanted, say thanks and goodbye, then call the goal_met function.",
-    "- Never mention that this is a test or a role-play.",
+    `You are ${brief.persona.replace(/\.\s*$/, "")}.`,
+    ...(brief.goal === undefined ? [] : [`What you want: ${brief.goal}`]),
+    "The other voice in the conversation is there to help you. You're the one who wants something: you ask, it answers. You don't know its answers until it tells you.",
+    "Get to what you want early, without waiting to be asked.",
+    "Talk like a real person: briefly, a sentence or two at a time.",
+    "When you've got what you wanted, wrap up naturally, then call the goal_met function.",
+    "Never mention that this is a test.",
   ].join("\n");
 }
 
