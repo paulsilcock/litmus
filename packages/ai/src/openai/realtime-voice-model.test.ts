@@ -250,7 +250,10 @@ describe("OpenAI Realtime voice model", () => {
       says: "It's order 1234",
       goalMet: true,
     });
-    openai.transcribesHeardSpeechAs("Sure, what's the order number?");
+    // Transcribing what was heard is slower than replying to it.
+    openai.transcribesHeardSpeechAs("Sure, what's the order number?", {
+      late: true,
+    });
     await using session = await modelFor(openai).connect({
       persona: "a customer",
     });

@@ -27,7 +27,9 @@ export class FakeRealtimeServer implements AsyncDisposable {
   readonly #replies: (Reply | { error: string; code: string | null })[] = [];
   readonly #tools = new Set<string>();
   readonly #heard: number[] = [];
-  readonly #transcriptions: string[] = [];
+  readonly #transcriptions: { words: string; late: boolean }[] = [];
+  /** Transcriptions waiting for the next reply to finish. */
+  readonly #lateTranscriptions: object[] = [];
   #transcribesInput = false;
   #repliesAutomatically = true;
   #instructions = "";
@@ -74,10 +76,14 @@ export class FakeRealtimeServer implements AsyncDisposable {
   /**
    * Queues the words the next heard turn turns out to say, as Realtime's
    * transcription of it — only sent if the session enabled transcription.
-   * Like the real API's slowest case, it arrives after the reply to it.
+   * It arrives as soon as the turn ends; with `late`, only once the next
+   * reply has finished, like the real API's slowest case.
    */
-  transcribesHeardSpeechAs(words: string): void {
-    this.#transcriptions.push(words);
+  transcribesHeardSpeechAs(
+    words: string,
+    options: { late?: boolean } = {},
+  ): void {
+    this.#transcriptions.push({ words, late: options.late === true });
   }
 
   /** Finishes the reply that's under way, if it was held open. */
@@ -163,10 +169,9 @@ export class FakeRealtimeServer implements AsyncDisposable {
     if (!this.#transcribesInput) return;
     // Like the real API, every heard turn's transcription either completes
     // or fails. With no words provided, the stub has nothing to transcribe.
-    const words = this.#transcriptions.shift();
-    send(
-      socket,
-      words === undefined
+    const next = this.#transcriptions.shift();
+    const transcription =
+      next === undefined
         ? {
             type: "conversation.item.input_audio_transcription.failed",
             item_id: itemId,
@@ -175,9 +180,10 @@ export class FakeRealtimeServer implements AsyncDisposable {
         : {
             type: "conversation.item.input_audio_transcription.completed",
             item_id: itemId,
-            transcript: words,
-          },
-    );
+            transcript: next.words,
+          };
+    if (next?.late) this.#lateTranscriptions.push(transcription);
+    else send(socket, transcription);
   }
 
   #configure(event: object): void {
@@ -319,6 +325,9 @@ export class FakeRealtimeServer implements AsyncDisposable {
         ]
       : [];
     send(socket, { type: "response.done", response: { output } });
+    for (const transcription of this.#lateTranscriptions.splice(0)) {
+      send(socket, transcription);
+    }
   }
 }
 
