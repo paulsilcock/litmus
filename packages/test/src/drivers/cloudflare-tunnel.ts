@@ -75,7 +75,9 @@ async function opened(tunnel: Tunnel): Promise<string> {
 /**
  * Waits until public DNS knows a new tunnel's name. Twilio, for one,
  * rejects an address it can't resolve, and a new name takes a few seconds
- * to appear. Asks public resolvers directly, skipping this machine's cache.
+ * to appear. Asks public resolvers directly, skipping this machine's cache,
+ * then allows a little longer: other resolvers, like Twilio's, can lag
+ * behind them.
  */
 async function untilPubliclyResolvable(host: string): Promise<void> {
   const resolver = new Resolver();
@@ -85,7 +87,10 @@ async function untilPubliclyResolvable(host: string): Promise<void> {
       (addresses) => addresses.length > 0,
       () => false,
     );
-    if (resolved) return;
+    if (resolved) {
+      await sleep(10_000);
+      return;
+    }
     await sleep(1_000);
   }
   throw new Error(`Public DNS still can't find ${host} after a minute.`);
