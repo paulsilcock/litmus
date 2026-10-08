@@ -4,6 +4,11 @@ export {
   type AudioStream,
   BrowserDriver,
 } from "#litmus-test/drivers/browser.ts";
+export {
+  type Exposure,
+  PhoneDriver,
+  type PhoneDriverOptions,
+} from "#litmus-test/drivers/phone.ts";
 export { Dsl, DslContext } from "#litmus-test/dsl.ts";
 export {
   type Grader,

@@ -33,6 +33,11 @@ export interface VoiceOptions {
    * turn to speak before the simulator gives up on it. Defaults to 10000.
    */
   silenceTimeout?: number;
+  /**
+   * Called with each turn as it's added to the transcript — e.g. to print
+   * the conversation live.
+   */
+  watch?: (turn: Turn) => void;
 }
 
 /** Marks a wait for the system that ran out. */
@@ -56,6 +61,7 @@ export class VoiceSimulator {
   readonly #speak: (audio: Audio) => Promise<void>;
   readonly #listen: () => Promise<Audio>;
   readonly #silenceTimeout: number;
+  readonly #watch: (turn: Turn) => void;
   readonly #conversation = new Conversation();
   #joined?: Joined;
   /** Why the conversation ended, once it has. */
@@ -70,6 +76,7 @@ export class VoiceSimulator {
     this.#speak = options.speak;
     this.#listen = options.listen;
     this.#silenceTimeout = options.silenceTimeout ?? 10_000;
+    this.#watch = options.watch ?? (() => {});
   }
 
   /**
@@ -233,6 +240,12 @@ export class VoiceSimulator {
     }
   }
 
+  /** Adds a turn to the transcript, and lets whoever's watching see it. */
+  #record(turn: Turn): void {
+    this.#conversation.add(turn);
+    this.#watch(turn);
+  }
+
   async #handle(action: SimulatedUserAction): Promise<void> {
     switch (action.type) {
       case "speak":
@@ -246,16 +259,10 @@ export class VoiceSimulator {
         this.#silenceClock?.stop();
         break;
       case "said":
-        this.#conversation.add({
-          speaker: "simulatedUser",
-          content: action.text,
-        });
+        this.#record({ speaker: "simulatedUser", content: action.text });
         break;
       case "heard":
-        this.#conversation.add({
-          speaker: "systemUnderTest",
-          content: action.text,
-        });
+        this.#record({ speaker: "systemUnderTest", content: action.text });
         break;
       case "finishedTurn":
         // Now it's the system's turn to speak — once it's heard the

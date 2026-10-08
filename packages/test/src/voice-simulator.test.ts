@@ -5,6 +5,7 @@ import { FakeRealtimeServer } from "@litmus/ai/openai/testing";
 import type { Audio } from "@litmus/core/ai";
 import { describe, expect, it, vi } from "vite-plus/test";
 
+import type { Turn } from "#litmus-test/conversation.ts";
 import { UserSimulator } from "#litmus-test/simulator.ts";
 
 /** A system that says nothing. Like real audio, its silence arrives over time. */
@@ -136,6 +137,46 @@ describe("voice user simulator", () => {
     expect(await customer.transcript()).toEqual([
       { speaker: "simulatedUser", content: "Hi, I'd like a refund" },
     ]);
+  });
+
+  it("the conversation can be watched turn by turn as it happens", async () => {
+    await using openai = await FakeRealtimeServer.start();
+    openai.replyWith({ audio: [[0.25]], says: "Hi, I'd like a refund" });
+    openai.transcribesHeardSpeechAs("Sure, what's the order number?");
+    openai.replyWith({
+      audio: [[0.125]],
+      says: "It's order 1234",
+      goalMet: true,
+    });
+    const systemSays = [[0.5, -0.25]];
+    const watched: Turn[] = [];
+    const watchedBeforeFinalReply: number[] = [];
+
+    await using customer = UserSimulator.voice({
+      model: new OpenAIRealtimeVoiceModel({
+        apiKey: "sk-test",
+        url: openai.url,
+      }),
+      persona: "a customer",
+      speak: async (audio) => {
+        if (audio.samples[0] === 0.125) {
+          watchedBeforeFinalReply.push(watched.length);
+        }
+      },
+      listen: async () => {
+        await setImmediate();
+        return {
+          samples: systemSays.shift() ?? [0, 0, 0, 0],
+          sampleRate: 24_000,
+        };
+      },
+      watch: (turn) => watched.push(turn),
+    });
+    await customer.pursueGoal("get a refund");
+
+    expect(watched).toEqual(await customer.transcript());
+    // Turns arrive while the conversation is still going, not all at the end.
+    expect(watchedBeforeFinalReply[0]).toBeGreaterThan(0);
   });
 
   it("what the system says is recorded in the transcript", async () => {
