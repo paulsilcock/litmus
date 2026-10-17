@@ -14,9 +14,9 @@ jobs:
         with:
           # Need history for vitest --changed to find the merge base
           fetch-depth: 0
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.21.2
         with:
-          version: "0.1.15"
+          version: "1.3.0"
           node-version: "24"
           cache: true
       - run: vp install
@@ -58,9 +58,9 @@ jobs:
       BOOKSHOP_DRIVER: ${{ matrix.driver }}
     steps:
       - uses: actions/checkout@v4
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.21.2
         with:
-          version: "0.1.15"
+          version: "1.3.0"
           node-version: "24"
           cache: true
       - run: vp install

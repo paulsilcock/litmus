@@ -556,6 +556,7 @@ function spawnVitest(
   logPath: string,
   configFile = "vite.config.ts",
 ): Promise<JsonReport> {
+  const reportPath = `${logPath}.report.json`;
   return new Promise((resolve, reject) => {
     const child = spawn(
       "vp",
@@ -565,6 +566,7 @@ function spawnVitest(
         join(fixturesDir, configFile),
         join(fixturesDir, fixtureFile),
         "--reporter=json",
+        `--outputFile=${reportPath}`,
         // Subprocess is a fixture for testing `.only`, not the real CI
         // invocation. Override vitest's `allowOnly: !isCI()` default so
         // the focus marker isn't suppressed under any CI provider.
@@ -582,15 +584,16 @@ function spawnVitest(
     });
     child.on("error", reject);
     child.on("exit", () => {
-      const jsonStart = stdout.indexOf("{");
       try {
-        const parsed: JsonReport = JSON.parse(stdout.slice(jsonStart));
+        const parsed: JsonReport = JSON.parse(readFileSync(reportPath, "utf8"));
         resolve(parsed);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         reject(
           new Error(`Could not parse vitest JSON report:\n${stdout}\n${msg}`),
         );
+      } finally {
+        rmSync(reportPath, { force: true });
       }
     });
   });
