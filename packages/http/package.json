@@ -57,12 +57,12 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "@hono/node-server": "catalog:",
+    "@hono/node-server": "^1.19.13",
     "@litmus/test": "workspace:*",
-    "hono": "catalog:",
-    "reflect-metadata": "catalog:",
-    "tsyringe": "catalog:",
-    "zod": "catalog:"
+    "hono": "^4.12.10",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0",
+    "zod": "^4.4.3"
   },
   "peerDependenciesMeta": {
     "@litmus/test": {

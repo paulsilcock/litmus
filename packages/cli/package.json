@@ -51,9 +51,9 @@
   },
   "peerDependencies": {
     "@litmus/test": "workspace:*",
-    "reflect-metadata": "catalog:",
-    "tsyringe": "catalog:",
-    "zod": "catalog:"
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0",
+    "zod": "^4.4.3"
   },
   "peerDependenciesMeta": {
     "@litmus/test": {
