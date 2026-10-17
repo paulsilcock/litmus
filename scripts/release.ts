@@ -40,7 +40,11 @@ console.log(
   `Releasing ${plan.version} (npm dist-tag "${plan.distTag}") for ${packages.map((p) => p.name).join(", ")}${dryRun ? " [dry run]" : ""}`,
 );
 
+const license = readFileSync(join(root, "LICENSE"), "utf8");
 for (const pkg of packages) {
+  if (readFileSync(join(pkg.dir, "LICENSE"), "utf8") !== license) {
+    throw new Error(`${pkg.dir}/LICENSE must be a copy of the root LICENSE.`);
+  }
   if (isPublished(pkg.name, plan.version)) {
     throw new Error(`${pkg.name}@${plan.version} is already on npm.`);
   }
