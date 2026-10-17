@@ -199,8 +199,8 @@ export class RespondToCustomerSupport extends CommandHandler<
 The agent picks tools from a `Toolbox` scoped per-agent — capability surface is explicit and auditable.
 
 ```ts
-import { Agent, Toolbox } from "@litmus/core/ai";
 import { toVercelTools } from "@litmus/ai/vercel";
+import { Agent, Toolbox } from "@litmus/core/ai";
 import { type LanguageModel, generateText, stepCountIs, tool } from "ai";
 import { inject, injectable } from "tsyringe";
 import { z } from "zod";

@@ -33,3 +33,4 @@ dist-ssr
 
 # Example outputs (screenshots, recordings, findings)
 examples/*/out/
+.vitest/
