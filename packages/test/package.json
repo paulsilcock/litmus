@@ -56,6 +56,10 @@
   },
   "peerDependencies": {
     "ai": "catalog:",
-    "playwright": "catalog:"
+    "playwright": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.14.1"
   }
 }

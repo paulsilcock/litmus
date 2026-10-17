@@ -50,8 +50,17 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
+    "@litmus/test": "workspace:*",
     "reflect-metadata": "catalog:",
     "tsyringe": "catalog:",
     "zod": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@litmus/test": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24.14.1"
   }
 }

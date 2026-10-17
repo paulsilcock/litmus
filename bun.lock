@@ -29,6 +29,7 @@
       },
       "peerDependencies": {
         "ai": "catalog:",
+        "zod": "catalog:",
       },
     },
     "packages/cli": {
@@ -49,10 +50,14 @@
         "zod": "catalog:",
       },
       "peerDependencies": {
+        "@litmus/test": "workspace:*",
         "reflect-metadata": "catalog:",
         "tsyringe": "catalog:",
         "zod": "catalog:",
       },
+      "optionalPeers": [
+        "@litmus/test",
+      ],
     },
     "packages/core": {
       "name": "@litmus/core",
@@ -89,14 +94,23 @@
         "vite-plus": "catalog:",
       },
       "peerDependencies": {
+        "@electric-sql/pglite": "catalog:",
+        "drizzle-kit": "catalog:",
         "drizzle-orm": "catalog:",
+        "vite-plus": "catalog:",
       },
+      "optionalPeers": [
+        "@electric-sql/pglite",
+        "drizzle-kit",
+        "vite-plus",
+      ],
     },
     "packages/http": {
       "name": "@litmus/http",
       "version": "0.0.0",
       "dependencies": {
         "@hono/otel": "^1.1.1",
+        "@hono/zod-validator": "^0.7.6",
         "@litmus/core": "workspace:*",
         "@opentelemetry/api": "^1.9.1",
         "@opentelemetry/context-async-hooks": "^2.7.0",
@@ -105,7 +119,6 @@
       },
       "devDependencies": {
         "@hono/node-server": "catalog:",
-        "@hono/zod-validator": "^0.7.6",
         "@litmus/test": "workspace:*",
         "@types/node": "catalog:",
         "@typescript/native-preview": "7.0.0-dev.20260328.1",
@@ -118,10 +131,15 @@
       },
       "peerDependencies": {
         "@hono/node-server": "catalog:",
+        "@litmus/test": "workspace:*",
         "hono": "catalog:",
         "reflect-metadata": "catalog:",
         "tsyringe": "catalog:",
+        "zod": "catalog:",
       },
+      "optionalPeers": [
+        "@litmus/test",
+      ],
     },
     "packages/log": {
       "name": "@litmus/log",
@@ -161,6 +179,7 @@
       "peerDependencies": {
         "ai": "catalog:",
         "playwright": "catalog:",
+        "vite-plus": "catalog:",
       },
     },
     "packages/test-acceptance": {

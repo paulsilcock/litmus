@@ -51,6 +51,23 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "drizzle-orm": "catalog:"
+    "@electric-sql/pglite": "catalog:",
+    "drizzle-kit": "catalog:",
+    "drizzle-orm": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@electric-sql/pglite": {
+      "optional": true
+    },
+    "drizzle-kit": {
+      "optional": true
+    },
+    "vite-plus": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24.14.1"
   }
 }
