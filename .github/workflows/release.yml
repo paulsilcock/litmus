@@ -1,0 +1,69 @@
+name: Release
+
+# Publishing a GitHub release publishes every public package to npm at the
+# version in the release tag (v0.1.0 → latest, v0.1.0-rc.0 → rc).
+#
+# Authentication is npm trusted publishing: each package on npmjs.com
+# trusts this workflow file and the `npm` environment, so no npm token is
+# stored in GitHub. The first version of each package must be published
+# from a maintainer's machine with `node scripts/release.ts <tag>`.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      PRERELEASE: ${{ github.event.release.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # History is needed to check that the tag is on main.
+          fetch-depth: 0
+      - name: Check the tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG is not on main. Create releases from main only."
+            exit 1
+          fi
+      - name: Check the release type matches the version
+        run: |
+          case "$TAG" in
+            *-*) has_label=true ;;
+            *) has_label=false ;;
+          esac
+          if [ "$has_label" != "$PRERELEASE" ]; then
+            echo "::error::$TAG and the GitHub 'pre-release' option disagree. A pre-release needs a label such as -rc.0; a release must not have one."
+            exit 1
+          fi
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          version: "1.3.0"
+          node-version: "24"
+          # No dependency cache in a job that publishes.
+          cache: false
+      - run: vp install
+      - name: Install Playwright browsers
+        run: |
+          version=$(node -p "require('./package.json').catalog.playwright")
+          vp dlx "playwright@$version" install --with-deps chromium
+      - run: vp check
+      - run: vp test --tags-filter='!bookshop-acceptance'
+      - name: Publish to npm
+        # Not `vp run`: Vite+ tasks run in a clean environment, which would
+        # drop the ACTIONS_ID_TOKEN_REQUEST_* variables npm needs for OIDC.
+        run: node scripts/release.ts "$TAG"
