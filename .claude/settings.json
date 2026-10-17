@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '. \"$HOME/.vite-plus/env\"' >> \"$CLAUDE_ENV_FILE\""
+            "command": "echo 'vp_env=\"${XDG_CONFIG_HOME:-$HOME/.config}/vite-plus/env\"; if [ -f \"$vp_env\" ]; then . \"$vp_env\"; fi' >> \"$CLAUDE_ENV_FILE\""
           }
         ]
       }
