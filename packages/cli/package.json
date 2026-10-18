@@ -1,6 +1,6 @@
 {
   "name": "@litmus-ts/cli",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "description": "CLI entrypoint adapter for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
