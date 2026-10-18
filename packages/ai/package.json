@@ -1,6 +1,6 @@
 {
-  "name": "@litmus/ai",
-  "version": "0.0.0",
+  "name": "@litmus-ts/ai",
+  "version": "0.1.0-rc.0",
   "description": "AI SDK adapters for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
@@ -38,7 +38,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@litmus/core": "workspace:*",
+    "@litmus-ts/core": "workspace:*",
     "ws": "catalog:"
   },
   "devDependencies": {
@@ -50,6 +50,10 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "ai": "catalog:"
+    "ai": "^6.0.0",
+    "zod": "^4.4.3"
+  },
+  "engines": {
+    "node": ">=24.14.1"
   }
 }

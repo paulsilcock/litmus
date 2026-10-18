@@ -1,4 +1,4 @@
-import { Cli } from "@litmus/cli";
+import { Cli } from "@litmus-ts/cli";
 
 import {
   AddBookToCart,

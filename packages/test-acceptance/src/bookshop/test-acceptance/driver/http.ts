@@ -1,4 +1,4 @@
-import { HonoDriver } from "@litmus/http/testing";
+import { HonoDriver } from "@litmus-ts/http/testing";
 
 import type { BookshopApp } from "#bookshop/entrypoints/http/app.ts";
 import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";

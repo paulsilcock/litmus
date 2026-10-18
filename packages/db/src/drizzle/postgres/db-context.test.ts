@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { DomainEvent } from "@litmus/core";
-import { DomainEventDispatcher } from "@litmus/core/events";
+import { DomainEvent } from "@litmus-ts/core";
+import { DomainEventDispatcher } from "@litmus-ts/core/events";
 import { pushSchema } from "drizzle-kit/api";
 import { integer, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";

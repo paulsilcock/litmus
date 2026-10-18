@@ -3,7 +3,7 @@ import type {
   SimulatedUserAction,
   VoiceModel,
   VoiceSession,
-} from "@litmus/core/ai";
+} from "@litmus-ts/core/ai";
 
 import { Conversation, type Turn } from "#litmus-test/conversation.ts";
 import type { PursuitResult } from "#litmus-test/simulator.ts";
@@ -11,7 +11,7 @@ import type { PursuitResult } from "#litmus-test/simulator.ts";
 export interface VoiceOptions {
   /**
    * The voice model that plays the simulated user — e.g.
-   * `new OpenAIRealtimeVoiceModel({ apiKey })` from `@litmus/ai/openai`.
+   * `new OpenAIRealtimeVoiceModel({ apiKey })` from `@litmus-ts/ai/openai`.
    */
   model: VoiceModel;
   /** Who the simulated user is. */

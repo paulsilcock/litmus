@@ -1,4 +1,4 @@
-import { evaluate } from "@litmus/test";
+import { evaluate } from "@litmus-ts/test";
 
 // One grader, always rejects. The body calls policies(...) with
 // a value the grader will reject.

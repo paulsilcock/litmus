@@ -11,7 +11,7 @@
  *
  * @example
  * ```typescript
- * import { ValueObject } from "@litmus/core";
+ * import { ValueObject } from "@litmus-ts/core";
  *
  * class Money extends ValueObject {
  *   constructor(

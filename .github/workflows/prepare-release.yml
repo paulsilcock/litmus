@@ -1,0 +1,55 @@
+name: Prepare release
+
+# Sets the version in every package.json, commits it as
+# "chore: release v<version>" and opens a release PR. Merging that PR
+# publishes the packages (see publish.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, e.g. 0.1.0-rc.1 or 0.1.0
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          version: "1.3.0"
+          node-version: "24"
+          cache: false
+      - run: vp install
+      - name: Commit the version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "release/v$RELEASE_VERSION"
+          # Not `vp run`: tasks run in a clean environment without RELEASE_VERSION.
+          node scripts/release.ts
+          git push origin "release/v$RELEASE_VERSION"
+      - name: Open the release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "release/v$RELEASE_VERSION" \
+            --title "chore: release v$RELEASE_VERSION" \
+            --body "Merging this PR publishes every package at $RELEASE_VERSION to npm and creates the GitHub release."

@@ -1,5 +1,5 @@
-import { QueryHandler } from "@litmus/core";
-import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
+import { QueryHandler } from "@litmus-ts/core";
+import { DrizzleDbContext } from "@litmus-ts/db/drizzle/postgres";
 import { sql } from "drizzle-orm";
 import { injectable } from "tsyringe";
 import { z } from "zod";

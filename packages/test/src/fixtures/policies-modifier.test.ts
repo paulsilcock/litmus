@@ -1,4 +1,4 @@
-import { evaluate } from "@litmus/test";
+import { evaluate } from "@litmus-ts/test";
 
 // .only filters the whole vitest file — anything else here would be
 // silently skipped, defeating sibling assertions. Lives alone for that

@@ -1,4 +1,4 @@
-import { CliDriver } from "@litmus/cli/testing";
+import { CliDriver } from "@litmus-ts/cli/testing";
 
 import type { BookshopCli } from "#bookshop/entrypoints/cli/app.ts";
 import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";

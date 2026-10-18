@@ -1,4 +1,4 @@
-import { Logger as LoggerBase, logContext } from "@litmus/core/log";
+import { Logger as LoggerBase, logContext } from "@litmus-ts/core/log";
 import { describe, expect, it } from "vite-plus/test";
 
 import { Logger } from "#litmus-log/logger.ts";

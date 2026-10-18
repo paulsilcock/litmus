@@ -1,6 +1,6 @@
 {
-  "name": "@litmus/http",
-  "version": "0.0.0",
+  "name": "@litmus-ts/http",
+  "version": "0.1.0-rc.0",
   "description": "HTTP entrypoint adapter for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
@@ -37,7 +37,8 @@
   },
   "dependencies": {
     "@hono/otel": "^1.1.1",
-    "@litmus/core": "workspace:*",
+    "@hono/zod-validator": "^0.7.6",
+    "@litmus-ts/core": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/context-async-hooks": "^2.7.0",
     "@opentelemetry/core": "^2.7.0",
@@ -45,8 +46,7 @@
   },
   "devDependencies": {
     "@hono/node-server": "catalog:",
-    "@hono/zod-validator": "^0.7.6",
-    "@litmus/test": "workspace:*",
+    "@litmus-ts/test": "workspace:*",
     "@types/node": "catalog:",
     "hono": "catalog:",
     "reflect-metadata": "catalog:",
@@ -57,9 +57,19 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "@hono/node-server": "catalog:",
-    "hono": "catalog:",
-    "reflect-metadata": "catalog:",
-    "tsyringe": "catalog:"
+    "@hono/node-server": "^1.19.13",
+    "@litmus-ts/test": "workspace:*",
+    "hono": "^4.12.10",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependenciesMeta": {
+    "@litmus-ts/test": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24.14.1"
   }
 }

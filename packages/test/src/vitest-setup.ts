@@ -17,7 +17,7 @@ import {
  * import { defineConfig } from "vite-plus";
  *
  * export default defineConfig({
- *   test: { setupFiles: ["@litmus/test/vitest-setup"] },
+ *   test: { setupFiles: ["@litmus-ts/test/vitest-setup"] },
  * });
  * ```
  *

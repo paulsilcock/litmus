@@ -1,6 +1,6 @@
 {
-  "name": "@litmus/log",
-  "version": "0.0.0",
+  "name": "@litmus-ts/log",
+  "version": "0.1.0-rc.0",
   "description": "Structured logging with async-scoped context for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
@@ -35,12 +35,15 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@litmus/core": "workspace:*",
+    "@litmus-ts/core": "workspace:*",
     "pino": "^9.5.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.14.1"
   }
 }

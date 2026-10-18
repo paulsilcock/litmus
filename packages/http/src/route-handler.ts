@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import type { HandlerClass } from "@litmus/core";
+import type { HandlerClass } from "@litmus-ts/core";
 import type { Context, Env } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -83,7 +83,7 @@ function resolveInput<TEnv extends Env, TSchema, TInput>(
  *
  * @example
  * ```typescript
- * import { createRouteHandler } from "@litmus/http";
+ * import { createRouteHandler } from "@litmus-ts/http";
  *
  * const routeHandler = createRouteHandler<{
  *   Variables: { userId: string };
@@ -247,7 +247,7 @@ export function createRouteHandler<TEnv extends Env = any>() {
  *
  * @example
  * ```typescript
- * import { routeHandler } from "@litmus/http";
+ * import { routeHandler } from "@litmus-ts/http";
  *
  * const app = new Hono()
  *   .post("/orders",   ...routeHandler.json(PlaceOrder, PlaceOrderSchema))

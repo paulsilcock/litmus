@@ -1,4 +1,4 @@
-# @litmus/core
+# @litmus-ts/core
 
 Domain primitives and base classes for the Litmus framework.
 

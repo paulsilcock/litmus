@@ -1,4 +1,4 @@
-import { routeHandler } from "@litmus/http";
+import { routeHandler } from "@litmus-ts/http";
 import { Hono } from "hono";
 
 import { CheckOut, CheckOutSchema } from "#bookshop/use-cases/check-out.ts";

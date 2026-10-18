@@ -3,7 +3,7 @@ import {
   DomainError,
   isAsyncIterable,
   QueryHandler,
-} from "@litmus/core";
+} from "@litmus-ts/core";
 import { Hono } from "hono";
 import { hc } from "hono/client";
 import { describe, expect, it } from "vite-plus/test";

@@ -1,4 +1,4 @@
-import { evaluate } from "@litmus/test";
+import { evaluate } from "@litmus-ts/test";
 
 let n = 0;
 evaluate(

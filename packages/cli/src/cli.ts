@@ -1,4 +1,8 @@
-import { DomainError, type HandlerClass, isAsyncIterable } from "@litmus/core";
+import {
+  DomainError,
+  type HandlerClass,
+  isAsyncIterable,
+} from "@litmus-ts/core";
 import { container } from "tsyringe";
 import yargsParser from "yargs-parser";
 import { ZodError, type ZodType } from "zod";
@@ -72,7 +76,7 @@ type PrefixKeys<
  *
  * @example
  * ```typescript
- * import { Cli } from "@litmus/cli";
+ * import { Cli } from "@litmus-ts/cli";
  *
  * const orderCommands = new Cli()
  *   .command("create", PlaceOrder, PlaceOrderSchema)

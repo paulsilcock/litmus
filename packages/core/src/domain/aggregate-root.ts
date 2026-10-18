@@ -10,7 +10,7 @@ import { Entity } from "#litmus/domain/entity.ts";
  *
  * @example
  * ```typescript
- * import type { AggregateData } from "@litmus/core";
+ * import type { AggregateData } from "@litmus-ts/core";
  *
  * interface OrderData extends AggregateData {
  *   status: "draft" | "placed" | "shipped" | "cancelled";
@@ -41,7 +41,7 @@ export type AggregateData<TId = string> = {
  *
  * @example
  * ```typescript
- * import { AggregateRoot, DomainEvent, type AggregateData } from "@litmus/core";
+ * import { AggregateRoot, DomainEvent, type AggregateData } from "@litmus-ts/core";
  *
  * interface OrderData extends AggregateData {
  *   status: "draft" | "placed" | "shipped";

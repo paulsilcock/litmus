@@ -2,6 +2,14 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   pack: {
+    entry: {
+      index: "src/index.ts",
+      ai: "src/ai.ts",
+      db: "src/db/db-context.ts",
+      events: "src/domain/domain-event-dispatcher.ts",
+      id: "src/id.ts",
+      log: "src/log.ts",
+    },
     deps: {
       // tsdown <0.23 compatibility: resolve external dependency subpaths.
       // Remove to preserve subpath imports as written (the new default).

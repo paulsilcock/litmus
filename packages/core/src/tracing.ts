@@ -2,7 +2,7 @@ import { SpanStatusCode, trace } from "@opentelemetry/api";
 
 import { DomainError } from "#litmus/domain/domain-error.ts";
 
-const TRACER_NAME = "@litmus/core";
+const TRACER_NAME = "@litmus-ts/core";
 
 function toException(err: unknown): Error | string {
   return err instanceof Error ? err : String(err);

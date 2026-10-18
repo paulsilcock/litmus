@@ -1,7 +1,7 @@
-import { type LogContext, Logger as LoggerBase } from "@litmus/core/log";
+import { type LogContext, Logger as LoggerBase } from "@litmus-ts/core/log";
 import pino from "pino";
 
-export type { LogContext } from "@litmus/core/log";
+export type { LogContext } from "@litmus-ts/core/log";
 
 /**
  * Options for constructing a `Logger`.
@@ -26,7 +26,7 @@ export interface LoggerOptions {
  *
  * @example
  * ```typescript
- * import { Logger } from "@litmus/log";
+ * import { Logger } from "@litmus-ts/log";
  *
  * const logger = new Logger({ level: "info" });
  * logger.info("server starting", { port: 3000 });

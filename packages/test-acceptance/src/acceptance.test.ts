@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { DomainEventDispatcher } from "@litmus/core/events";
-import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
+import { DomainEventDispatcher } from "@litmus-ts/core/events";
+import { DrizzleDbContext } from "@litmus-ts/db/drizzle/postgres";
 import {
   Customer,
   CustomerCreated,
@@ -9,7 +9,7 @@ import {
   OrderPlaced,
   OrderRepository,
   schema,
-} from "@litmus/db/test-support/fixtures";
+} from "@litmus-ts/db/test-support/fixtures";
 import { pushSchema } from "drizzle-kit/api";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";

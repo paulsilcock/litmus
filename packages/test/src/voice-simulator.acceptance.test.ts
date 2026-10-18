@@ -1,5 +1,5 @@
-import { OpenAIRealtimeVoiceModel } from "@litmus/ai/openai";
-import { FakeRealtimeServer } from "@litmus/ai/openai/testing";
+import { OpenAIRealtimeVoiceModel } from "@litmus-ts/ai/openai";
+import { FakeRealtimeServer } from "@litmus-ts/ai/openai/testing";
 import { describe, expect, it } from "vite-plus/test";
 
 import { UserSimulator } from "#litmus-test/simulator.ts";

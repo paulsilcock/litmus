@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
-import { serveCli } from "@litmus/cli";
+import { serveCli } from "@litmus-ts/cli";
 import {
   DomainEventDispatcher,
   registerDomainEventHandlers,
-} from "@litmus/core/events";
-import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
-import { serve } from "@litmus/http";
+} from "@litmus-ts/core/events";
+import { DrizzleDbContext } from "@litmus-ts/db/drizzle/postgres";
+import { serve } from "@litmus-ts/http";
 import { pushSchema } from "drizzle-kit/api";
 import { drizzle } from "drizzle-orm/pglite";
 import { container } from "tsyringe";

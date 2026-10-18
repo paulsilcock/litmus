@@ -97,7 +97,7 @@ it("customer can purchase a book", async () => {
 Switching to a different feature — issuing a refund — here's what a use case looks like in code. A `CommandHandler` (or `QueryHandler`) with the input schema co-located, so HTTP routes, CLI commands, and agent tools all share one source of truth.
 
 ```ts
-import { CommandHandler } from "@litmus/core";
+import { CommandHandler } from "@litmus-ts/core";
 import { inject, injectable } from "tsyringe";
 import { z } from "zod";
 
@@ -141,8 +141,8 @@ export class IssueRefund extends CommandHandler<
 When part of the system is non-deterministic — say, an AI agent handles support conversations — the acceptance test pattern still works. The DSL is the same. The assertions are the same. The body just runs many times against varied scenarios and asserts a pass rate.
 
 ```ts
-import { vercelGenerator } from "@litmus/ai/vercel";
-import { evaluate, UserSimulator, utteranceSchema } from "@litmus/test";
+import { vercelGenerator } from "@litmus-ts/ai/vercel";
+import { evaluate, UserSimulator, utteranceSchema } from "@litmus-ts/test";
 
 evaluate.scenarios(damageComplaints, { samples: 20, passRate: 0.9 })(
   "customer gets a replacement when their book arrived damaged",
@@ -174,7 +174,7 @@ Both deterministic and probabilistic tests run as ordinary tests in CI. Synthesi
 A use case can take an agent as a collaborator the same way it takes any other dependency. The agent itself uses tools — wrapped use cases plus a few internal utilities — to take action.
 
 ```ts
-import { CommandHandler } from "@litmus/core";
+import { CommandHandler } from "@litmus-ts/core";
 import { injectable } from "tsyringe";
 
 @injectable()
@@ -199,8 +199,8 @@ export class RespondToCustomerSupport extends CommandHandler<
 The agent picks tools from a `Toolbox` scoped per-agent — capability surface is explicit and auditable.
 
 ```ts
-import { toVercelTools } from "@litmus/ai/vercel";
-import { Agent, Toolbox } from "@litmus/core/ai";
+import { toVercelTools } from "@litmus-ts/ai/vercel";
+import { Agent, Toolbox } from "@litmus-ts/core/ai";
 import { type LanguageModel, generateText, stepCountIs, tool } from "ai";
 import { inject, injectable } from "tsyringe";
 import { z } from "zod";

@@ -1,6 +1,6 @@
 import { appendFileSync } from "node:fs";
 
-import { evaluate } from "@litmus/test";
+import { evaluate } from "@litmus-ts/test";
 
 const log = process.env.LITMUS_TEST_LOG;
 const append = (s: string) => {

@@ -1,4 +1,4 @@
-import { Driver } from "@litmus/test";
+import { Driver } from "@litmus-ts/test";
 import type { Hono } from "hono";
 import { hc } from "hono/client";
 

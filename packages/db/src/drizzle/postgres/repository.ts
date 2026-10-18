@@ -1,4 +1,4 @@
-import type { AggregateRoot, Repository } from "@litmus/core";
+import type { AggregateRoot, Repository } from "@litmus-ts/core";
 import type { ColumnBaseConfig } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";

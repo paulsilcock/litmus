@@ -1,6 +1,6 @@
-import { toVercelTools } from "@litmus/ai/vercel";
-import { Agent } from "@litmus/core/ai";
-import { Toolbox } from "@litmus/core/ai";
+import { toVercelTools } from "@litmus-ts/ai/vercel";
+import { Agent } from "@litmus-ts/core/ai";
+import { Toolbox } from "@litmus-ts/core/ai";
 import { generateText, stepCountIs } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";

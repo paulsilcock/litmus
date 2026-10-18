@@ -1,6 +1,6 @@
 {
-  "name": "@litmus/db",
-  "version": "0.0.0",
+  "name": "@litmus-ts/db",
+  "version": "0.1.0-rc.0",
   "description": "Database adapters for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
@@ -38,7 +38,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@litmus/core": "workspace:*",
+    "@litmus-ts/core": "workspace:*",
     "reflect-metadata": "catalog:",
     "tsyringe": "catalog:"
   },
@@ -51,6 +51,23 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "drizzle-orm": "catalog:"
+    "@electric-sql/pglite": "^0.4.2",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "vite-plus": "^1.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@electric-sql/pglite": {
+      "optional": true
+    },
+    "drizzle-kit": {
+      "optional": true
+    },
+    "vite-plus": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24.14.1"
   }
 }

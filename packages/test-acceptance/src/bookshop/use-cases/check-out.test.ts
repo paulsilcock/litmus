@@ -1,4 +1,4 @@
-import { prefixedUlid } from "@litmus/core/id";
+import { prefixedUlid } from "@litmus-ts/core/id";
 import { container } from "tsyringe";
 import { describe, expect, it } from "vite-plus/test";
 

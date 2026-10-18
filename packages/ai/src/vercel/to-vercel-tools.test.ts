@@ -1,4 +1,4 @@
-import { Toolbox } from "@litmus/core/ai";
+import { Toolbox } from "@litmus-ts/core/ai";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 
