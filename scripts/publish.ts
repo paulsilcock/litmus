@@ -59,10 +59,13 @@ vp([
 
 // A publish sets one tag, so further tags are added per package. With
 // trusted publishing this needs "Allow npm dist-tag" on each package.
+// `vp pm dist-tag` (and pnpm) run the npm bundled with Node, but npm needs
+// 11.21.0 or later to change dist-tags with trusted publishing, so a pinned
+// npm is run instead.
 if (!dryRun) {
   for (const tag of extraTags) {
     for (const name of packages) {
-      vp(["pm", "dist-tag", "add", `${name}@${version}`, tag]);
+      vp(["dlx", "npm@11.21.0", "dist-tag", "add", `${name}@${version}`, tag]);
     }
   }
 }
