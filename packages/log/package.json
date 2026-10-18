@@ -1,6 +1,6 @@
 {
   "name": "@litmus-ts/log",
-  "version": "0.1.0-rc.0",
+  "version": "0.1.0-rc.1",
   "description": "Structured logging with async-scoped context for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
