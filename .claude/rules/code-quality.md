@@ -16,4 +16,5 @@
 - Acceptance tests live at `packages/core/src/acceptance.test.ts`.
 - Shared test fixtures (aggregates, schemas, repos) live in `packages/core/src/test-support/fixtures.ts`.
 - Use the `#litmus/*` import alias for absolute imports within `@litmus-ts/core`.
-- Import test utilities from `vite-plus/test`, not `vitest`.
+- Import test utilities from `vite-plus/test`, not `vitest`, in tests and test helpers.
+- Published package code (anything a package's `exports` reach) must never import `vite-plus`: installed packages must not depend on Vite+. Import Vitest APIs from `vitest` instead; `vitest` is a peer dependency of `@litmus-ts/test` and an optional one of `@litmus-ts/db`.

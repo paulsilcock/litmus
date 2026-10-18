@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 
 import { generateText, type LanguageModel, Output } from "ai";
-import { expect } from "vite-plus/test";
+import { expect } from "vitest";
 import { z } from "zod";
 
 export interface SynthesizeOptions<T> {

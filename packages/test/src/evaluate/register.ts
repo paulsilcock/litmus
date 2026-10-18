@@ -1,4 +1,4 @@
-import { describe, test } from "vite-plus/test";
+import { describe, test } from "vitest";
 
 import { runConcurrent, runSequential, type RunTask } from "./runner.ts";
 

@@ -1,4 +1,4 @@
-import { test } from "vite-plus/test";
+import { test } from "vitest";
 
 import { type Grader } from "#litmus-test/grader.ts";
 import {
