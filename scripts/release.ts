@@ -1,146 +1,51 @@
 /**
- * Builds and publishes every public package at one version.
+ * Sets one version in every package.json and commits it as
+ * "chore: release v<version>".
  *
- *   node scripts/release.ts v0.1.0-rc.0 [--dry-run]
+ *   RELEASE_VERSION=0.1.0-rc.1 node scripts/release.ts
  *
- * The version comes only from the tag; package.json files in the repo stay
- * at 0.0.0. The script sets the version, builds, packs each package with
- * Bun (which replaces `catalog:` and `workspace:` with real versions) and
- * publishes the tarballs with npm. It restores every package.json when it
- * finishes, so a local run leaves the working tree as it was.
- *
- * The GitHub release workflow runs it with trusted publishing. For a first
- * publish from your machine, run `npm login` first.
+ * Without RELEASE_VERSION, bumpp asks for the version. The Prepare release
+ * workflow runs this and opens a PR; merging that PR publishes the packages
+ * (see .github/workflows/publish.yml).
  */
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { releasePlan } from "./release-version.ts";
+import {
+  type VersionBumpRelease,
+  type VersionNumber,
+  versionBump,
+} from "bumpp";
 
-interface PackageJson {
-  name: string;
-  version: string;
-  private?: boolean;
-}
+import { distTag } from "./dist-tag.ts";
 
 const root = join(import.meta.dirname, "..");
-const args = process.argv.slice(2);
-const dryRun = args.includes("--dry-run");
-const tag = args.find((arg) => !arg.startsWith("--"));
-if (tag === undefined) {
-  console.error("Usage: node scripts/release.ts <tag> [--dry-run]");
-  process.exit(1);
+const files = [
+  "package.json",
+  ...readdirSync(join(root, "packages"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `packages/${entry.name}/package.json`),
+];
+
+const input = process.env["RELEASE_VERSION"];
+let release: VersionBumpRelease = "prompt";
+if (input) {
+  // Throws for anything that is not a version npm can publish.
+  distTag(input);
+  if (isVersionNumber(input)) release = input;
 }
 
-const plan = releasePlan(tag);
-const packages = publicPackages();
-console.log(
-  `Releasing ${plan.version} (npm dist-tag "${plan.distTag}") for ${packages.map((p) => p.name).join(", ")}${dryRun ? " [dry run]" : ""}`,
-);
+await versionBump({
+  cwd: root,
+  files,
+  release,
+  commit: "chore: release v%s",
+  tag: false,
+  push: false,
+  printCommits: false,
+  confirm: release === "prompt",
+});
 
-const license = readFileSync(join(root, "LICENSE"), "utf8");
-for (const pkg of packages) {
-  if (readFileSync(join(pkg.dir, "LICENSE"), "utf8") !== license) {
-    throw new Error(`${pkg.dir}/LICENSE must be a copy of the root LICENSE.`);
-  }
-  if (isPublished(pkg.name, plan.version)) {
-    throw new Error(`${pkg.name}@${plan.version} is already on npm.`);
-  }
-}
-
-const originals = new Map(
-  packages.map((pkg) => [pkg.manifestPath, readFileSync(pkg.manifestPath)]),
-);
-try {
-  for (const pkg of packages) {
-    setVersion(pkg.manifestPath, plan.version);
-  }
-  run("vp", ["run", "-r", "build"], root);
-
-  const outDir = mkdtempSync(join(tmpdir(), "litmus-release-"));
-  for (const pkg of packages) {
-    run("vp", ["pm", "pack", "--", "--destination", outDir], pkg.dir);
-  }
-
-  // Dependencies first, so a consumer never sees a package whose
-  // @litmus-ts dependency is missing at the same version.
-  const order = ["@litmus-ts/core", ...packages.map((p) => p.name)];
-  const tarballs = readdirSync(outDir);
-  for (const name of new Set(order)) {
-    const file = `${name.replace("@", "").replace("/", "-")}-${plan.version}.tgz`;
-    if (!tarballs.includes(file)) {
-      throw new Error(`Expected tarball ${file} in ${outDir}.`);
-    }
-    run(
-      "npm",
-      [
-        "publish",
-        join(outDir, file),
-        "--access",
-        "public",
-        "--tag",
-        plan.distTag,
-        ...(dryRun ? ["--dry-run"] : []),
-      ],
-      root,
-    );
-  }
-} finally {
-  for (const [path, contents] of originals) {
-    writeFileSync(path, contents);
-  }
-}
-
-function publicPackages() {
-  const dir = join(root, "packages");
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    if (!entry.isDirectory()) return [];
-    const name = entry.name;
-    const manifestPath = join(dir, name, "package.json");
-    const manifest: PackageJson = JSON.parse(
-      readFileSync(manifestPath, "utf8"),
-    );
-    if (manifest.private === true) return [];
-    return [{ name: manifest.name, dir: join(dir, name), manifestPath }];
-  });
-}
-
-// Bun resolves `workspace:` from the lockfile, which still holds 0.0.0, so
-// the internal references are pinned here before packing.
-function setVersion(manifestPath: string, version: string) {
-  const manifest: Record<string, unknown> = JSON.parse(
-    readFileSync(manifestPath, "utf8"),
-  );
-  manifest["version"] = version;
-  for (const field of ["dependencies", "peerDependencies"]) {
-    const deps = manifest[field];
-    if (typeof deps !== "object" || deps === null) continue;
-    for (const [name, range] of Object.entries(deps)) {
-      if (typeof range === "string" && range.startsWith("workspace:")) {
-        Reflect.set(deps, name, version);
-      }
-    }
-  }
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-}
-
-function isPublished(name: string, version: string): boolean {
-  try {
-    const out = execFileSync("npm", ["view", `${name}@${version}`, "version"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return out.trim() !== "";
-  } catch (error) {
-    // A package that has never been published returns E404.
-    if (String(error).includes("E404")) return false;
-    throw error;
-  }
-}
-
-function run(command: string, commandArgs: string[], cwd: string) {
-  console.log(`$ ${command} ${commandArgs.join(" ")}`);
-  execFileSync(command, commandArgs, { cwd, stdio: "inherit" });
+function isVersionNumber(value: string): value is VersionNumber {
+  return /^\d/.test(value);
 }

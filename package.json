@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@litmus-ts/test": "workspace:*",
+    "bumpp": "catalog:",
     "reflect-metadata": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
