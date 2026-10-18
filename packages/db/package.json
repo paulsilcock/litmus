@@ -1,6 +1,6 @@
 {
   "name": "@litmus-ts/db",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.0",
   "description": "Database adapters for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {

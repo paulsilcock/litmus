@@ -1,6 +1,6 @@
 {
   "name": "@litmus-ts/test",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.0",
   "description": "Test utilities for the Litmus framework — trial runner, graders, and simulators.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
   "bugs": {
