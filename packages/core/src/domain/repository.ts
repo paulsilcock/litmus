@@ -25,7 +25,7 @@ import type { AggregateRoot } from "#litmus/domain/aggregate-root.ts";
  *
  * @example
  * ```typescript
- * import type { Repository } from "@litmus/core";
+ * import type { Repository } from "@litmus-ts/core";
  *
  * interface OrderRepository extends Repository<Order> {
  *   findById(id: string): Promise<Order | null>;

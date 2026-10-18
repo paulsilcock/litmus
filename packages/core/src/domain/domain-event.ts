@@ -18,7 +18,7 @@ declare const sourceSymbol: unique symbol;
  *
  * @example
  * ```typescript
- * import { AggregateRoot, DomainEvent, type AggregateData } from "@litmus/core";
+ * import { AggregateRoot, DomainEvent, type AggregateData } from "@litmus-ts/core";
  *
  * interface OrderData extends AggregateData {
  *   status: string;

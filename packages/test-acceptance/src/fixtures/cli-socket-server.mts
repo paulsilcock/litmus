@@ -1,6 +1,6 @@
 import "reflect-metadata";
-import { Cli, serveCli } from "@litmus/cli";
-import { CommandHandler } from "@litmus/core";
+import { Cli, serveCli } from "@litmus-ts/cli";
+import { CommandHandler } from "@litmus-ts/core";
 import { z } from "zod";
 
 class Noop extends CommandHandler<Record<string, never>, void> {

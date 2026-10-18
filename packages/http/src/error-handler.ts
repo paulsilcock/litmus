@@ -1,4 +1,4 @@
-import { DomainError } from "@litmus/core";
+import { DomainError } from "@litmus-ts/core";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 

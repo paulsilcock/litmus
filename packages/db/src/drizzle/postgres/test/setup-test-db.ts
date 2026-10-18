@@ -26,8 +26,8 @@ import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
  * ```ts
  * import { container } from "tsyringe";
  * import { describe, expect, it } from "vite-plus/test";
- * import { DrizzleDbContext } from "@litmus/db/drizzle/postgres";
- * import { setupTestDb } from "@litmus/db/drizzle/postgres/test";
+ * import { DrizzleDbContext } from "@litmus-ts/db/drizzle/postgres";
+ * import { setupTestDb } from "@litmus-ts/db/drizzle/postgres/test";
  * import { orders, schema } from "./schema.ts";
  *
  * describe("OrderRepository", () => {

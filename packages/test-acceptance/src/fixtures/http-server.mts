@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { serve } from "@litmus/http";
+import { serve } from "@litmus-ts/http";
 import { Hono } from "hono";
 
 const app = new Hono().get("/", (c) => c.text("ok"));

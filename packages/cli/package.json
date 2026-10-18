@@ -1,5 +1,5 @@
 {
-  "name": "@litmus/cli",
+  "name": "@litmus-ts/cli",
   "version": "0.0.0",
   "description": "CLI entrypoint adapter for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
@@ -36,11 +36,11 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@litmus/core": "workspace:*",
+    "@litmus-ts/core": "workspace:*",
     "yargs-parser": "^21.1.1"
   },
   "devDependencies": {
-    "@litmus/test": "workspace:*",
+    "@litmus-ts/test": "workspace:*",
     "@types/node": "catalog:",
     "@types/yargs-parser": "^21.0.3",
     "reflect-metadata": "catalog:",
@@ -50,13 +50,13 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "@litmus/test": "workspace:*",
+    "@litmus-ts/test": "workspace:*",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0",
     "zod": "^4.4.3"
   },
   "peerDependenciesMeta": {
-    "@litmus/test": {
+    "@litmus-ts/test": {
       "optional": true
     }
   },

@@ -7,13 +7,13 @@
  * the failure to the appropriate response. The human-readable
  * `message` is for developers and logs; the `code` is the contract.
  *
- * `@litmus/http`'s `serve()` accepts a map from error class names to
+ * `@litmus-ts/http`'s `serve()` accepts a map from error class names to
  * HTTP status codes and produces structured `{ code, message }` responses
  * automatically.
  *
  * @example
  * ```typescript
- * import { DomainError } from "@litmus/core";
+ * import { DomainError } from "@litmus-ts/core";
  *
  * class InsufficientFunds extends DomainError {
  *   constructor(accountId: string, requested: number, available: number) {

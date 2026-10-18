@@ -1,5 +1,9 @@
-import { type AggregateData, AggregateRoot, DomainEvent } from "@litmus/core";
-import { prefixedUlid } from "@litmus/core/id";
+import {
+  type AggregateData,
+  AggregateRoot,
+  DomainEvent,
+} from "@litmus-ts/core";
+import { prefixedUlid } from "@litmus-ts/core/id";
 import { eq } from "drizzle-orm";
 import {
   integer,

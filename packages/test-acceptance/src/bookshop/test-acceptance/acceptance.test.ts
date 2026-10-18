@@ -1,4 +1,4 @@
-import { acceptance } from "@litmus/test";
+import { acceptance } from "@litmus-ts/test";
 import { afterAll, beforeAll, describe } from "vite-plus/test";
 
 import { bootstrapBookshop, type RunningBookshop } from "#bookshop/bookshop.ts";

@@ -25,7 +25,7 @@ export type PrefixedUlid<T extends string> = `${T}_${string}`;
  *
  * @example
  * ```typescript
- * import { prefixedUlid } from "@litmus/core/id";
+ * import { prefixedUlid } from "@litmus-ts/core/id";
  *
  * class OrderRepository extends DrizzlePostgresRepository<Order, typeof orders> {
  *   nextId() {

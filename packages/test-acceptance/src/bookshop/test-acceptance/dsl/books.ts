@@ -1,4 +1,4 @@
-import type { DslContext } from "@litmus/test";
+import type { DslContext } from "@litmus-ts/test";
 
 import type { BookshopDriver } from "#bookshop/test-acceptance/driver.ts";
 

@@ -1,7 +1,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DomainError } from "@litmus/core";
+import { DomainError } from "@litmus-ts/core";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 

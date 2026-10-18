@@ -1,6 +1,6 @@
 import { createConnection } from "node:net";
 
-import { DomainError } from "@litmus/core";
+import { DomainError } from "@litmus-ts/core";
 
 import type { Cli } from "#litmus-cli/cli.ts";
 

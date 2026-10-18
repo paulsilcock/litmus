@@ -1,10 +1,10 @@
-# @litmus/test-acceptance
+# @litmus-ts/test-acceptance
 
 Private package. Not published.
 
 ## What this is for
 
-Cross-package acceptance tests for the Litmus framework. Lives outside `@litmus/core`, `@litmus/db`, and `@litmus/http` so that acceptance tests exercising cross-cutting concerns don't force those packages to depend on each other (or on test infrastructure).
+Cross-package acceptance tests for the Litmus framework. Lives outside `@litmus-ts/core`, `@litmus-ts/db`, and `@litmus-ts/http` so that acceptance tests exercising cross-cutting concerns don't force those packages to depend on each other (or on test infrastructure).
 
 ## The bookshop
 
@@ -16,7 +16,7 @@ Concretely, the bookshop demonstrates:
 - **Use cases** — `CommandHandler` / `QueryHandler` composed via tsyringe DI
 - **Repositories** — `DrizzlePostgresRepository` against PGlite (in-memory Postgres)
 - **Event-driven reactions** — `OrderPlaced` → `CloseCart` + `SendOrderConfirmation`, wired via `registerDomainEventHandlers([...])`
-- **HTTP entrypoints** — Hono routes via `@litmus/http` `routeHandler`, with structured `DomainError` → status mapping
+- **HTTP entrypoints** — Hono routes via `@litmus-ts/http` `routeHandler`, with structured `DomainError` → status mapping
 - **Acceptance testing** — `HttpDriver` + DSL, booting the real app on a free port and interacting only through HTTP
 
 Acceptance tests live in [src/bookshop/test-acceptance/](src/bookshop/test-acceptance/) and treat the system as a black box: no container access, no direct DB writes.

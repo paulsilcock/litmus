@@ -1,4 +1,4 @@
-import { CommandHandler } from "@litmus/core";
+import { CommandHandler } from "@litmus-ts/core";
 import { injectable } from "tsyringe";
 
 import type { CartId } from "#bookshop/domain/cart.ts";

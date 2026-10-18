@@ -1,4 +1,4 @@
-import { Dsl } from "@litmus/test";
+import { Dsl } from "@litmus-ts/test";
 
 import type { BookshopDriver } from "./driver.ts";
 import { BooksDsl } from "./dsl/books.ts";

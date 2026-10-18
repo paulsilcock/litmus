@@ -1,4 +1,4 @@
-import { type Tool as SystemTool, ToolSelection } from "@litmus/core/ai";
+import { type Tool as SystemTool, ToolSelection } from "@litmus-ts/core/ai";
 import { tool, type Tool } from "ai";
 
 /**
@@ -9,7 +9,7 @@ import { tool, type Tool } from "ai";
  *
  * @example
  * ```typescript
- * import { toVercelTools } from "@litmus/ai/vercel";
+ * import { toVercelTools } from "@litmus-ts/ai/vercel";
  * import { generateText } from "ai";
  *
  * const tools = toVercelTools(systemTools.pick("getTransactions"));

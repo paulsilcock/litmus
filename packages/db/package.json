@@ -1,5 +1,5 @@
 {
-  "name": "@litmus/db",
+  "name": "@litmus-ts/db",
   "version": "0.0.0",
   "description": "Database adapters for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
@@ -38,7 +38,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@litmus/core": "workspace:*",
+    "@litmus-ts/core": "workspace:*",
     "reflect-metadata": "catalog:",
     "tsyringe": "catalog:"
   },

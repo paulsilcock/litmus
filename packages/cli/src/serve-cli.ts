@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
 
-import { DomainError } from "@litmus/core";
+import { DomainError } from "@litmus-ts/core";
 
 import type { Cli, RunOptions } from "#litmus-cli/cli.ts";
 

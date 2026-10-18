@@ -1,5 +1,5 @@
 {
-  "name": "@litmus/test",
+  "name": "@litmus-ts/test",
   "version": "0.0.0",
   "description": "Test utilities for the Litmus framework — trial runner, graders, and simulators.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
@@ -36,7 +36,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@litmus/core": "workspace:*",
+    "@litmus-ts/core": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/context-async-hooks": "^2.7.0",
     "@opentelemetry/core": "^2.7.0",
@@ -45,7 +45,7 @@
   },
   "devDependencies": {
     "@hono/node-server": "catalog:",
-    "@litmus/ai": "workspace:*",
+    "@litmus-ts/ai": "workspace:*",
     "@types/node": "catalog:",
     "ai": "catalog:",
     "hono": "catalog:",

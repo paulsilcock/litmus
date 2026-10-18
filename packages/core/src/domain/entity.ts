@@ -11,7 +11,7 @@
  *
  * @example
  * ```typescript
- * import { Entity } from "@litmus/core";
+ * import { Entity } from "@litmus-ts/core";
  *
  * interface UserData {
  *   id: string;

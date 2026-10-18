@@ -1,8 +1,8 @@
 import { setImmediate, setTimeout as sleep } from "node:timers/promises";
 
-import { OpenAIRealtimeVoiceModel } from "@litmus/ai/openai";
-import { FakeRealtimeServer } from "@litmus/ai/openai/testing";
-import type { Audio } from "@litmus/core/ai";
+import { OpenAIRealtimeVoiceModel } from "@litmus-ts/ai/openai";
+import { FakeRealtimeServer } from "@litmus-ts/ai/openai/testing";
+import type { Audio } from "@litmus-ts/core/ai";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { UserSimulator } from "#litmus-test/simulator.ts";

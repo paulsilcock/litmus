@@ -8,7 +8,7 @@ export type LogContext = Record<string, unknown>;
 /**
  * Abstract base class for structured loggers.
  *
- * `@litmus/log` ships a pino-backed implementation. Anywhere in the
+ * `@litmus-ts/log` ships a pino-backed implementation. Anywhere in the
  * framework that needs to log accepts this class so it stays decoupled
  * from the underlying logger library. Consumers who want a different
  * backend extend this class and implement the level methods.
@@ -22,7 +22,7 @@ export type LogContext = Record<string, unknown>;
  *
  * @example
  * ```typescript
- * import { Logger } from "@litmus/core/log";
+ * import { Logger } from "@litmus-ts/core/log";
  *
  * class CreateUser {
  *   constructor(private readonly logger: Logger) {}
@@ -76,8 +76,8 @@ export abstract class Logger {
  *
  * @example
  * ```typescript
- * import { CommandHandler } from "@litmus/core";
- * import { logContext } from "@litmus/core/log";
+ * import { CommandHandler } from "@litmus-ts/core";
+ * import { logContext } from "@litmus-ts/core/log";
  *
  * class PlaceOrder extends CommandHandler<PlaceOrderCommand, OrderDto> {
  *   // No args logged

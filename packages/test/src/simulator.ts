@@ -1,4 +1,4 @@
-import type { GenerationFunction, Tool } from "@litmus/core/ai";
+import type { GenerationFunction, Tool } from "@litmus-ts/core/ai";
 import { z } from "zod";
 
 import { Conversation, type Turn } from "#litmus-test/conversation.ts";
@@ -32,7 +32,7 @@ type BaseOptions = {
    * Generates the simulated user's next utterance from the prompt the
    * simulator assembles each turn. Back it with a model (e.g.
    * `vercelGenerator({ model, schema: utteranceSchema })` from
-   * `@litmus/ai/vercel`) or a plain function in tests.
+   * `@litmus-ts/ai/vercel`) or a plain function in tests.
    */
   generateResponse: GenerationFunction<Utterance>;
   /**

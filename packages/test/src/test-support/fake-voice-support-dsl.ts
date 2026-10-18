@@ -1,6 +1,6 @@
 import { setImmediate } from "node:timers/promises";
 
-import type { Audio } from "@litmus/core/ai";
+import type { Audio } from "@litmus-ts/core/ai";
 import { expect } from "vite-plus/test";
 
 import {

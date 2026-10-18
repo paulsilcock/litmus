@@ -1,4 +1,4 @@
-import { Driver } from "@litmus/test";
+import { Driver } from "@litmus-ts/test";
 
 type CommonHeader =
   | "Accept"

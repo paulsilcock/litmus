@@ -46,7 +46,7 @@ export type DomainEventHandler<
  *
  * @example
  * ```typescript
- * import { DomainEventDispatcher } from "@litmus/core/events";
+ * import { DomainEventDispatcher } from "@litmus-ts/core/events";
  *
  * class OrderPlaced extends DomainEvent<Order> {
  *   constructor(readonly orderId: string) { super(); }

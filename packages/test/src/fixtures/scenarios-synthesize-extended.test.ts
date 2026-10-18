@@ -2,7 +2,7 @@ import { appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { evaluate } from "@litmus/test";
+import { evaluate } from "@litmus-ts/test";
 import { MockLanguageModelV3 } from "ai/test";
 import { z } from "zod";
 

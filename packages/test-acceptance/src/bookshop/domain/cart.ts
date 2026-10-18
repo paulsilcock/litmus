@@ -1,5 +1,9 @@
-import { AggregateRoot, type AggregateData, DomainError } from "@litmus/core";
-import type { PrefixedUlid } from "@litmus/core/id";
+import {
+  AggregateRoot,
+  type AggregateData,
+  DomainError,
+} from "@litmus-ts/core";
+import type { PrefixedUlid } from "@litmus-ts/core/id";
 
 import type { BookId } from "./book.ts";
 import type { CustomerId } from "./customer.ts";

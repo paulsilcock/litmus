@@ -15,7 +15,7 @@ import type { HandlerClass } from "#litmus/use-case/handlers.ts";
  *
  * @example
  * ```typescript
- * import type { AiTask } from "@litmus/core/ai";
+ * import type { AiTask } from "@litmus-ts/core/ai";
  * import { generateText, embed } from "ai";
  *
  * // Text generation
@@ -53,7 +53,7 @@ export abstract class AiTask<TInput, TOutput = void> extends Traceable {
  *
  * @example
  * ```typescript
- * import type { Agent } from "@litmus/core/ai";
+ * import type { Agent } from "@litmus-ts/core/ai";
  *
  * class DisputeAgent extends Agent<{ customerId: string }, string> {
  *   constructor(
@@ -186,7 +186,7 @@ export class ToolSelection {
  *
  * @example
  * ```typescript
- * import { Toolbox } from "@litmus/core/ai";
+ * import { Toolbox } from "@litmus-ts/core/ai";
  *
  * const systemTools = new Toolbox()
  *   .tool("getTransactions", GetRecentTransactions, GetTransactionsSchema, {

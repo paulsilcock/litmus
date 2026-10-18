@@ -14,5 +14,5 @@
 - Test files are co-located with source files using a `.test.ts` suffix.
 - Acceptance tests live at `packages/core/src/acceptance.test.ts`.
 - Shared test fixtures (aggregates, schemas, repos) live in `packages/core/src/test-support/fixtures.ts`.
-- Use the `#litmus/*` import alias for absolute imports within `@litmus/core`.
+- Use the `#litmus/*` import alias for absolute imports within `@litmus-ts/core`.
 - Import test utilities from `vite-plus/test`, not `vitest`.

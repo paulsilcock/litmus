@@ -10,11 +10,11 @@
  * during a transaction and dispatching them only after the transaction
  * commits — events are discarded on rollback.
  *
- * For Postgres + Drizzle, use `DrizzleDbContext` from `@litmus/db/drizzle/postgres`.
+ * For Postgres + Drizzle, use `DrizzleDbContext` from `@litmus-ts/db/drizzle/postgres`.
  *
  * @example
  * ```typescript
- * import type { DbContext } from "@litmus/core/db";
+ * import type { DbContext } from "@litmus-ts/core/db";
  *
  * async function placeOrderAndChargeCustomer(
  *   ctx: DbContext<unknown>,

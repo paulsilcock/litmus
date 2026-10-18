@@ -1,4 +1,4 @@
-import type { GenerationFunction, Message } from "@litmus/core/ai";
+import type { GenerationFunction, Message } from "@litmus-ts/core/ai";
 import {
   generateText,
   type LanguageModel,
@@ -17,7 +17,7 @@ import { toVercelTools } from "#litmus-ai/vercel/to-vercel-tools.ts";
  *
  * @example
  * ```typescript
- * import { vercelGenerator } from "@litmus/ai/vercel";
+ * import { vercelGenerator } from "@litmus-ts/ai/vercel";
  *
  * const generate = vercelGenerator({
  *   model: anthropic("claude-sonnet-4-5-20250929"),

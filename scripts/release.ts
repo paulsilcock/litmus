@@ -65,8 +65,8 @@ try {
   }
 
   // Dependencies first, so a consumer never sees a package whose
-  // @litmus dependency is missing at the same version.
-  const order = ["@litmus/core", ...packages.map((p) => p.name)];
+  // @litmus-ts dependency is missing at the same version.
+  const order = ["@litmus-ts/core", ...packages.map((p) => p.name)];
   const tarballs = readdirSync(outDir);
   for (const name of new Set(order)) {
     const file = `${name.replace("@", "").replace("/", "-")}-${plan.version}.tgz`;

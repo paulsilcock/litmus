@@ -1,4 +1,4 @@
-import { Driver } from "@litmus/test";
+import { Driver } from "@litmus-ts/test";
 
 import type { Cli, CliClient } from "#litmus-cli/index.ts";
 import { cliClient } from "#litmus-cli/index.ts";

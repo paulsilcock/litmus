@@ -1,5 +1,5 @@
 {
-  "name": "@litmus/core",
+  "name": "@litmus-ts/core",
   "version": "0.0.0",
   "description": "Domain primitives and base classes for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",

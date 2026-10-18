@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-import type { DomainEvent } from "@litmus/core";
-import type { DbContext } from "@litmus/core/db";
-import { DomainEventDispatcher } from "@litmus/core/events";
+import type { DomainEvent } from "@litmus-ts/core";
+import type { DbContext } from "@litmus-ts/core/db";
+import { DomainEventDispatcher } from "@litmus-ts/core/events";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { container, inject, singleton } from "tsyringe";
 
@@ -13,7 +13,7 @@ type PgDb = PgDatabase<PgQueryResultHKT, Record<string, unknown>>;
  * registers the constructed Drizzle handle under this token so
  * `DrizzleDbContext` can be DI-resolved.
  */
-export const DRIZZLE_DB = Symbol.for("@litmus/db/DrizzleDb");
+export const DRIZZLE_DB = Symbol.for("@litmus-ts/db/DrizzleDb");
 
 @singleton()
 export class DrizzleDbContext implements DbContext<PgDb> {

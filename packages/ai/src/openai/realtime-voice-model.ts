@@ -5,7 +5,7 @@ import type {
   SimulatedUserAction,
   VoiceModel,
   VoiceSession,
-} from "@litmus/core/ai";
+} from "@litmus-ts/core/ai";
 import { type RawData, WebSocket } from "ws";
 
 const SAMPLE_RATE = 24_000;

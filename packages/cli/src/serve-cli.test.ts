@@ -1,7 +1,7 @@
 import { connect } from "node:net";
 import { Readable } from "node:stream";
 
-import { CommandHandler, DomainError } from "@litmus/core";
+import { CommandHandler, DomainError } from "@litmus-ts/core";
 import { describe, expect, it } from "vite-plus/test";
 import { z } from "zod";
 

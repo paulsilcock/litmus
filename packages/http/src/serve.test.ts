@@ -1,5 +1,5 @@
-import { CommandHandler, DomainError } from "@litmus/core";
-import { useInMemoryTracing } from "@litmus/test";
+import { CommandHandler, DomainError } from "@litmus-ts/core";
+import { useInMemoryTracing } from "@litmus-ts/test";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { Hono } from "hono";
 import { routePath } from "hono/route";

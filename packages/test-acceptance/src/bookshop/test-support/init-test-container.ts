@@ -1,5 +1,5 @@
-import { DomainEventDispatcher } from "@litmus/core/events";
-import { setupTestDb } from "@litmus/db/drizzle/postgres/test";
+import { DomainEventDispatcher } from "@litmus-ts/core/events";
+import { setupTestDb } from "@litmus-ts/db/drizzle/postgres/test";
 import "reflect-metadata";
 import { container } from "tsyringe";
 import { beforeEach } from "vite-plus/test";

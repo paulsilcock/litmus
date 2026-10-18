@@ -1,4 +1,4 @@
-import { evaluate } from "@litmus/test";
+import { evaluate } from "@litmus-ts/test";
 
 // Three samples must all start simultaneously for the latch to release.
 // With pool=2 (from vite.config.max-concurrency.ts) the third sample can

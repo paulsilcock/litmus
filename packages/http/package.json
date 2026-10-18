@@ -1,5 +1,5 @@
 {
-  "name": "@litmus/http",
+  "name": "@litmus-ts/http",
   "version": "0.0.0",
   "description": "HTTP entrypoint adapter for the Litmus framework.",
   "homepage": "https://github.com/paulsilcock/litmus#readme",
@@ -38,7 +38,7 @@
   "dependencies": {
     "@hono/otel": "^1.1.1",
     "@hono/zod-validator": "^0.7.6",
-    "@litmus/core": "workspace:*",
+    "@litmus-ts/core": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/context-async-hooks": "^2.7.0",
     "@opentelemetry/core": "^2.7.0",
@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@hono/node-server": "catalog:",
-    "@litmus/test": "workspace:*",
+    "@litmus-ts/test": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260328.1",
     "hono": "catalog:",
@@ -58,14 +58,14 @@
   },
   "peerDependencies": {
     "@hono/node-server": "^1.19.13",
-    "@litmus/test": "workspace:*",
+    "@litmus-ts/test": "workspace:*",
     "hono": "^4.12.10",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0",
     "zod": "^4.4.3"
   },
   "peerDependenciesMeta": {
-    "@litmus/test": {
+    "@litmus-ts/test": {
       "optional": true
     }
   },

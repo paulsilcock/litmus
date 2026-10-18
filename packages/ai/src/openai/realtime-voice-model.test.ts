@@ -1,4 +1,4 @@
-import type { SimulatedUserAction } from "@litmus/core/ai";
+import type { SimulatedUserAction } from "@litmus-ts/core/ai";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { OpenAIRealtimeVoiceModel } from "#litmus-ai/openai/realtime-voice-model.ts";

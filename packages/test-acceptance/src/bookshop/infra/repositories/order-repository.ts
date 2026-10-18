@@ -1,8 +1,8 @@
-import { prefixedUlid } from "@litmus/core/id";
+import { prefixedUlid } from "@litmus-ts/core/id";
 import {
   DrizzleDbContext,
   DrizzlePostgresRepository,
-} from "@litmus/db/drizzle/postgres";
+} from "@litmus-ts/db/drizzle/postgres";
 import { singleton } from "tsyringe";
 
 import { Order } from "#bookshop/domain/order.ts";
