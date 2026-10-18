@@ -48,10 +48,11 @@
     "@hono/zod-validator": "^0.7.6",
     "@litmus/test": "workspace:*",
     "@types/node": "catalog:",
-    "@typescript/native-preview": "7.0.0-dev.20260328.1",
     "hono": "catalog:",
     "reflect-metadata": "catalog:",
     "tsyringe": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:",
     "zod": "catalog:"
   },

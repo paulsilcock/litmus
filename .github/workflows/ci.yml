@@ -14,18 +14,18 @@ jobs:
         with:
           # Need history for vitest --changed to find the merge base
           fetch-depth: 0
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.21.2
         with:
-          version: "0.1.15"
+          version: "1.3.0"
           node-version: "24"
           cache: true
       - run: vp install
       - name: Resolve Playwright version
         id: playwright
         run: |
-          version=$(node -p "require('./package.json').catalog.playwright")
+          version=$(yq -r '.catalog.playwright // ""' pnpm-workspace.yaml)
           if [ -z "$version" ]; then
-            echo "::error::Failed to resolve Playwright version from package.json catalog" >&2
+            echo "::error::Failed to resolve Playwright version from the pnpm-workspace.yaml catalog" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -58,9 +58,9 @@ jobs:
       BOOKSHOP_DRIVER: ${{ matrix.driver }}
     steps:
       - uses: actions/checkout@v4
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.21.2
         with:
-          version: "0.1.15"
+          version: "1.3.0"
           node-version: "24"
           cache: true
       - run: vp install

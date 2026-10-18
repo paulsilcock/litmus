@@ -45,6 +45,7 @@
     "@types/node": "catalog:",
     "@types/ws": "catalog:",
     "ai": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:",
     "zod": "catalog:"
   },

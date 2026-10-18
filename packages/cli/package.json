@@ -45,6 +45,7 @@
     "@types/yargs-parser": "^21.0.3",
     "reflect-metadata": "catalog:",
     "tsyringe": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:",
     "zod": "catalog:"
   },

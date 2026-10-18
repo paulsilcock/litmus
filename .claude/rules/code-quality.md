@@ -6,7 +6,7 @@
 
 # Commits and Builds
 
-- Always include `bun.lock` in commits that change any `package.json`. The lockfile must stay in sync or CI resolves different versions.
+- Always include `pnpm-lock.yaml` in commits that change any `package.json` or `pnpm-workspace.yaml`. The lockfile must stay in sync or CI resolves different versions.
 - `vp pack` and `vp run -r build` rewrite `exports` in `package.json` from `./src/*.ts` to `./dist/*.mjs`. After running either, check `git diff` for export-path changes and restore source paths before committing.
 
 # Conventions
