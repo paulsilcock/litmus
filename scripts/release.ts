@@ -17,7 +17,7 @@ import {
   versionBump,
 } from "bumpp";
 
-import { distTag } from "./dist-tag.ts";
+import { assertPublishableVersion } from "./dist-tags.ts";
 
 const root = join(import.meta.dirname, "..");
 const files = [
@@ -31,7 +31,7 @@ const input = process.env["RELEASE_VERSION"];
 let release: VersionBumpRelease = "prompt";
 if (input) {
   // Throws for anything that is not a version npm can publish.
-  distTag(input);
+  assertPublishableVersion(input);
   if (isVersionNumber(input)) release = input;
 }
 
