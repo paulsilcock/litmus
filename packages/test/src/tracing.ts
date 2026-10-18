@@ -8,7 +8,7 @@ import {
   SimpleSpanProcessor,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { afterEach, beforeEach } from "vite-plus/test";
+import { afterEach, beforeEach } from "vitest";
 
 /**
  * Records spans emitted during each test in the enclosing `describe`

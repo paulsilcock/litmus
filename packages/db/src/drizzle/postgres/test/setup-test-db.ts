@@ -5,7 +5,7 @@ import { PgTable } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pglite";
 import "reflect-metadata";
 import { container } from "tsyringe";
-import { beforeAll, beforeEach } from "vite-plus/test";
+import { beforeAll, beforeEach } from "vitest";
 
 import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
 
@@ -25,7 +25,7 @@ import { DrizzleDbContext } from "#litmus-db/drizzle/postgres/db-context.ts";
  * @example
  * ```ts
  * import { container } from "tsyringe";
- * import { describe, expect, it } from "vite-plus/test";
+ * import { describe, expect, it } from "vitest";
  * import { DrizzleDbContext } from "@litmus-ts/db/drizzle/postgres";
  * import { setupTestDb } from "@litmus-ts/db/drizzle/postgres/test";
  * import { orders, schema } from "./schema.ts";

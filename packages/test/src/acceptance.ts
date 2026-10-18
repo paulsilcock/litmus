@@ -1,4 +1,4 @@
-import { test as baseTest } from "vite-plus/test";
+import { test as baseTest } from "vitest";
 
 import { Dsl } from "#litmus-test/dsl.ts";
 import { evaluate as baseEvaluate } from "#litmus-test/evaluate/index.ts";

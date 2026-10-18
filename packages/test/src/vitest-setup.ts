@@ -14,7 +14,7 @@ import {
  *
  * Add to `vitest.config.ts`:
  * ```ts
- * import { defineConfig } from "vite-plus";
+ * import { defineConfig } from "vitest/config";
  *
  * export default defineConfig({
  *   test: { setupFiles: ["@litmus-ts/test/vitest-setup"] },
@@ -23,7 +23,7 @@ import {
  *
  * Then run with the env var to see traces:
  * ```sh
- * OTEL_TRACES_EXPORTER=console vp test
+ * OTEL_TRACES_EXPORTER=console vitest
  * ```
  */
 if (process.env.OTEL_TRACES_EXPORTER === "console") {
