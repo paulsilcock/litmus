@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * Aliasing context shared across a Dsl and its sub-DSLs.
  *
- * Each `DslContext` instance holds a unique prefix scoped to the current
- * test worker. Pass `context.alias(value)` through identifier params that
+ * Each `DslContext` instance holds a prefix that is unique to this test
+ * run and worker, and to the instance. Pass `context.alias(value)` through identifier params that
  * the SUT enforces uniqueness on (emails, ids, etc.) so concurrent tests
  * and repeated runs against a shared SUT don't collide.
  *
@@ -18,18 +20,13 @@
  * ```
  */
 export class DslContext {
-  static readonly #counters = new Map<string, number>();
+  static readonly #runId = randomUUID().slice(0, 8);
+  static #count = 0;
   readonly #prefix: string;
 
   constructor() {
-    this.#prefix = DslContext.#nextPrefix();
-  }
-
-  static #nextPrefix(): string {
-    const key = process.env["VITEST_POOL_ID"] ?? `pid${process.pid}`;
-    const next = (DslContext.#counters.get(key) ?? 0) + 1;
-    DslContext.#counters.set(key, next);
-    return String(next);
+    DslContext.#count += 1;
+    this.#prefix = `${DslContext.#runId}-${DslContext.#count}-`;
   }
 
   alias(value: string): string {

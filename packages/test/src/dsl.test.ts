@@ -5,7 +5,7 @@ import { Dsl, DslContext } from "#litmus-test/dsl.ts";
 describe("DslContext", () => {
   it("prefixes a suffix to the aliased value", () => {
     const ctx = new DslContext();
-    expect(ctx.alias("hello")).toMatch(/^\d+hello$/);
+    expect(ctx.alias("hello")).toMatch(/^.+hello$/);
   });
 
   it("returns the same alias for the same input within one instance", () => {
@@ -20,6 +20,19 @@ describe("DslContext", () => {
     const b = new DslContext();
     expect(a.alias("x")).not.toBe(b.alias("x"));
   });
+
+  it("yields different aliases in another test run or worker", async () => {
+    const earlier = await freshDslModule();
+    const later = await freshDslModule();
+    expect(new earlier.DslContext().alias("x")).not.toBe(
+      new later.DslContext().alias("x"),
+    );
+  });
+
+  async function freshDslModule() {
+    vi.resetModules();
+    return import("#litmus-test/dsl.ts");
+  }
 });
 
 describe("Dsl", () => {
