@@ -16,7 +16,7 @@ jobs:
           node-version: "24"
       # Corepack installs the pnpm version in package.json `packageManager`.
       - run: corepack enable
-      - run: pnpm audit
+      - run: pnpm audit --audit-level=high
 
   check:
     # Playwright 1.59.1 cannot install Chromium on Ubuntu 26.04 (ubuntu-latest).
