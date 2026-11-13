@@ -58,8 +58,8 @@ catalogs:
       specifier: 8.20.0
       version: 8.20.0
     zod:
-      specifier: 4.4.3
-      version: 4.4.3
+      specifier: 4.6.6
+      version: 4.6.6
 
 overrides:
   vite@*: npm:@voidzero-dev/vite-plus-core@1.3.0
@@ -105,7 +105,7 @@ importers:
         version: 8.18.1
       ai:
         specifier: 'catalog:'
-        version: 6.0.0(zod@4.4.3)
+        version: 6.0.0(zod@4.6.6)
       vite:
         specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.5.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)'
@@ -114,7 +114,7 @@ importers:
         version: 1.3.0(@opentelemetry/api@1.9.1)(@types/node@25.5.0)(@vitest/ui@5.0.5)(esbuild@0.28.2)(jiti@2.7.0)(playwright@1.59.1)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.6
 
   packages/cli:
     dependencies:
@@ -148,7 +148,7 @@ importers:
         version: 1.3.0(@opentelemetry/api@1.9.1)(@types/node@25.5.0)(@vitest/ui@5.0.5)(esbuild@0.28.2)(jiti@2.7.0)(playwright@1.59.1)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.6
 
   packages/core:
     dependencies:
@@ -166,7 +166,7 @@ importers:
         version: 2.4.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.6
     devDependencies:
       '@opentelemetry/context-async-hooks':
         specifier: ^2.7.0
@@ -225,7 +225,7 @@ importers:
         version: 1.2.0(hono@4.12.10)
       '@hono/zod-validator':
         specifier: ^0.7.6
-        version: 0.7.6(hono@4.12.10)(zod@4.4.3)
+        version: 0.7.6(hono@4.12.10)(zod@4.6.6)
       '@litmus-ts/core':
         specifier: workspace:*
         version: link:../core
@@ -271,7 +271,7 @@ importers:
         version: 1.3.0(@opentelemetry/api@1.9.1)(@types/node@25.5.0)(@vitest/ui@5.0.5)(esbuild@0.28.2)(jiti@2.7.0)(playwright@1.59.1)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.6
 
   packages/log:
     dependencies:
@@ -311,7 +311,7 @@ importers:
         version: 2.12.0(@opentelemetry/api@1.9.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.6
     devDependencies:
       '@hono/node-server':
         specifier: 'catalog:'
@@ -324,7 +324,7 @@ importers:
         version: 25.5.0
       ai:
         specifier: 'catalog:'
-        version: 6.0.0(zod@4.4.3)
+        version: 6.0.0(zod@4.6.6)
       hono:
         specifier: 'catalog:'
         version: 4.12.10
@@ -375,7 +375,7 @@ importers:
         version: 25.5.0
       ai:
         specifier: 'catalog:'
-        version: 6.0.0(zod@4.4.3)
+        version: 6.0.0(zod@4.6.6)
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.10
@@ -399,7 +399,7 @@ importers:
         version: 1.3.0(@opentelemetry/api@1.9.1)(@types/node@25.5.0)(@vitest/ui@5.0.5)(esbuild@0.28.2)(jiti@2.7.0)(playwright@1.59.1)(tsx@4.23.15)(typescript@7.0.2)(yaml@2.9.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.6
 
 packages:
 
@@ -958,6 +958,7 @@ packages:
   '@opentelemetry/sdk-trace-base@2.12.0':
     resolution: {integrity: sha512-JOERgZCxRM06FEJ5kEWxlSRChah6MmXDx3KwCruqEv/iEyLkTokCSemf2y1w8oIHtfrr8EVTpzebq/31vn2Cpg==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
@@ -2276,31 +2277,31 @@ packages:
     resolution: {integrity: sha512-XrBh9ZiQK5mJVRxZBAvD6LwRyAYrK3MFtH3+onyuxFL5hFD44EC3QOmIC1FjTj6H2MMwq46/NAI+NZxLZPZgxg==}
     engines: {node: '>=14.18.0'}
 
-  zod@4.4.3:
-    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
 snapshots:
 
-  '@ai-sdk/gateway@2.0.0(zod@4.4.3)':
+  '@ai-sdk/gateway@2.0.0(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.12(zod@4.4.3)
+      '@ai-sdk/provider-utils': 3.0.12(zod@4.6.6)
       '@vercel/oidc': 3.0.3
-      zod: 4.4.3
+      zod: 4.6.6
 
-  '@ai-sdk/provider-utils@3.0.12(zod@4.4.3)':
+  '@ai-sdk/provider-utils@3.0.12(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.1
-      zod: 4.4.3
+      zod: 4.6.6
 
-  '@ai-sdk/provider-utils@4.0.0(zod@4.4.3)':
+  '@ai-sdk/provider-utils@4.0.0(zod@4.6.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.0
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.1
-      zod: 4.4.3
+      zod: 4.6.6
 
   '@ai-sdk/provider@2.0.0':
     dependencies:
@@ -2568,10 +2569,10 @@ snapshots:
       '@opentelemetry/semantic-conventions': 1.43.0
       hono: 4.12.10
 
-  '@hono/zod-validator@0.7.6(hono@4.12.10)(zod@4.4.3)':
+  '@hono/zod-validator@0.7.6(hono@4.12.10)(zod@4.6.6)':
     dependencies:
       hono: 4.12.10
-      zod: 4.4.3
+      zod: 4.6.6
 
   '@jridgewell/resolve-uri@3.1.2': {}
 
@@ -3018,13 +3019,13 @@ snapshots:
 
   '@yuku-toolchain/types@0.19.0': {}
 
-  ai@6.0.0(zod@4.4.3):
+  ai@6.0.0(zod@4.6.6):
     dependencies:
-      '@ai-sdk/gateway': 2.0.0(zod@4.4.3)
+      '@ai-sdk/gateway': 2.0.0(zod@4.6.6)
       '@ai-sdk/provider': 3.0.0
-      '@ai-sdk/provider-utils': 4.0.0(zod@4.4.3)
+      '@ai-sdk/provider-utils': 4.0.0(zod@4.6.6)
       '@opentelemetry/api': 1.9.0
-      zod: 4.4.3
+      zod: 4.6.6
 
   ansi-regex@5.0.1: {}
 
@@ -3605,4 +3606,4 @@ snapshots:
       '@yuku-toolchain/types': 0.19.0
       yuku-core: 0.19.0
 
-  zod@4.4.3: {}
+  zod@4.6.6: {}
